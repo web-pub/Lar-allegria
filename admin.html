@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administration — Lar'Allegria by Lara Rossoux</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body class="app-body">
+
+<div class="app-topbar">
+  <div class="app-title">Bonjour <span id="adminNom">Lara</span> <small>Espace administrateur · <span id="versionTag" style="opacity:0.6;"></span></small></div>
+  <div style="display:flex; align-items:center; gap:8px;">
+    <button class="btn-sm" id="logoutBtn" style="background:transparent; border-color:rgba(255,255,255,0.4); color:#fff;">Déconnexion</button>
+    <a class="app-home-link" href="index.html" title="Retour au site" aria-label="Retour au site">⌂</a>
+  </div>
+</div>
+
+<main class="app-main">
+
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="reservations">Réservations</button>
+    <button class="tab-btn" data-tab="membres" id="tabMembresBtn">Membres</button>
+    <button class="tab-btn" data-tab="nettoyage">Nettoyage box</button>
+    <button class="tab-btn" data-tab="tarifs">Tarifs</button>
+    <button class="tab-btn" data-tab="activites">Activités</button>
+    <button class="tab-btn" data-tab="boutique" id="tabBoutiqueBtn">Boutique</button>
+    <button class="tab-btn" data-tab="messages" id="tabMessagesBtn">Messages</button>
+    <button class="tab-btn" data-tab="parametres">Paramètres</button>
+  </div>
+
+  <!-- ==================== RÉSERVATIONS ==================== -->
+  <div id="panel-reservations" class="tab-panel">
+    <div class="app-panel">
+      <h2>Météo des prochains jours</h2>
+      <div id="meteoResume" style="margin-bottom:0;"></div>
+    </div>
+    <div class="app-panel">
+      <div class="section-heading"><h2>Demandes en attente de validation</h2></div>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Une seule réservation validée par créneau : en validant l'une, pense à refuser les éventuelles autres demandes sur le même créneau.</p>
+      <div class="data-list" id="listeReservationsAttente"><div class="empty-state">...</div></div>
+    </div>
+    <div class="app-panel">
+      <div class="resa-nav">
+        <button class="btn-sm" id="resaAdminSemainePrec">← Semaine précédente</button>
+        <h3 id="resaAdminSemaineLabel">Semaine du ...</h3>
+        <button class="btn-sm" id="resaAdminSemaineSuiv">Semaine suivante →</button>
+      </div>
+      <h2>Planning de la piste</h2>
+      <div class="data-list" id="listePlanningSemaine"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+
+  <!-- ==================== MEMBRES ==================== -->
+  <div id="panel-membres" class="tab-panel hidden">
+    <div class="app-panel">
+      <div class="section-heading"><h2>Demandes d'inscription</h2></div>
+      <div class="data-list" id="listeDemandesInscription"><div class="empty-state">...</div></div>
+    </div>
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>Membres</h2>
+        <button class="btn-sm primary" id="btnAjouterMembre">+ Ajouter un membre</button>
+      </div>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Pour créer l'accès d'un membre, crée d'abord son compte dans Firebase Authentication (voir README), puis ajoute sa fiche ici avec l'UID généré.</p>
+      <input type="text" id="rechercheMembre" placeholder="🔍 Rechercher un membre..." style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #DCCBA8; border-radius:6px; margin-bottom:14px; font-size:0.95rem;">
+      <div class="data-list" id="listeMembres"><div class="empty-state">...</div></div>
+      <button class="btn-sm" id="btnVoirArchives" style="margin-top:14px;">Voir les membres archivés</button>
+      <div class="data-list" id="listeMembresArchives" style="margin-top:10px; display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ==================== NETTOYAGE BOX ==================== -->
+  <div id="panel-nettoyage" class="tab-panel hidden">
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>Box</h2>
+        <button class="btn-sm primary" id="btnAjouterBox">+ Ajouter un box</button>
+      </div>
+      <div class="data-list" id="listeBoxes"><div class="empty-state">...</div></div>
+    </div>
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>Planning de nettoyage</h2>
+        <button class="btn-sm primary" id="btnAjouterNettoyage">+ Assigner une tâche</button>
+      </div>
+      <div class="data-list" id="listeNettoyages"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+
+  <!-- ==================== TARIFS ==================== -->
+  <div id="panel-tarifs" class="tab-panel hidden">
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>Grille tarifaire</h2>
+        <button class="btn-sm primary" id="btnAjouterTarif">+ Ajouter un tarif</button>
+      </div>
+      <div id="listeTarifs"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+
+  <!-- ==================== ACTIVITÉS ==================== -->
+  <div id="panel-activites" class="tab-panel hidden">
+    <div class="app-panel">
+      <h3>Compte bancaire du club (pour les virements)</h3>
+      <div class="form-grid">
+        <div class="field"><label>IBAN</label><input id="act-iban" placeholder="ex: BE00 0000 0000 0000"></div>
+      </div>
+      <button class="btn-sm" id="btnSauverIban">Enregistrer</button>
+    </div>
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>Stages &amp; spectacles</h2>
+        <button class="btn-sm primary" id="btnAjouterActivite">+ Créer une activité</button>
+      </div>
+      <div class="data-list" id="listeActivites"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+
+  <!-- ==================== BOUTIQUE ==================== -->
+  <div id="panel-boutique" class="tab-panel hidden">
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>Articles</h2>
+        <button class="btn-sm primary" id="btnAjouterArticleBoutique">+ Ajouter un article</button>
+      </div>
+      <div class="data-list" id="listeArticlesBoutique"><div class="empty-state">...</div></div>
+    </div>
+    <div class="app-panel">
+      <h2>Commandes</h2>
+      <div class="data-list" id="listeCommandes"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+
+  <!-- ==================== MESSAGES ==================== -->
+  <div id="panel-messages" class="tab-panel hidden">
+    <div class="app-panel">
+      <h2>Messages</h2>
+      <input type="text" id="rechercheMessage" placeholder="🔍 Rechercher un membre..." style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #DCCBA8; border-radius:6px; margin-bottom:14px; font-size:0.95rem;">
+      <div class="data-list" id="listeConversations"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+
+  <!-- ==================== PARAMÈTRES ==================== -->
+  <div id="panel-parametres" class="tab-panel hidden">
+    <div class="app-panel">
+      <h2>Mon mot de passe</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Change ton mot de passe de connexion à l'espace admin.</p>
+      <div class="login-error" id="pwError"></div>
+      <div class="form-success" id="pwSuccess">✅ Mot de passe modifié.</div>
+      <div class="form-grid">
+        <div class="field"><label>Mot de passe actuel</label><input type="password" id="pw-actuel" autocomplete="current-password"></div>
+        <div class="field"><label>Nouveau mot de passe</label><input type="password" id="pw-nouveau" autocomplete="new-password"></div>
+      </div>
+      <div class="field" style="max-width:220px;"><label>Confirmer le nouveau</label><input type="password" id="pw-confirme" autocomplete="new-password"></div>
+      <button class="btn-sm primary" id="btnChangerMotDePasse">Changer mon mot de passe</button>
+    </div>
+    <div class="app-panel">
+      <h2>Horaires d'ouverture de la piste</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Définit la grille de créneaux d'une heure proposée aux membres pour les réservations.</p>
+      <div class="form-grid">
+        <div class="field"><label>Heure d'ouverture</label><input type="time" id="param-heureDebut"></div>
+        <div class="field"><label>Heure de fermeture</label><input type="time" id="param-heureFin"></div>
+      </div>
+      <h3 style="margin-top:14px;">Jours ouverts</h3>
+      <div class="membre-check-list" id="param-jours" style="max-height:none;"></div>
+      <button class="btn-sm primary" id="btnSauverDisponibilites" style="margin-top:14px;">Enregistrer les horaires</button>
+    </div>
+  </div>
+
+</main>
+
+<div id="modalZone"></div>
+
+<script type="module" src="assets/app-admin.js"></script>
+</body>
+</html>

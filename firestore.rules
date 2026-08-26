@@ -1,0 +1,108 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function estConnecte() {
+      return request.auth != null;
+    }
+    function estAdmin() {
+      return estConnecte() &&
+        get(/databases/$(database)/documents/membres/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function champsAutorisesMembre() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['gsm','email','adressePostale','niveauEquitation','contactUrgence',
+                  'assuranceRC','chevaux','cotisationRenouvellement']);
+    }
+
+    match /membres/{uid} {
+      allow read: if estConnecte() && (request.auth.uid == uid || estAdmin());
+      allow create: if estAdmin();
+      allow update: if estAdmin() || (estConnecte() && request.auth.uid == uid && champsAutorisesMembre());
+      allow delete: if estAdmin();
+    }
+
+    // Demandes d'inscription : formulaire public, écrit par des visiteurs
+    // non connectés. Lecture/traitement réservés à l'admin.
+    match /demandes_inscription/{id} {
+      allow create: if request.resource.data.statut == 'en_attente';
+      allow read, update, delete: if estAdmin();
+    }
+
+    // Réservations de la piste (cours ou usage libre) — une seule validée
+    // par créneau, contrôlé côté application par l'admin au moment de la
+    // validation.
+    match /reservations/{id} {
+      allow read: if estConnecte();
+      allow create: if estConnecte() && request.resource.data.membreId == request.auth.uid
+        && request.resource.data.statut == 'en_attente';
+      allow update: if estAdmin() || (
+        estConnecte() && resource.data.membreId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['statut']) &&
+        request.resource.data.statut == 'annulee'
+      );
+      allow delete: if estAdmin();
+    }
+
+    match /boxes/{id} {
+      allow read: if estConnecte();
+      allow write: if estAdmin();
+    }
+
+    match /nettoyages/{id} {
+      allow read: if estConnecte();
+      allow create, delete: if estAdmin();
+      allow update: if estAdmin() || (
+        estConnecte() && resource.data.assigneA == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['statut','dateRealisation'])
+      );
+    }
+
+    // Grille tarifaire : lisible publiquement (page tarifs.html du site).
+    match /tarifs/{id} {
+      allow read: if true;
+      allow write: if estAdmin();
+    }
+
+    match /activites/{id} {
+      allow read: if estConnecte();
+      allow write: if estAdmin();
+    }
+
+    match /activites_reponses/{id} {
+      allow read: if estConnecte();
+      allow create: if estConnecte() && request.resource.data.uid == request.auth.uid;
+      allow update: if estAdmin() || (estConnecte() && resource.data.uid == request.auth.uid);
+      allow delete: if estAdmin();
+    }
+
+    match /conversations/{uid} {
+      allow read, write: if estConnecte() && (request.auth.uid == uid || estAdmin());
+      match /messages/{msgId} {
+        allow read, create, update: if estConnecte() && (request.auth.uid == uid || estAdmin());
+      }
+    }
+
+    match /paiements/{id} {
+      allow read: if estConnecte() && (resource.data.membreId == request.auth.uid || estAdmin());
+      allow create, update, delete: if estAdmin();
+    }
+
+    match /parametres/{id} {
+      allow read: if estConnecte();
+      allow write: if estAdmin();
+    }
+
+    match /articles_boutique/{id} {
+      allow read: if estConnecte();
+      allow write: if estAdmin();
+    }
+
+    match /commandes/{id} {
+      allow read: if estConnecte() && (resource.data.membreId == request.auth.uid || estAdmin());
+      allow create: if estConnecte() && request.resource.data.membreId == request.auth.uid;
+      allow update, delete: if estAdmin();
+    }
+  }
+}
