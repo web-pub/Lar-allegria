@@ -1,29 +1,35 @@
 /* ==========================================================================
    Lar'Allegria by Lara Rossoux — Charte graphique
-   Ambiance espagnole & flamenco : noir chaud + rouge flamenco + or/ochre
+   Ambiance espagnole & flamenco assumée : noir profond, rouge carmin ardent,
+   jaune d'or andalou, blanc pur — pois et volants en clin d'œil aux robes
+   de flamenco.
    ========================================================================== */
 
 :root {
-  --noir: #2A1712;
-  --noir-dark: #1B0F0C;
-  --terre: #6E5C4F;
-  --terre-light: #9C897A;
-  --paper: #FBF4E7;
-  --paper-warm: #F1E2C8;
+  --noir: #000105;
+  --noir-dark: #000000;
+  --terre: #5C4A3C;
+  --terre-light: #8C7A68;
+  --paper: #FFFBF2;
+  --paper-warm: #FCEBC7;
   --white: #FFFFFF;
-  --or: #B8842C;
-  --or-light: #D8AE5F;
-  --rouge: #9C2B33;
-  --rouge-dark: #6F1D24;
-  --ink: #2B1C15;
+  --or: #E8A230;
+  --or-light: #F4C463;
+  --orange: #D9660B;
+  --rouge: #E70026;
+  --rouge-dark: #9A0320;
+  --ink: #1A0E0A;
 
-  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-display: "Yeseva One", "Fraunces", Georgia, "Times New Roman", serif;
+  --font-accent: "Playball", "Fraunces", cursive;
   --font-body: "Source Sans 3", "Segoe UI", Arial, sans-serif;
 
-  --radius: 6px;
-  --shadow-card: 0 12px 30px -14px rgba(27, 15, 12, 0.45);
-  --shadow-soft: 0 2px 10px rgba(27, 15, 12, 0.12);
+  --radius: 4px;
+  --shadow-card: 0 14px 32px -14px rgba(0, 1, 5, 0.55);
+  --shadow-soft: 0 2px 10px rgba(0, 1, 5, 0.14);
   --max-width: 1120px;
+
+  --pois: radial-gradient(var(--white) 2.4px, transparent 2.6px);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -78,7 +84,13 @@ button:focus-visible {
   top: 0;
   z-index: 50;
   box-shadow: var(--shadow-soft);
-  border-bottom: 3px solid var(--rouge);
+  border-bottom: 4px solid var(--rouge);
+}
+.site-header::after {
+  content: "";
+  display: block;
+  height: 3px;
+  background: linear-gradient(90deg, var(--rouge) 0%, var(--or) 50%, var(--rouge) 100%);
 }
 
 .header-inner {
@@ -215,30 +227,30 @@ nav.main-nav { margin-left: auto; }
 .hero {
   background: linear-gradient(160deg, var(--noir) 0%, var(--noir-dark) 100%);
   color: var(--white);
-  padding: 60px 0 76px;
+  padding: 60px 0 88px;
   position: relative;
   overflow: hidden;
+  border-bottom: 5px solid var(--rouge);
 }
 
-.hero::after {
-  content: "";
-  position: absolute;
-  right: -90px;
-  bottom: -140px;
-  width: 380px;
-  height: 380px;
-  border: 1px solid rgba(216, 174, 95, 0.22);
-  border-radius: 50%;
-}
 .hero::before {
   content: "";
   position: absolute;
-  left: -60px;
-  top: -90px;
-  width: 220px;
-  height: 220px;
-  border: 1px solid rgba(156, 43, 51, 0.35);
-  border-radius: 50%;
+  inset: 0;
+  background-image: var(--pois);
+  background-size: 26px 26px;
+  opacity: 0.06;
+  pointer-events: none;
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 22px;
+  background: radial-gradient(circle at 12px 0, transparent 13px, var(--paper) 14px) top left / 26px 24px repeat-x;
+  pointer-events: none;
 }
 
 .hero-inner {
@@ -291,9 +303,32 @@ nav.main-nav { margin-left: auto; }
 .page-hero {
   background: linear-gradient(160deg, var(--noir) 0%, var(--noir-dark) 100%);
   color: var(--white);
-  padding: 50px 0 62px;
+  padding: 50px 0 74px;
+  position: relative;
+  overflow: hidden;
+  border-bottom: 5px solid var(--rouge);
+}
+.page-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--pois);
+  background-size: 26px 26px;
+  opacity: 0.06;
+  pointer-events: none;
+}
+.page-hero::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 22px;
+  background: radial-gradient(circle at 12px 0, transparent 13px, var(--paper) 14px) top left / 26px 24px repeat-x;
+  pointer-events: none;
 }
 
+.page-hero .container { position: relative; z-index: 1; }
 .page-hero h1 { color: var(--white); font-size: clamp(1.9rem, 3.6vw, 2.6rem); }
 .page-hero .lead { color: #EADFCB; max-width: 60ch; margin-bottom: 0; }
 
@@ -357,8 +392,8 @@ section { padding: 60px 0; }
 
 .link-card {
   background: var(--white);
-  border: 1px solid #E9DEC8;
-  border-top: 3px solid var(--or);
+  border: 1px solid #EEE0C4;
+  border-top: 4px solid var(--rouge);
   border-radius: var(--radius);
   padding: 26px 24px;
   text-decoration: none;
@@ -547,13 +582,14 @@ section { padding: 60px 0; }
 }
 
 blockquote.pull-quote {
-  border-left: 3px solid var(--rouge);
+  border-left: 4px solid var(--rouge);
   margin: 28px 0;
-  padding: 4px 0 4px 22px;
-  font-family: var(--font-display);
-  font-size: 1.2rem;
-  color: var(--noir-dark);
-  font-style: italic;
+  padding: 6px 0 6px 24px;
+  font-family: var(--font-accent);
+  font-size: 1.7rem;
+  line-height: 1.35;
+  color: var(--rouge-dark);
+  font-style: normal;
 }
 
 /* ---------- Footer ---------- */
@@ -563,7 +599,20 @@ blockquote.pull-quote {
   color: #D9CBB6;
   padding: 44px 0 26px;
   font-size: 0.9rem;
+  border-top: 4px solid var(--or);
+  position: relative;
+  overflow: hidden;
 }
+.site-footer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--pois);
+  background-size: 26px 26px;
+  opacity: 0.045;
+  pointer-events: none;
+}
+.site-footer .container { position: relative; z-index: 1; }
 
 .footer-grid {
   display: grid;
@@ -613,13 +662,26 @@ blockquote.pull-quote {
 }
 
 .cta-band {
-  background: var(--paper-warm);
-  border-top: 1px solid #E3D3AE;
-  border-bottom: 1px solid #E3D3AE;
+  background: linear-gradient(160deg, var(--rouge) 0%, var(--rouge-dark) 100%);
   text-align: center;
+  position: relative;
+  overflow: hidden;
 }
+.cta-band::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--pois);
+  background-size: 24px 24px;
+  opacity: 0.07;
+  pointer-events: none;
+}
+.cta-band .container { position: relative; z-index: 1; }
+.cta-band h2, .cta-band .eyebrow { color: var(--white); }
 .cta-band h2 { margin-bottom: 10px; }
-.cta-band p { max-width: 56ch; margin: 0 auto 26px; color: var(--terre); }
+.cta-band p { max-width: 56ch; margin: 0 auto 26px; color: #FBE0D9; }
+.cta-band .btn-primary { background: var(--or); color: var(--noir-dark); }
+.cta-band .btn-outline { border-color: rgba(255,255,255,0.7); }
 
 /* ---------- Flourish (ornement d'inspiration espagnole) ---------- */
 

@@ -4,7 +4,7 @@
 // Config du projet Firebase "Lar-allegria" — déjà branchée. Voir le
 // README.md pour la marche à suivre complète (Auth + Firestore + compte
 // admin + déploiement).
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
   getAuth,
   signInWithEmailAndPassword,
@@ -12,7 +12,8 @@ import {
   onAuthStateChanged,
   updatePassword,
   reauthenticateWithCredential,
-  EmailAuthProvider
+  EmailAuthProvider,
+  createUserWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
   getFirestore,
@@ -37,10 +38,29 @@ export const db = getFirestore(app);
 export {
   signInWithEmailAndPassword, signOut, onAuthStateChanged,
   updatePassword, reauthenticateWithCredential, EmailAuthProvider,
+  createUserWithEmailAndPassword, initializeApp, deleteApp, getAuth,
   doc, getDoc, getDocFromServer, setDoc, updateDoc, deleteDoc,
   collection, addDoc, getDocs, query, where, orderBy,
   serverTimestamp
 };
+
+// Crée un compte Firebase Authentication (identifiant + mot de passe) sans
+// déconnecter la personne actuellement connectée (Lara, l'admin). Le SDK
+// Firebase connecte automatiquement le nouveau compte créé sur l'instance
+// "auth" utilisée — on utilise donc une seconde instance d'app temporaire,
+// isolée, qu'on détruit juste après. Retourne l'UID du nouveau compte.
+export async function creerCompteMembre(identifiant, motDePasse) {
+  const appTemp = initializeApp(firebaseConfig, 'temp-' + Date.now());
+  const authTemp = getAuth(appTemp);
+  try {
+    const cred = await createUserWithEmailAndPassword(authTemp, identifiantVersEmail(identifiant), motDePasse);
+    const uid = cred.user.uid;
+    await signOut(authTemp);
+    return uid;
+  } finally {
+    await deleteApp(appTemp);
+  }
+}
 
 // Les identifiants membres/admin ne sont pas de vraies adresses e-mail.
 // On les transforme en "faux e-mail" pour utiliser l'authentification

@@ -1,10 +1,11 @@
 import {
   auth, db, onAuthStateChanged, signOut,
+  updatePassword, reauthenticateWithCredential, EmailAuthProvider,
   doc, getDoc, getDocAvecReessai, setDoc, getDocs, collection, addDoc, updateDoc, query, where, serverTimestamp
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V02';
+const VERSION_SITE = 'V05';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -71,7 +72,7 @@ document.getElementById('logoutBtn').addEventListener('click', () => signOut(aut
 function afficherAccueil() {
   document.getElementById('membreNom').textContent = `${membreData.prenom || ''} ${membreData.nom || ''}`.trim();
   const badgeType = membreData.typeMembre === 'pension'
-    ? `<span class="badge badge-neutral">Membre pension</span>`
+    ? `<span class="badge badge-neutral">Membre demi-pension</span>`
     : `<span class="badge badge-neutral">Membre cours</span>`;
   const badgeCotis = membreData.cotisationPayee
     ? `<span class="badge badge-ok">Cotisation à jour</span>`
@@ -155,6 +156,49 @@ document.getElementById('mp-enregistrer').addEventListener('click', async () => 
     statut.textContent = 'Erreur : ' + e.message;
   }
   btn.disabled = false;
+});
+
+document.getElementById('btnChangerMotDePasse').addEventListener('click', async () => {
+  const errorBox = document.getElementById('pwError');
+  const successBox = document.getElementById('pwSuccess');
+  errorBox.classList.remove('show');
+  successBox.classList.remove('show');
+
+  const actuel = document.getElementById('pw-actuel').value;
+  const nouveau = document.getElementById('pw-nouveau').value;
+  const confirme = document.getElementById('pw-confirme').value;
+
+  if (!actuel || !nouveau) {
+    errorBox.textContent = 'Merci de remplir le mot de passe actuel et le nouveau mot de passe.';
+    errorBox.classList.add('show');
+    return;
+  }
+  if (nouveau.length < 6) {
+    errorBox.textContent = 'Le nouveau mot de passe doit contenir au moins 6 caractères.';
+    errorBox.classList.add('show');
+    return;
+  }
+  if (nouveau !== confirme) {
+    errorBox.textContent = 'La confirmation ne correspond pas au nouveau mot de passe.';
+    errorBox.classList.add('show');
+    return;
+  }
+
+  try {
+    const user = auth.currentUser;
+    const credential = EmailAuthProvider.credential(user.email, actuel);
+    await reauthenticateWithCredential(user, credential);
+    await updatePassword(user, nouveau);
+    successBox.classList.add('show');
+    document.getElementById('pw-actuel').value = '';
+    document.getElementById('pw-nouveau').value = '';
+    document.getElementById('pw-confirme').value = '';
+  } catch (err) {
+    errorBox.textContent = err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password'
+      ? 'Mot de passe actuel incorrect.'
+      : 'Erreur : ' + (err.code || err.message);
+    errorBox.classList.add('show');
+  }
 });
 
 // ==========================================================================

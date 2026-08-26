@@ -1,11 +1,12 @@
 import {
   auth, db, onAuthStateChanged, signOut,
   updatePassword, reauthenticateWithCredential, EmailAuthProvider,
+  creerCompteMembre,
   doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, collection, addDoc, query, where, orderBy, serverTimestamp
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V02';
+const VERSION_SITE = 'V05';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -233,7 +234,7 @@ async function chargerDemandesInscription() {
   wrap.innerHTML = demandes.map(d => `
     <div class="data-row">
       <div class="data-main">
-        <div class="data-title">${escapeHtml(d.prenom)} ${escapeHtml(d.nom)} — ${d.typeMembre === 'pension' ? 'Membre pension' : 'Membre cours'}</div>
+        <div class="data-title">${escapeHtml(d.prenom)} ${escapeHtml(d.nom)} — ${d.typeMembre === 'pension' ? 'Membre demi-pension' : 'Membre cours'}</div>
         <div class="data-sub">${escapeHtml(d.email)} · ${escapeHtml(d.telephone)}${d.cheval?.nom ? ` · Cheval : ${escapeHtml(d.cheval.nom)}` : ''}</div>
       </div>
       <div class="data-actions">
@@ -257,7 +258,7 @@ window.voirDemande = (id) => {
       <div class="modal-box" style="max-width:560px;">
         <h3>Demande de ${escapeHtml(d.prenom)} ${escapeHtml(d.nom)}</h3>
         <div style="font-size:0.9rem; line-height:1.7; max-height:50vh; overflow-y:auto;">
-          <p><strong>Type :</strong> ${d.typeMembre === 'pension' ? 'Membre pension' : 'Membre cours'}<br>
+          <p><strong>Type :</strong> ${d.typeMembre === 'pension' ? 'Membre demi-pension' : 'Membre cours'}<br>
           <strong>Naissance :</strong> ${d.dateNaissance || '—'}<br>
           <strong>Téléphone :</strong> ${escapeHtml(d.telephone)}<br>
           <strong>Email :</strong> ${escapeHtml(d.email)}<br>
@@ -296,7 +297,7 @@ function renderMembres(filtre = '') {
       <div class="data-row">
         <div class="data-main">
           <div class="data-title">${escapeHtml(m.prenom)} ${escapeHtml(m.nom)}</div>
-          <div class="data-sub">${m.typeMembre === 'pension' ? 'Membre pension' : 'Membre cours'} · ${escapeHtml(m.email||'')} ${m.cotisationPayee ? '<span class="badge badge-ok">Cotisation OK</span>' : '<span class="badge badge-warn">Cotisation à régler</span>'}</div>
+          <div class="data-sub">${m.typeMembre === 'pension' ? 'Membre demi-pension' : 'Membre cours'} · ${escapeHtml(m.email||'')} ${m.cotisationPayee ? '<span class="badge badge-ok">Cotisation OK</span>' : '<span class="badge badge-warn">Cotisation à régler</span>'}</div>
         </div>
         <div class="data-actions">
           <button class="btn-sm" onclick="window.editerMembre('${m.id}')">Modifier</button>
@@ -342,17 +343,20 @@ window.ouvrirModalMembre = (membre, demandeId) => {
     <div class="modal-overlay" id="modalOverlayMembre">
       <div class="modal-box" style="max-width:640px;">
         <h3>${membre ? 'Modifier le membre' : 'Ajouter un membre'}</h3>
-        ${estNouveau ? `<div class="banner-alert info">Crée d'abord le compte dans Firebase Authentication (email : identifiant@membres.lar-allegria.local), puis colle son UID ci-dessous. Voir le README pour le détail de la procédure.</div>` : ''}
+        ${estNouveau ? `<div class="banner-alert info">Le compte de connexion (identifiant + mot de passe) est créé automatiquement quand tu cliques sur "Enregistrer" — rien à faire dans Firebase.</div>` : ''}
         <div class="form-grid">
-          ${estNouveau ? `<div class="field"><label>UID Firebase Auth *</label><input id="fm-uid" placeholder="ex: 8f3kd..."></div>` : ''}
           <div class="field"><label>Identifiant de connexion *</label><input id="fm-identifiant" value="${escapeHtml(src.identifiant||src.prenom||'')}"></div>
           <div class="field"><label>Type de membre</label>
             <select id="fm-type">
               <option value="cours" ${(src.typeMembre||'cours')==='cours'?'selected':''}>Membre cours</option>
-              <option value="pension" ${src.typeMembre==='pension'?'selected':''}>Membre pension</option>
+              <option value="pension" ${src.typeMembre==='pension'?'selected':''}>Membre demi-pension</option>
             </select>
           </div>
         </div>
+        ${estNouveau ? `<div class="form-grid">
+          <div class="field"><label>Mot de passe temporaire *</label><input id="fm-motdepasse" type="text" placeholder="ex: club4460" value="club${Math.floor(1000+Math.random()*9000)}"></div>
+          <div class="field"><label></label><div style="font-size:0.85rem;color:var(--terre);padding-top:8px;">À communiquer au membre — il pourra le changer une fois connecté.</div></div>
+        </div>` : ''}
         <div class="form-grid">
           <div class="field"><label>Prénom *</label><input id="fm-prenom" value="${escapeHtml(src.prenom||'')}"></div>
           <div class="field"><label>Nom *</label><input id="fm-nom" value="${escapeHtml(src.nom||'')}"></div>
@@ -380,9 +384,34 @@ window.ouvrirModalMembre = (membre, demandeId) => {
   document.getElementById('modalZone').innerHTML = html;
 
   document.getElementById('fm-save').addEventListener('click', async () => {
-    const uid = estNouveau ? document.getElementById('fm-uid').value.trim() : membre.id;
     const identifiant = document.getElementById('fm-identifiant').value.trim();
-    if (!uid || !identifiant) { alert('UID et identifiant sont obligatoires.'); return; }
+    const motDePasse = estNouveau ? document.getElementById('fm-motdepasse').value.trim() : '';
+    if (!identifiant) { alert('L\'identifiant est obligatoire.'); return; }
+    if (estNouveau && motDePasse.length < 6) { alert('Le mot de passe temporaire doit contenir au moins 6 caractères.'); return; }
+
+    const btnSave = document.getElementById('fm-save');
+    let uid;
+    if (estNouveau) {
+      btnSave.disabled = true;
+      btnSave.textContent = 'Création du compte...';
+      try {
+        uid = await creerCompteMembre(identifiant, motDePasse);
+      } catch (err) {
+        btnSave.disabled = false;
+        btnSave.textContent = 'Enregistrer';
+        if (err.code === 'auth/email-already-in-use') {
+          alert('Cet identifiant est déjà utilisé par un autre compte. Choisis un identifiant différent.');
+        } else if (err.code === 'auth/weak-password') {
+          alert('Mot de passe trop faible (6 caractères minimum).');
+        } else {
+          alert('Erreur lors de la création du compte : ' + (err.code || err.message));
+        }
+        return;
+      }
+      btnSave.textContent = 'Enregistrement de la fiche...';
+    } else {
+      uid = membre.id;
+    }
     const data = {
       role: 'membre',
       identifiant,
@@ -423,6 +452,8 @@ window.ouvrirModalMembre = (membre, demandeId) => {
       renderMembres();
       chargerDemandesInscription();
     } catch (err) {
+      btnSave.disabled = false;
+      btnSave.textContent = 'Enregistrer';
       alert('Erreur : ' + (err.code || err.message));
     }
   });
@@ -469,7 +500,7 @@ window.ouvrirModalBox = (box) => {
         <h3>${box ? 'Modifier le box' : 'Ajouter un box'}</h3>
         <div class="field"><label>Nom du box</label><input id="bx-nom" value="${escapeHtml(box?.nom||'')}" placeholder="ex: Box 1"></div>
         <div class="field"><label>Cheval actuel</label><input id="bx-cheval" value="${escapeHtml(box?.chevalActuel||'')}"></div>
-        <div class="field"><label>Propriétaire (membre pension)</label>
+        <div class="field"><label>Membre en demi-pension</label>
           <select id="bx-membre"><option value="">—</option>${optionsMembres}</select>
         </div>
         <div class="modal-actions">
@@ -528,7 +559,7 @@ document.getElementById('btnAjouterNettoyage').addEventListener('click', () => {
         <h3>Assigner une tâche de nettoyage</h3>
         <div class="field"><label>Box</label><select id="nt-box">${optionsBoxes || '<option value="">Aucun box créé</option>'}</select></div>
         <div class="field"><label>Date</label><input type="date" id="nt-date"></div>
-        <div class="field"><label>Assigné à</label><select id="nt-membre">${optionsMembres || '<option value="">Aucun membre pension</option>'}</select></div>
+        <div class="field"><label>Assigné à</label><select id="nt-membre">${optionsMembres || '<option value="">Aucun membre demi-pension</option>'}</select></div>
         <div class="modal-actions">
           <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
           <button class="btn-sm primary" type="button" id="nt-save">Enregistrer</button>
