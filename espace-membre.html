@@ -8,7 +8,7 @@
 <link rel="icon" href="assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Yeseva+One&family=Playball&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 <link rel="stylesheet" href="assets/app.css">
 </head>
@@ -91,17 +91,29 @@
       <p id="mp-statut" style="font-size:0.85rem; color:var(--terre); margin-top:10px;"></p>
       <button class="btn-sm primary" id="mp-enregistrer" style="margin-top:8px;">Enregistrer mon profil</button>
     </div>
+    <div class="app-panel">
+      <h2>Mon mot de passe</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Change ton mot de passe de connexion à l'espace membre.</p>
+      <div class="login-error" id="pwError"></div>
+      <div class="form-success" id="pwSuccess">✅ Mot de passe modifié.</div>
+      <div class="form-grid">
+        <div class="field"><label>Mot de passe actuel</label><input type="password" id="pw-actuel" autocomplete="current-password"></div>
+        <div class="field"><label>Nouveau mot de passe</label><input type="password" id="pw-nouveau" autocomplete="new-password"></div>
+      </div>
+      <div class="field" style="max-width:220px;"><label>Confirmer le nouveau</label><input type="password" id="pw-confirme" autocomplete="new-password"></div>
+      <button class="btn-sm primary" id="btnChangerMotDePasse">Changer mon mot de passe</button>
+    </div>
   </div>
 
   <!-- ==================== MON CHEVAL ==================== -->
   <div id="panel-cheval" class="tab-panel hidden">
     <div class="app-panel">
-      <h2>Mon cheval</h2>
+      <h2>Mon cheval en demi-pension</h2>
       <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">
-        Informations sur votre/vos cheval(aux) en pension à l'écurie.
+        Le(s) cheval(aux) de l'écurie mis à votre disposition en demi-pension — toujours propriété du club, mais suivi comme le vôtre au quotidien.
       </p>
       <div id="mc-liste"></div>
-      <button class="btn-sm primary" id="mc-ajouter" style="margin-top:6px;">+ Ajouter un cheval</button>
+      <button class="btn-sm primary" id="mc-ajouter" style="margin-top:6px;">+ Indiquer mon cheval en demi-pension</button>
     </div>
   </div>
 

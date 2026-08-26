@@ -1,4 +1,4 @@
-# Lar'Allegria by Lara Rossoux — site du club (V02)
+# Lar'Allegria by Lara Rossoux — site du club (V04)
 
 Dépôt GitHub : **web-pub/Lar-allegria**. Projet Firebase : **Lar-allegria**.
 
@@ -15,10 +15,11 @@ boutique...).
   jour par Lara), Inscription (formulaire public de demande d'adhésion),
   Contact, CGV, Confidentialité.
 - **Inscription en ligne** : un visiteur choisit "membre cours" ou "membre
-  pension" et remplit sa fiche complète. La demande part dans Firestore
-  (`demandes_inscription`) ; Lara la valide depuis l'espace admin et crée le
-  compte membre.
-- **Espace membre** (après connexion) : profil, cheval (si membre pension),
+  demi-pension" (les chevaux appartiennent tous à Lara ; un membre demi-pension
+  en a un mis à sa disposition comme s'il était le sien) et remplit sa fiche
+  complète. La demande part dans Firestore (`demandes_inscription`) ; Lara la
+  valide depuis l'espace admin et crée le compte membre.
+- **Espace membre** (après connexion) : profil, cheval (si membre demi-pension),
   réservation de la piste dans une grille horaire (cours d'1h ou usage libre
   de la piste), météo affichée sur chaque créneau, activités (stages,
   spectacles), nettoyage du box (si assigné), tarifs, boutique, messages,
@@ -72,14 +73,19 @@ et le mot de passe `Lara4460`, et elle arrive sur `admin.html`. Elle peut
 changer ce mot de passe à tout moment depuis l'onglet **Paramètres** de
 l'espace admin.
 
-**Pour chaque membre ensuite**, la même procédure s'applique — mais elle se
-fait directement depuis l'espace admin du site (onglet "Membres") : Lara crée
-d'abord le compte dans Firebase Authentication (email
-`identifiant@membres.lar-allegria.local`), copie l'UID, puis l'entre dans le
-formulaire "+ Ajouter un membre" qui crée la fiche complète dans Firestore.
-Depuis une **demande d'inscription**, le bouton "Créer la fiche membre"
-pré-remplit tout le formulaire automatiquement — il ne reste qu'à coller
-l'UID une fois le compte Authentication créé.
+**Pour chaque membre ensuite**, tout se fait directement depuis l'espace
+admin du site (onglet "Membres") → **"+ Ajouter un membre"** : Lara choisit
+un identifiant et un mot de passe temporaire (pré-rempli, modifiable), remplit
+la fiche, clique **Enregistrer** — le compte Firebase Authentication *et* la
+fiche Firestore sont créés automatiquement en un seul clic, sans passer par
+la console Firebase. Depuis une **demande d'inscription**, le bouton "Créer
+la fiche membre" pré-remplit tout le formulaire automatiquement. Le membre
+pourra ensuite changer ce mot de passe lui-même depuis son espace, onglet
+"Mon profil" → "Mon mot de passe" (même fonctionnement que pour Lara).
+
+Seul le tout premier compte (celui de Lara, l'administratrice) doit être créé
+à la main via la console Firebase, comme décrit ci-dessus — logique, puisqu'il
+n'y a pas encore d'espace admin accessible avant que ce compte existe.
 
 ## 4. Déployer les règles Firestore
 
@@ -111,7 +117,7 @@ le site :
 cd lar-allegria
 git init
 git add .
-git commit -m "Site Lar'Allegria V02"
+git commit -m "Site Lar'Allegria V04"
 git branch -M main
 git remote add origin https://github.com/web-pub/Lar-allegria.git
 git push -u origin main
@@ -133,7 +139,7 @@ dans Firebase Authentication → **Settings** → **Authorized domains**.
 1. Connecte-toi en tant que Lara sur `/connexion.html`.
 2. Onglet **Paramètres** : règle les horaires d'ouverture de la piste (jours
    + heures) — c'est cette grille qui apparaît ensuite côté membres.
-3. Onglet **Tarifs** : encode la grille tarifaire (cours, pension, stages...).
+3. Onglet **Tarifs** : encode la grille tarifaire (cours, demi-pension, stages...).
    Elle apparaît automatiquement sur la page publique `tarifs.html` et dans
    l'espace membre.
 4. Onglet **Nettoyage box** : crée les box de l'écurie.
@@ -155,7 +161,7 @@ lar-allegria/
 │   ├── meteo.js                   → météo Open-Meteo (Grâce-Hollogne)
 │   ├── app-membre.js              → logique espace membre
 │   ├── app-admin.js               → logique espace admin
-│   ├── logo.png, hero-lara.jpg    → visuels du club
+│   ├── logo.png, photo-spectacle-lara.jpg, photo-equipe-spectacle.jpg → visuels du club
 ├── firebase.json, .firebaserc, firestore.rules, firestore.indexes.json
 └── robots.txt, sitemap.xml
 ```
