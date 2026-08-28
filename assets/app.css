@@ -265,6 +265,8 @@
 .btn-sm.danger { color: #A23B3B; border-color: #E3B4B4; }
 .btn-sm.primary { background: var(--or); color: var(--noir-dark); border-color: var(--or); font-weight: 600; }
 .btn-sm.rouge { background: var(--rouge); color: var(--white); border-color: var(--rouge); font-weight: 600; }
+.btn-sm:disabled { opacity: 0.4; cursor: not-allowed; background: var(--white); }
+.btn-sm:disabled:hover { background: var(--white); }
 
 .badge {
   display: inline-block;

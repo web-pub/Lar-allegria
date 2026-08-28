@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V09';
+const VERSION_SITE = 'V11';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -729,26 +729,59 @@ document.getElementById('btnChangerMotDePasse').addEventListener('click', async 
 // DISPONIBILITÉS (horaires d'ouverture de la piste)
 // ==========================================================================
 const JOURS_SEMAINE = [[1,'Lundi'],[2,'Mardi'],[3,'Mercredi'],[4,'Jeudi'],[5,'Vendredi'],[6,'Samedi'],[7,'Dimanche']];
+
+// Construit un objet { "1": {ouvert, heureDebut, heureFin}, ... "7": {...} } à
+// partir des données enregistrées — supporte l'ancien format à horaire unique
+// (heureDebut/heureFin/joursOuverts) pour ne rien perdre lors de la migration.
+function horairesParJourDepuis(disp) {
+  const horaires = {};
+  const joursOuvertsAnciens = disp.joursOuverts || [1,2,3,4,5,6];
+  JOURS_SEMAINE.forEach(([num]) => {
+    const existant = disp.horaires && disp.horaires[num];
+    if (existant) {
+      horaires[num] = existant;
+    } else {
+      horaires[num] = {
+        ouvert: joursOuvertsAnciens.includes(num),
+        heureDebut: disp.heureDebut || '09:00',
+        heureFin: disp.heureFin || '19:00'
+      };
+    }
+  });
+  return horaires;
+}
+
 async function chargerDisponibilitesAdmin() {
   const d = await getDoc(doc(db, 'parametres', 'disponibilites'));
-  const disp = d.exists() ? d.data() : { heureDebut: '09:00', heureFin: '19:00', joursOuverts: [1,2,3,4,5,6] };
-  document.getElementById('param-heureDebut').value = disp.heureDebut || '09:00';
-  document.getElementById('param-heureFin').value = disp.heureFin || '19:00';
-  const joursOuverts = disp.joursOuverts || [1,2,3,4,5,6];
-  document.getElementById('param-jours').innerHTML = JOURS_SEMAINE.map(([num, nom]) => `
-    <label class="membre-check-row">
-      <input type="checkbox" value="${num}" ${joursOuverts.includes(num) ? 'checked' : ''} class="param-jour-check">
-      <span>${nom}</span>
-    </label>`).join('');
+  const disp = d.exists() ? d.data() : {};
+  const horaires = horairesParJourDepuis(disp);
+  document.getElementById('param-jours').innerHTML = JOURS_SEMAINE.map(([num, nom]) => {
+    const h = horaires[num];
+    return `
+    <div class="horaire-jour-row" style="display:flex; align-items:center; gap:14px; padding:10px 0; border-bottom:1px solid #EEE0C4; flex-wrap:wrap;">
+      <label style="display:flex; align-items:center; gap:8px; min-width:130px; font-weight:600;">
+        <input type="checkbox" class="param-jour-check" value="${num}" ${h.ouvert ? 'checked' : ''}>
+        ${nom}
+      </label>
+      <div class="field" style="margin:0;"><label>Ouverture</label><input type="time" class="param-jour-debut" data-jour="${num}" value="${h.heureDebut}"></div>
+      <div class="field" style="margin:0;"><label>Fermeture</label><input type="time" class="param-jour-fin" data-jour="${num}" value="${h.heureFin}"></div>
+    </div>`;
+  }).join('');
 }
 document.getElementById('btnSauverDisponibilites').addEventListener('click', async () => {
-  const joursOuverts = Array.from(document.querySelectorAll('.param-jour-check:checked')).map(c => parseInt(c.value, 10));
-  await setDoc(doc(db, 'parametres', 'disponibilites'), {
-    heureDebut: document.getElementById('param-heureDebut').value,
-    heureFin: document.getElementById('param-heureFin').value,
-    joursOuverts
-  }, { merge: true });
-  alert('Horaires enregistrés.');
+  const horaires = {};
+  JOURS_SEMAINE.forEach(([num]) => {
+    const check = document.querySelector(`.param-jour-check[value="${num}"]`);
+    const debut = document.querySelector(`.param-jour-debut[data-jour="${num}"]`);
+    const fin = document.querySelector(`.param-jour-fin[data-jour="${num}"]`);
+    horaires[num] = { ouvert: check.checked, heureDebut: debut.value || '09:00', heureFin: fin.value || '19:00' };
+  });
+  try {
+    await setDoc(doc(db, 'parametres', 'disponibilites'), { horaires }, { merge: true });
+    alert('Horaires enregistrés.');
+  } catch (err) {
+    alert('Erreur lors de l\'enregistrement : ' + (err.code || err.message));
+  }
 });
 
 // ==========================================================================

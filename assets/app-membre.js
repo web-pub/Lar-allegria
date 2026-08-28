@@ -5,7 +5,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V09';
+const VERSION_SITE = 'V11';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -364,8 +364,13 @@ async function chargerTarifsMembre() {
 
 // ==========================================================================
 // RÉSERVATIONS — grille hebdomadaire, une seule personne à la fois sur la piste
+// Uniquement le futur : navigation bornée entre la semaine en cours et
+// 4 semaines (semaine en cours + 3 suivantes).
 // ==========================================================================
+const NB_SEMAINES_VISIBLES = 4;
 let semaineAffichee = lundiDeLaSemaine(new Date());
+const semaineMin = lundiDeLaSemaine(new Date());
+const semaineMax = (() => { const d = new Date(semaineMin); d.setDate(d.getDate() + (NB_SEMAINES_VISIBLES - 1) * 7); return d; })();
 function lundiDeLaSemaine(d) {
   const date = new Date(d); date.setHours(0,0,0,0);
   const jour = date.getDay(); // 0 = dimanche
@@ -379,9 +384,25 @@ async function chargerDisponibilites() {
   if (pDoc.exists()) disponibilites = { ...disponibilites, ...pDoc.data() };
 }
 
+// Horaires de la piste par jour de la semaine (1 = lundi ... 7 = dimanche) —
+// peuvent différer d'un jour à l'autre. Reste compatible avec l'ancien
+// format à horaire unique (joursOuverts + heureDebut/heureFin) si l'admin
+// n'a pas encore réenregistré ses horaires depuis la mise à jour.
+function horaireDuJour(jourISO) {
+  if (disponibilites.horaires && disponibilites.horaires[jourISO]) {
+    return disponibilites.horaires[jourISO];
+  }
+  const joursOuverts = disponibilites.joursOuverts || [1,2,3,4,5,6];
+  return {
+    ouvert: joursOuverts.includes(jourISO),
+    heureDebut: disponibilites.heureDebut || '09:00',
+    heureFin: disponibilites.heureFin || '19:00'
+  };
+}
+
 function creneauxHoraires(heureDebut, heureFin) {
-  const [hD, mD] = (heureDebut || disponibilites.heureDebut).split(':').map(Number);
-  const [hF, mF] = (heureFin || disponibilites.heureFin).split(':').map(Number);
+  const [hD, mD] = (heureDebut || '09:00').split(':').map(Number);
+  const [hF, mF] = (heureFin || '19:00').split(':').map(Number);
   const creneaux = [];
   let h = hD, m = mD || 0;
   while (h < hF || (h === hF && m < mF)) {
@@ -396,10 +417,12 @@ async function exceptionJour(dateISO) {
 }
 
 document.getElementById('resaSemainePrec').addEventListener('click', () => {
+  if (semaineAffichee <= semaineMin) return;
   semaineAffichee.setDate(semaineAffichee.getDate() - 7);
   renderGrilleReservations();
 });
 document.getElementById('resaSemaineSuiv').addEventListener('click', () => {
+  if (semaineAffichee >= semaineMax) return;
   semaineAffichee.setDate(semaineAffichee.getDate() + 7);
   renderGrilleReservations();
 });
@@ -415,6 +438,8 @@ async function renderGrilleReservations() {
   const dimanche = jours[6];
   document.getElementById('resaSemaineLabel').textContent =
     `Semaine du ${jours[0].toLocaleDateString('fr-BE', {day:'numeric', month:'long'})} au ${dimanche.toLocaleDateString('fr-BE', {day:'numeric', month:'long'})}`;
+  document.getElementById('resaSemainePrec').disabled = semaineAffichee <= semaineMin;
+  document.getElementById('resaSemaineSuiv').disabled = semaineAffichee >= semaineMax;
 
   const dateDebut = dateISOLocale(jours[0]);
   const dateFin = dateISOLocale(dimanche);
@@ -428,7 +453,6 @@ async function renderGrilleReservations() {
   });
 
   const maintenant = new Date();
-  const joursOuverts = disponibilites.joursOuverts || [1,2,3,4,5,6];
 
   const blocs = await Promise.all(jours.map(async (d) => {
     const jourISO = d.getDay() === 0 ? 7 : d.getDay();
@@ -441,9 +465,13 @@ async function renderGrilleReservations() {
         <div class="empty-state" style="margin:0;">Fermé ce jour-là</div>
       </div>`;
     }
+    const horaireJour = horaireDuJour(jourISO);
     const ouvertParException = exception && (exception.heureDebut || exception.heureFin);
-    if (!joursOuverts.includes(jourISO) && !ouvertParException) return '';
-    const heures = creneauxHoraires(exception?.heureDebut, exception?.heureFin);
+    if (!horaireJour.ouvert && !ouvertParException) return '';
+    const heures = creneauxHoraires(
+      exception?.heureDebut || horaireJour.heureDebut,
+      exception?.heureFin || horaireJour.heureFin
+    );
     const m = await meteoPour(dateISO, '13:00');
     const alerte = alerteMeteo(m);
     const meteoHtml = m
