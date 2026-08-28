@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V05';
+const VERSION_SITE = 'V08';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -53,8 +53,16 @@ onAuthStateChanged(auth, async (user) => {
   chargerActivites();
   chargerConversations();
   chargerDisponibilitesAdmin();
+  chargerExceptionsAdmin();
   chargerBoutiqueAdmin();
   chargerCommandesAdmin();
+  chargerChevauxAdmin();
+  chargerEvenementsAdmin();
+  chargerBlogAdmin();
+  chargerStockAdmin();
+  chargerStockSignalements();
+  chargerContenuAdmin();
+  chargerPlanningBenevolesAdmin();
 });
 
 document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth).then(() => window.location.href = 'connexion.html'));
@@ -111,6 +119,11 @@ async function chargerMembres() {
 function nomMembre(uid) {
   const m = membresParUid[uid];
   return m ? `${m.prenom || ''} ${m.nom || ''}`.trim() || m.identifiant || uid : uid;
+}
+function labelTypeMembre(type) {
+  if (type === 'pension') return 'Membre demi-pension';
+  if (type === 'benevole') return 'Membre bénévole';
+  return 'Membre cours';
 }
 
 // ==========================================================================
@@ -234,7 +247,7 @@ async function chargerDemandesInscription() {
   wrap.innerHTML = demandes.map(d => `
     <div class="data-row">
       <div class="data-main">
-        <div class="data-title">${escapeHtml(d.prenom)} ${escapeHtml(d.nom)} — ${d.typeMembre === 'pension' ? 'Membre demi-pension' : 'Membre cours'}</div>
+        <div class="data-title">${escapeHtml(d.prenom)} ${escapeHtml(d.nom)} — ${labelTypeMembre(d.typeMembre)}</div>
         <div class="data-sub">${escapeHtml(d.email)} · ${escapeHtml(d.telephone)}${d.cheval?.nom ? ` · Cheval : ${escapeHtml(d.cheval.nom)}` : ''}</div>
       </div>
       <div class="data-actions">
@@ -258,7 +271,7 @@ window.voirDemande = (id) => {
       <div class="modal-box" style="max-width:560px;">
         <h3>Demande de ${escapeHtml(d.prenom)} ${escapeHtml(d.nom)}</h3>
         <div style="font-size:0.9rem; line-height:1.7; max-height:50vh; overflow-y:auto;">
-          <p><strong>Type :</strong> ${d.typeMembre === 'pension' ? 'Membre demi-pension' : 'Membre cours'}<br>
+          <p><strong>Type :</strong> ${labelTypeMembre(d.typeMembre)}<br>
           <strong>Naissance :</strong> ${d.dateNaissance || '—'}<br>
           <strong>Téléphone :</strong> ${escapeHtml(d.telephone)}<br>
           <strong>Email :</strong> ${escapeHtml(d.email)}<br>
@@ -297,7 +310,7 @@ function renderMembres(filtre = '') {
       <div class="data-row">
         <div class="data-main">
           <div class="data-title">${escapeHtml(m.prenom)} ${escapeHtml(m.nom)}</div>
-          <div class="data-sub">${m.typeMembre === 'pension' ? 'Membre demi-pension' : 'Membre cours'} · ${escapeHtml(m.email||'')} ${m.cotisationPayee ? '<span class="badge badge-ok">Cotisation OK</span>' : '<span class="badge badge-warn">Cotisation à régler</span>'}</div>
+          <div class="data-sub">${labelTypeMembre(m.typeMembre)} · ${escapeHtml(m.email||'')} ${m.cotisationPayee ? '<span class="badge badge-ok">Cotisation OK</span>' : '<span class="badge badge-warn">Cotisation à régler</span>'}</div>
         </div>
         <div class="data-actions">
           <button class="btn-sm" onclick="window.editerMembre('${m.id}')">Modifier</button>
@@ -350,6 +363,7 @@ window.ouvrirModalMembre = (membre, demandeId) => {
             <select id="fm-type">
               <option value="cours" ${(src.typeMembre||'cours')==='cours'?'selected':''}>Membre cours</option>
               <option value="pension" ${src.typeMembre==='pension'?'selected':''}>Membre demi-pension</option>
+              <option value="benevole" ${src.typeMembre==='benevole'?'selected':''}>Membre bénévole</option>
             </select>
           </div>
         </div>
@@ -977,3 +991,423 @@ function bulleMessage(m) {
   const heure = m.dateEnvoi ? new Date(m.dateEnvoi).toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' }) : '';
   return `<div class="chat-bubble ${estMoi ? 'moi' : 'autre'}">${escapeHtml(m.texte)}<div class="chat-meta">${heure}</div></div>`;
 }
+
+// ==========================================================================
+// CHEVAUX DE L'ÉCURIE (page publique "Nos chevaux")
+// ==========================================================================
+async function chargerChevauxAdmin() {
+  const snap = await getDocs(collection(db, 'chevaux_ecurie'));
+  let chevaux = [];
+  snap.forEach(d => chevaux.push({ id: d.id, ...d.data() }));
+  const wrap = document.getElementById('listeChevauxEcurie');
+  if (chevaux.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun cheval créé.</div>'; return; }
+  wrap.innerHTML = chevaux.map(c => `
+    <div class="data-row">
+      ${c.photoUrl ? `<img src="${escapeHtml(c.photoUrl)}" style="width:52px; height:52px; border-radius:6px; object-fit:cover; flex:none;">` : ''}
+      <div class="data-main">
+        <div class="data-title">${escapeHtml(c.nom)}</div>
+        <div class="data-sub">${escapeHtml(c.race || '')} ${c.visiblePublic === false ? '<span class="badge badge-neutral">Masqué du site public</span>' : ''}</div>
+      </div>
+      <div class="data-actions">
+        <button class="btn-sm" onclick="window.editerChevalEcurie('${c.id}')">Modifier</button>
+        <button class="btn-sm danger" onclick="window.supprimerChevalEcurie('${c.id}')">Supprimer</button>
+      </div>
+    </div>`).join('');
+  window._chevauxEcurie = {}; chevaux.forEach(c => window._chevauxEcurie[c.id] = c);
+}
+document.getElementById('btnAjouterCheval').addEventListener('click', () => window.ouvrirModalChevalEcurie());
+window.editerChevalEcurie = (id) => window.ouvrirModalChevalEcurie(window._chevauxEcurie[id]);
+window.supprimerChevalEcurie = async (id) => { if (!confirm('Supprimer ce cheval ?')) return; await deleteDoc(doc(db, 'chevaux_ecurie', id)); chargerChevauxAdmin(); };
+window.ouvrirModalChevalEcurie = (c) => {
+  const html = `
+    <div class="modal-overlay" id="modalOverlayCheval2">
+      <div class="modal-box">
+        <h3>${c ? 'Modifier le cheval' : 'Ajouter un cheval'}</h3>
+        <div class="form-grid">
+          <div class="field"><label>Nom</label><input id="ce-nom" value="${escapeHtml(c?.nom||'')}"></div>
+          <div class="field"><label>Race</label><input id="ce-race" value="${escapeHtml(c?.race||'')}"></div>
+        </div>
+        <div class="field"><label>Photo (URL — ex: assets/chevaux/nom.jpg si déposée sur GitHub)</label><input id="ce-photo" value="${escapeHtml(c?.photoUrl||'')}"></div>
+        <div class="field"><label>Description</label><textarea id="ce-description" rows="3">${escapeHtml(c?.description||'')}</textarea></div>
+        <div class="field"><label>Visible sur le site public</label>
+          <select id="ce-visible"><option value="oui" ${c?.visiblePublic!==false?'selected':''}>Oui</option><option value="non" ${c?.visiblePublic===false?'selected':''}>Non</option></select>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
+          <button class="btn-sm primary" type="button" id="ce-save">Enregistrer</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modalZone').innerHTML = html;
+  document.getElementById('ce-save').addEventListener('click', async () => {
+    const data = {
+      nom: document.getElementById('ce-nom').value.trim(),
+      race: document.getElementById('ce-race').value.trim(),
+      photoUrl: document.getElementById('ce-photo').value.trim(),
+      description: document.getElementById('ce-description').value.trim(),
+      visiblePublic: document.getElementById('ce-visible').value === 'oui'
+    };
+    if (!data.nom) { alert('Merci d\'indiquer un nom.'); return; }
+    if (c) await updateDoc(doc(db, 'chevaux_ecurie', c.id), data);
+    else await addDoc(collection(db, 'chevaux_ecurie'), data);
+    window.fermerModal();
+    chargerChevauxAdmin();
+  });
+};
+
+// ==========================================================================
+// ÉVÉNEMENTS (page publique, visible de tous)
+// ==========================================================================
+async function chargerEvenementsAdmin() {
+  const snap = await getDocs(collection(db, 'evenements'));
+  let evenements = [];
+  snap.forEach(d => evenements.push({ id: d.id, ...d.data() }));
+  evenements.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const wrap = document.getElementById('listeEvenements');
+  if (evenements.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun événement créé.</div>'; return; }
+  wrap.innerHTML = evenements.map(e => `
+    <div class="data-row">
+      ${e.photoUrl ? `<img src="${escapeHtml(e.photoUrl)}" style="width:52px; height:52px; border-radius:6px; object-fit:cover; flex:none;">` : ''}
+      <div class="data-main">
+        <div class="data-title">${escapeHtml(e.titre)}</div>
+        <div class="data-sub">${e.date || ''}</div>
+      </div>
+      <div class="data-actions">
+        <button class="btn-sm" onclick="window.editerEvenement('${e.id}')">Modifier</button>
+        <button class="btn-sm danger" onclick="window.supprimerEvenement('${e.id}')">Supprimer</button>
+      </div>
+    </div>`).join('');
+  window._evenements = {}; evenements.forEach(e => window._evenements[e.id] = e);
+}
+document.getElementById('btnAjouterEvenement').addEventListener('click', () => window.ouvrirModalEvenement());
+window.editerEvenement = (id) => window.ouvrirModalEvenement(window._evenements[id]);
+window.supprimerEvenement = async (id) => { if (!confirm('Supprimer cet événement ?')) return; await deleteDoc(doc(db, 'evenements', id)); chargerEvenementsAdmin(); };
+window.ouvrirModalEvenement = (e) => {
+  const html = `
+    <div class="modal-overlay" id="modalOverlayEvenement">
+      <div class="modal-box">
+        <h3>${e ? "Modifier l'événement" : 'Créer un événement'}</h3>
+        <div class="field"><label>Titre</label><input id="ev-titre" value="${escapeHtml(e?.titre||'')}"></div>
+        <div class="form-grid">
+          <div class="field"><label>Date</label><input type="date" id="ev-date" value="${e?.date||''}"></div>
+          <div class="field"><label>Heure (facultatif)</label><input type="time" id="ev-heure" value="${e?.heure||''}"></div>
+        </div>
+        <div class="field"><label>Photo (URL)</label><input id="ev-photo" value="${escapeHtml(e?.photoUrl||'')}"></div>
+        <div class="field"><label>Description</label><textarea id="ev-description" rows="3">${escapeHtml(e?.description||'')}</textarea></div>
+        <div class="modal-actions">
+          <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
+          <button class="btn-sm primary" type="button" id="ev-save">Enregistrer</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modalZone').innerHTML = html;
+  document.getElementById('ev-save').addEventListener('click', async () => {
+    const data = {
+      titre: document.getElementById('ev-titre').value.trim(),
+      date: document.getElementById('ev-date').value,
+      heure: document.getElementById('ev-heure').value,
+      photoUrl: document.getElementById('ev-photo').value.trim(),
+      description: document.getElementById('ev-description').value.trim()
+    };
+    if (!data.titre || !data.date) { alert('Merci d\'indiquer au moins un titre et une date.'); return; }
+    if (e) await updateDoc(doc(db, 'evenements', e.id), data);
+    else await addDoc(collection(db, 'evenements'), data);
+    window.fermerModal();
+    chargerEvenementsAdmin();
+  });
+};
+
+// ==========================================================================
+// BLOG (page publique, visible de tous)
+// ==========================================================================
+async function chargerBlogAdmin() {
+  const snap = await getDocs(collection(db, 'articles_blog'));
+  let articles = [];
+  snap.forEach(d => articles.push({ id: d.id, ...d.data() }));
+  articles.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const wrap = document.getElementById('listeArticlesBlog');
+  if (articles.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun article créé.</div>'; return; }
+  wrap.innerHTML = articles.map(a => `
+    <div class="data-row">
+      ${a.photoUrl ? `<img src="${escapeHtml(a.photoUrl)}" style="width:52px; height:52px; border-radius:6px; object-fit:cover; flex:none;">` : ''}
+      <div class="data-main">
+        <div class="data-title">${escapeHtml(a.titre)}</div>
+        <div class="data-sub">${a.date || ''} ${a.publie === false ? '<span class="badge badge-neutral">Brouillon</span>' : ''}</div>
+      </div>
+      <div class="data-actions">
+        <button class="btn-sm" onclick="window.editerArticleBlog('${a.id}')">Modifier</button>
+        <button class="btn-sm danger" onclick="window.supprimerArticleBlog('${a.id}')">Supprimer</button>
+      </div>
+    </div>`).join('');
+  window._articlesBlog = {}; articles.forEach(a => window._articlesBlog[a.id] = a);
+}
+document.getElementById('btnAjouterArticleBlog').addEventListener('click', () => window.ouvrirModalArticleBlog());
+window.editerArticleBlog = (id) => window.ouvrirModalArticleBlog(window._articlesBlog[id]);
+window.supprimerArticleBlog = async (id) => { if (!confirm('Supprimer cet article ?')) return; await deleteDoc(doc(db, 'articles_blog', id)); chargerBlogAdmin(); };
+window.ouvrirModalArticleBlog = (a) => {
+  const html = `
+    <div class="modal-overlay" id="modalOverlayArticleBlog">
+      <div class="modal-box" style="max-width:640px;">
+        <h3>${a ? "Modifier l'article" : 'Écrire un article'}</h3>
+        <div class="form-grid">
+          <div class="field"><label>Titre</label><input id="bl-titre" value="${escapeHtml(a?.titre||'')}"></div>
+          <div class="field"><label>Date</label><input type="date" id="bl-date" value="${a?.date || new Date().toISOString().slice(0,10)}"></div>
+        </div>
+        <div class="field"><label>Photo (URL, facultatif)</label><input id="bl-photo" value="${escapeHtml(a?.photoUrl||'')}"></div>
+        <div class="field"><label>Contenu</label><textarea id="bl-contenu" rows="6">${escapeHtml(a?.contenu||'')}</textarea></div>
+        <div class="field"><label>Statut</label>
+          <select id="bl-publie"><option value="oui" ${a?.publie!==false?'selected':''}>Publié</option><option value="non" ${a?.publie===false?'selected':''}>Brouillon (pas visible du public)</option></select>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
+          <button class="btn-sm primary" type="button" id="bl-save">Enregistrer</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modalZone').innerHTML = html;
+  document.getElementById('bl-save').addEventListener('click', async () => {
+    const data = {
+      titre: document.getElementById('bl-titre').value.trim(),
+      date: document.getElementById('bl-date').value,
+      photoUrl: document.getElementById('bl-photo').value.trim(),
+      contenu: document.getElementById('bl-contenu').value.trim(),
+      publie: document.getElementById('bl-publie').value === 'oui'
+    };
+    if (!data.titre) { alert('Merci d\'indiquer un titre.'); return; }
+    if (a) await updateDoc(doc(db, 'articles_blog', a.id), data);
+    else await addDoc(collection(db, 'articles_blog'), data);
+    window.fermerModal();
+    chargerBlogAdmin();
+  });
+};
+
+// ==========================================================================
+// STOCK (foin, nourriture...)
+// ==========================================================================
+async function chargerStockAdmin() {
+  const snap = await getDocs(collection(db, 'stock'));
+  let stock = [];
+  snap.forEach(d => stock.push({ id: d.id, ...d.data() }));
+  const wrap = document.getElementById('listeStock');
+  if (stock.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun article de stock créé.</div>'; return; }
+  wrap.innerHTML = stock.map(s => `
+    <div class="data-row">
+      <div class="data-main">
+        <div class="data-title">${escapeHtml(s.nom)} ${s.quantite <= 0 ? '<span class="badge badge-danger">Épuisé</span>' : ''}</div>
+        <div class="data-sub">${s.quantite} ${escapeHtml(s.unite || '')}</div>
+      </div>
+      <div class="data-actions">
+        <button class="btn-sm" onclick="window.ajusterStock('${s.id}', -1)">−</button>
+        <button class="btn-sm" onclick="window.ajusterStock('${s.id}', 1)">+</button>
+        <button class="btn-sm danger" onclick="window.supprimerStock('${s.id}')">Supprimer</button>
+      </div>
+    </div>`).join('');
+  window._stock = {}; stock.forEach(s => window._stock[s.id] = s);
+}
+document.getElementById('btnAjouterStock').addEventListener('click', () => {
+  const html = `
+    <div class="modal-overlay" id="modalOverlayStock">
+      <div class="modal-box">
+        <h3>Ajouter un article de stock</h3>
+        <div class="field"><label>Nom</label><input id="st-nom" placeholder="ex: Foin, Granulés, Litière..."></div>
+        <div class="form-grid">
+          <div class="field"><label>Quantité de départ</label><input type="number" step="0.1" id="st-quantite" value="0"></div>
+          <div class="field"><label>Unité</label><input id="st-unite" placeholder="ex: bottes, kg, sacs"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
+          <button class="btn-sm primary" type="button" id="st-save">Créer</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modalZone').innerHTML = html;
+  document.getElementById('st-save').addEventListener('click', async () => {
+    const nom = document.getElementById('st-nom').value.trim();
+    if (!nom) { alert('Merci d\'indiquer un nom.'); return; }
+    await addDoc(collection(db, 'stock'), {
+      nom,
+      quantite: parseFloat(document.getElementById('st-quantite').value) || 0,
+      unite: document.getElementById('st-unite').value.trim()
+    });
+    window.fermerModal();
+    chargerStockAdmin();
+  });
+});
+window.ajusterStock = async (id, delta) => {
+  const item = window._stock[id];
+  if (!item) return;
+  const nouvelle = Math.max(0, (item.quantite || 0) + delta);
+  await updateDoc(doc(db, 'stock', id), { quantite: nouvelle });
+  chargerStockAdmin();
+};
+window.supprimerStock = async (id) => { if (!confirm('Supprimer cet article de stock ?')) return; await deleteDoc(doc(db, 'stock', id)); chargerStockAdmin(); };
+
+async function chargerStockSignalements() {
+  const snap = await getDocs(collection(db, 'stock_signalements'));
+  let logs = [];
+  snap.forEach(d => logs.push({ id: d.id, ...d.data() }));
+  logs.sort((a, b) => (b.dateSignalement || '').localeCompare(a.dateSignalement || ''));
+  logs = logs.slice(0, 20);
+  const wrap = document.getElementById('listeStockSignalements');
+  if (logs.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucune prise signalée pour l\'instant.</div>'; return; }
+  wrap.innerHTML = logs.map(l => {
+    const dateLabel = l.dateSignalement ? new Date(l.dateSignalement).toLocaleString('fr-BE', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : '';
+    return `
+    <div class="data-row">
+      <div class="data-main">
+        <div class="data-title">${escapeHtml(nomMembre(l.membreId))} — ${l.quantitePrise} ${escapeHtml(l.unite||'')} de ${escapeHtml(l.nom)}</div>
+        <div class="data-sub">${dateLabel}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ==========================================================================
+// PLANNING BÉNÉVOLES (qui vient quand, pour quelle tâche)
+// ==========================================================================
+async function chargerPlanningBenevolesAdmin() {
+  const snap = await getDocs(collection(db, 'planning_benevoles'));
+  let creneaux = [];
+  snap.forEach(d => creneaux.push({ id: d.id, ...d.data() }));
+  creneaux.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.heure || '').localeCompare(b.heure || ''));
+  const wrap = document.getElementById('listePlanningBenevoles');
+  if (creneaux.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun créneau planifié.</div>'; return; }
+  wrap.innerHTML = creneaux.map(c => {
+    const dateLabel = c.date ? capitalize(new Date(c.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'})) : '';
+    const badge = c.statut === 'fait' ? '<span class="badge badge-ok">Fait</span>' : '<span class="badge badge-warn">À venir</span>';
+    return `
+    <div class="data-row">
+      <div class="data-main">
+        <div class="data-title">${escapeHtml(c.tache)} — ${dateLabel}${c.heure ? ' à ' + escapeHtml(c.heure) : ''}</div>
+        <div class="data-sub">Bénévole : ${escapeHtml(c.assigneNom || nomMembre(c.assigneA))} ${badge}</div>
+      </div>
+      <div class="data-actions">
+        ${c.statut !== 'fait' ? `<button class="btn-sm primary" onclick="window.marquerPlanningBenevoleFaitAdmin('${c.id}')">Marquer fait</button>` : ''}
+        <button class="btn-sm danger" onclick="window.supprimerPlanningBenevole('${c.id}')">Supprimer</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+window.marquerPlanningBenevoleFaitAdmin = async (id) => {
+  await updateDoc(doc(db, 'planning_benevoles', id), { statut: 'fait', dateRealisation: new Date().toISOString() });
+  chargerPlanningBenevolesAdmin();
+};
+window.supprimerPlanningBenevole = async (id) => {
+  if (!confirm('Supprimer ce créneau ?')) return;
+  await deleteDoc(doc(db, 'planning_benevoles', id));
+  chargerPlanningBenevolesAdmin();
+};
+
+document.getElementById('btnAjouterPlanningBenevole').addEventListener('click', () => {
+  const optionsBenevoles = membresCache.filter(m => m.typeMembre === 'benevole').map(m => `<option value="${m.id}">${escapeHtml(m.prenom)} ${escapeHtml(m.nom)}</option>`).join('');
+  const html = `
+    <div class="modal-overlay" id="modalOverlayPlanningBenevole">
+      <div class="modal-box">
+        <h3>Ajouter un créneau bénévole</h3>
+        <div class="field"><label>Bénévole</label><select id="pb-membre">${optionsBenevoles || '<option value="">Aucun membre bénévole</option>'}</select></div>
+        <div class="field"><label>Tâche</label><input id="pb-tache" placeholder="ex: Nourrissage du soir, entretien du paddock..."></div>
+        <div class="form-grid">
+          <div class="field"><label>Date</label><input type="date" id="pb-date"></div>
+          <div class="field"><label>Heure (optionnel)</label><input type="time" id="pb-heure"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
+          <button class="btn-sm primary" type="button" id="pb-save">Enregistrer</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modalZone').innerHTML = html;
+  document.getElementById('pb-save').addEventListener('click', async () => {
+    const membreSelect = document.getElementById('pb-membre');
+    const membre = membresCache.find(m => m.id === membreSelect.value);
+    const tache = document.getElementById('pb-tache').value.trim();
+    const dateVal = document.getElementById('pb-date').value;
+    if (!membreSelect.value || !tache || !dateVal) { alert('Merci de choisir un bénévole, une tâche et une date.'); return; }
+    await addDoc(collection(db, 'planning_benevoles'), {
+      assigneA: membreSelect.value,
+      assigneNom: membre ? `${membre.prenom} ${membre.nom}` : '',
+      tache,
+      date: dateVal,
+      heure: document.getElementById('pb-heure').value,
+      statut: 'a_faire',
+      createdAt: serverTimestamp()
+    });
+    window.fermerModal();
+    chargerPlanningBenevolesAdmin();
+  });
+});
+
+// ==========================================================================
+// CONTENU DU SITE (textes des pages publiques)
+// ==========================================================================
+async function chargerContenuAdmin() {
+  const d = await getDoc(doc(db, 'contenu_site', 'global'));
+  const c = d.exists() ? d.data() : {};
+  document.getElementById('ct-heroTitre').value = c.heroTitre || '';
+  document.getElementById('ct-heroTexte').value = c.heroTexte || '';
+  document.getElementById('ct-clubIntro').value = c.clubIntro || '';
+  document.getElementById('ct-clubOffre').value = c.clubOffre || '';
+  document.getElementById('ct-laraBio').value = c.laraBio || '';
+}
+document.getElementById('btnSauverContenu').addEventListener('click', async () => {
+  await setDoc(doc(db, 'contenu_site', 'global'), {
+    heroTitre: document.getElementById('ct-heroTitre').value.trim(),
+    heroTexte: document.getElementById('ct-heroTexte').value.trim(),
+    clubIntro: document.getElementById('ct-clubIntro').value.trim(),
+    clubOffre: document.getElementById('ct-clubOffre').value.trim(),
+    laraBio: document.getElementById('ct-laraBio').value.trim()
+  }, { merge: true });
+  alert('Textes enregistrés. Ils apparaîtront sur le site public au prochain chargement des pages.');
+});
+
+// ==========================================================================
+// CALENDRIER — jours fermés / horaires exceptionnels
+// ==========================================================================
+document.getElementById('exc-statut').addEventListener('change', (e) => {
+  document.getElementById('exc-horaireZone').style.display = e.target.value === 'horaire' ? 'grid' : 'none';
+});
+document.getElementById('btnAjouterException').addEventListener('click', async () => {
+  const dateISO = document.getElementById('exc-date').value;
+  if (!dateISO) { alert('Merci de choisir une date.'); return; }
+  const statut = document.getElementById('exc-statut').value;
+  const data = statut === 'ferme'
+    ? { ferme: true }
+    : {
+        ferme: false,
+        heureDebut: document.getElementById('exc-heureDebut').value,
+        heureFin: document.getElementById('exc-heureFin').value
+      };
+  if (statut === 'horaire' && (!data.heureDebut || !data.heureFin)) {
+    alert('Merci d\'indiquer une heure d\'ouverture et de fermeture.');
+    return;
+  }
+  await setDoc(doc(db, 'disponibilites_exceptions', dateISO), data);
+  document.getElementById('exc-date').value = '';
+  chargerExceptionsAdmin();
+});
+async function chargerExceptionsAdmin() {
+  const snap = await getDocs(collection(db, 'disponibilites_exceptions'));
+  let exceptions = [];
+  snap.forEach(d => exceptions.push({ date: d.id, ...d.data() }));
+  exceptions = exceptions.filter(e => e.date >= dateISOLocale(new Date()));
+  exceptions.sort((a, b) => a.date.localeCompare(b.date));
+  const wrap = document.getElementById('listeExceptions');
+  if (exceptions.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucune exception à venir.</div>'; return; }
+  wrap.innerHTML = exceptions.map(e => {
+    const dateLabel = capitalize(new Date(e.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
+    return `
+    <div class="data-row">
+      <div class="data-main">
+        <div class="data-title">${dateLabel}</div>
+        <div class="data-sub">${e.ferme ? '<span class="badge badge-danger">Fermé</span>' : `<span class="badge badge-neutral">Horaire spécial : ${e.heureDebut} – ${e.heureFin}</span>`}</div>
+      </div>
+      <div class="data-actions">
+        <button class="btn-sm danger" onclick="window.supprimerException('${e.date}')">Supprimer</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+window.supprimerException = async (dateISO) => {
+  await deleteDoc(doc(db, 'disponibilites_exceptions', dateISO));
+  chargerExceptionsAdmin();
+};

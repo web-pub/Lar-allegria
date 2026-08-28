@@ -5,7 +5,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V05';
+const VERSION_SITE = 'V08';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -42,6 +42,7 @@ onAuthStateChanged(auth, async (user) => {
 
   document.getElementById('tabChevalBtn').classList.toggle('hidden', membreData.typeMembre !== 'pension');
   document.getElementById('tabNettoyageBtn').classList.toggle('hidden', membreData.typeMembre !== 'pension');
+  document.getElementById('tabBenevolatBtn').classList.toggle('hidden', membreData.typeMembre !== 'benevole');
   document.getElementById('resaTypeChoix').classList.toggle('hidden', membreData.typeMembre !== 'pension');
 
   afficherAccueil();
@@ -53,7 +54,9 @@ onAuthStateChanged(auth, async (user) => {
   afficherAlerteMessage();
   chargerBoutiqueMembre();
   chargerHistoriquePaiementsMembre();
+  chargerStockMembre();
   if (membreData.typeMembre === 'pension') chargerNettoyage();
+  if (membreData.typeMembre === 'benevole') chargerPlanningBenevole();
 
   await chargerDisponibilites();
   await renderGrilleReservations();
@@ -73,6 +76,8 @@ function afficherAccueil() {
   document.getElementById('membreNom').textContent = `${membreData.prenom || ''} ${membreData.nom || ''}`.trim();
   const badgeType = membreData.typeMembre === 'pension'
     ? `<span class="badge badge-neutral">Membre demi-pension</span>`
+    : membreData.typeMembre === 'benevole'
+    ? `<span class="badge badge-neutral">Membre bénévole</span>`
     : `<span class="badge badge-neutral">Membre cours</span>`;
   const badgeCotis = membreData.cotisationPayee
     ? `<span class="badge badge-ok">Cotisation à jour</span>`
@@ -374,9 +379,9 @@ async function chargerDisponibilites() {
   if (pDoc.exists()) disponibilites = { ...disponibilites, ...pDoc.data() };
 }
 
-function creneauxHoraires() {
-  const [hD, mD] = disponibilites.heureDebut.split(':').map(Number);
-  const [hF, mF] = disponibilites.heureFin.split(':').map(Number);
+function creneauxHoraires(heureDebut, heureFin) {
+  const [hD, mD] = (heureDebut || disponibilites.heureDebut).split(':').map(Number);
+  const [hF, mF] = (heureFin || disponibilites.heureFin).split(':').map(Number);
   const creneaux = [];
   let h = hD, m = mD || 0;
   while (h < hF || (h === hF && m < mF)) {
@@ -384,6 +389,10 @@ function creneauxHoraires() {
     h += 1;
   }
   return creneaux;
+}
+async function exceptionJour(dateISO) {
+  const d = await getDoc(doc(db, 'disponibilites_exceptions', dateISO));
+  return d.exists() ? d.data() : null;
 }
 
 document.getElementById('resaSemainePrec').addEventListener('click', () => {
@@ -418,14 +427,23 @@ async function renderGrilleReservations() {
     parCle[`${r.date}_${r.heureDebut}`] = { id: d.id, ...r };
   });
 
-  const heures = creneauxHoraires();
   const maintenant = new Date();
   const joursOuverts = disponibilites.joursOuverts || [1,2,3,4,5,6];
 
   const blocs = await Promise.all(jours.map(async (d) => {
     const jourISO = d.getDay() === 0 ? 7 : d.getDay();
     const dateISO = dateISOLocale(d);
-    if (!joursOuverts.includes(jourISO)) return '';
+    const exception = await exceptionJour(dateISO);
+    if (exception?.ferme) {
+      return `
+      <div class="resa-jour">
+        <div class="resa-jour-titre">${capitalize(d.toLocaleDateString('fr-BE', {weekday:'short', day:'numeric', month:'short'}))}</div>
+        <div class="empty-state" style="margin:0;">Fermé ce jour-là</div>
+      </div>`;
+    }
+    const ouvertParException = exception && (exception.heureDebut || exception.heureFin);
+    if (!joursOuverts.includes(jourISO) && !ouvertParException) return '';
+    const heures = creneauxHoraires(exception?.heureDebut, exception?.heureFin);
     const m = await meteoPour(dateISO, '13:00');
     const alerte = alerteMeteo(m);
     const meteoHtml = m
@@ -642,6 +660,68 @@ window.marquerNettoyageFait = async (id) => {
 };
 
 // ==========================================================================
+// PLANNING BÉNÉVOLES (mes créneaux + planning complet de l'équipe)
+// ==========================================================================
+async function chargerPlanningBenevole() {
+  await Promise.all([chargerMesCreneauxBenevole(), chargerPlanningEquipeBenevole()]);
+}
+
+async function chargerMesCreneauxBenevole() {
+  const wrap = document.getElementById('zoneMesCreneauxBenevole');
+  const snap = await getDocs(query(collection(db, 'planning_benevoles'), where('assigneA', '==', membreUid)));
+  let creneaux = [];
+  snap.forEach(d => creneaux.push({ id: d.id, ...d.data() }));
+  creneaux.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.heure || '').localeCompare(b.heure || ''));
+  if (creneaux.length === 0) {
+    wrap.innerHTML = '<div class="empty-state">Aucun créneau qui vous soit assigné pour l\'instant.</div>';
+    return;
+  }
+  wrap.innerHTML = creneaux.map(c => {
+    const dateLabel = c.date ? capitalize(new Date(c.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'})) : '';
+    const badge = c.statut === 'fait' ? '<span class="badge badge-ok">Fait</span>' : '<span class="badge badge-warn">À venir</span>';
+    return `
+    <div class="data-row">
+      <div class="data-main">
+        <div class="data-title">${escapeHtml(c.tache)} — ${dateLabel}${c.heure ? ' à ' + escapeHtml(c.heure) : ''}</div>
+        <div class="data-sub">${badge}</div>
+      </div>
+      ${c.statut !== 'fait' ? `<div class="data-actions"><button class="btn-sm primary" onclick="window.marquerPlanningBenevoleFait('${c.id}')">Marquer comme fait</button></div>` : ''}
+    </div>`;
+  }).join('');
+}
+window.marquerPlanningBenevoleFait = async (id) => {
+  await updateDoc(doc(db, 'planning_benevoles', id), { statut: 'fait', dateRealisation: new Date().toISOString() });
+  chargerMesCreneauxBenevole();
+  chargerPlanningEquipeBenevole();
+};
+
+async function chargerPlanningEquipeBenevole() {
+  const wrap = document.getElementById('zonePlanningEquipeBenevole');
+  const snap = await getDocs(collection(db, 'planning_benevoles'));
+  let creneaux = [];
+  const aujourdhui = dateISOLocale(new Date());
+  snap.forEach(d => {
+    const c = d.data();
+    if (c.statut !== 'fait' && (c.date || '') >= aujourdhui) creneaux.push({ id: d.id, ...c });
+  });
+  creneaux.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.heure || '').localeCompare(b.heure || ''));
+  if (creneaux.length === 0) {
+    wrap.innerHTML = '<div class="empty-state">Aucun créneau à venir dans le planning de l\'équipe.</div>';
+    return;
+  }
+  wrap.innerHTML = creneaux.map(c => {
+    const dateLabel = c.date ? capitalize(new Date(c.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'})) : '';
+    return `
+    <div class="data-row">
+      <div class="data-main">
+        <div class="data-title">${escapeHtml(c.tache)} — ${dateLabel}${c.heure ? ' à ' + escapeHtml(c.heure) : ''}</div>
+        <div class="data-sub">Bénévole : ${escapeHtml(c.assigneNom || '—')}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ==========================================================================
 // CHAT AVEC LARA
 // ==========================================================================
 async function chargerChat() {
@@ -819,6 +899,58 @@ async function chargerHistoriquePaiementsMembre() {
       </div>
     </div>`).join('');
 }
+
+// ==========================================================================
+// STOCK — les membres peuvent signaler une prise
+// ==========================================================================
+let stockCache = [];
+async function chargerStockMembre() {
+  const wrap = document.getElementById('zoneStockMembre');
+  try {
+    const snap = await getDocs(collection(db, 'stock'));
+    stockCache = [];
+    snap.forEach(d => stockCache.push({ id: d.id, ...d.data() }));
+    if (stockCache.length === 0) {
+      wrap.innerHTML = '<div class="empty-state">Aucun article de stock enregistré pour l\'instant.</div>';
+      return;
+    }
+    wrap.innerHTML = stockCache.map(s => `
+      <div class="data-row">
+        <div class="data-main">
+          <div class="data-title">${escapeHtml(s.nom)}</div>
+          <div class="data-sub">${s.quantite <= 0 ? '<span class="badge badge-danger">Épuisé</span>' : `${s.quantite} ${escapeHtml(s.unite || '')} en stock`}</div>
+        </div>
+        <div class="data-actions">
+          <button class="btn-sm" ${s.quantite <= 0 ? 'disabled' : ''} onclick="window.signalerPriseStock('${s.id}')">J'ai pris quelque chose</button>
+        </div>
+      </div>`).join('');
+  } catch (err) {
+    wrap.innerHTML = `<div class="banner-alert danger">Erreur : ${escapeHtml(err.code || '')} — ${escapeHtml(err.message || String(err))}</div>`;
+  }
+}
+window.signalerPriseStock = async (id) => {
+  const item = stockCache.find(s => s.id === id);
+  if (!item) return;
+  const quantiteStr = prompt(`Quelle quantité de "${item.nom}" avez-vous prise ? (unité : ${item.unite || '—'})`, '1');
+  if (quantiteStr === null) return;
+  const quantite = parseFloat(quantiteStr.replace(',', '.'));
+  if (!quantite || quantite <= 0) { alert('Merci d\'indiquer une quantité valide.'); return; }
+  const nouvelleQuantite = Math.max(0, (item.quantite || 0) - quantite);
+  try {
+    await updateDoc(doc(db, 'stock', id), { quantite: nouvelleQuantite });
+    await addDoc(collection(db, 'stock_signalements'), {
+      membreId: membreUid,
+      stockId: id,
+      nom: item.nom,
+      quantitePrise: quantite,
+      unite: item.unite || '',
+      dateSignalement: new Date().toISOString()
+    });
+    await chargerStockMembre();
+  } catch (err) {
+    alert('Erreur : ' + (err.code || err.message));
+  }
+};
 
 // Filet de sécurité : si une zone reste bloquée sur "..." après un moment.
 setTimeout(() => {

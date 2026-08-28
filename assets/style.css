@@ -1,13 +1,14 @@
 /* ==========================================================================
    Lar'Allegria by Lara Rossoux — Charte graphique
-   Ambiance espagnole & flamenco assumée : noir profond, rouge carmin ardent,
-   jaune d'or andalou, blanc pur — pois et volants en clin d'œil aux robes
-   de flamenco.
+   Ambiance espagnole & flamenco, version plus chaleureuse et joyeuse :
+   brun profond (au lieu du noir pur), rouge cerise vif (moins soutenu que
+   le carmin ardent), jaune d'or andalou, blanc pur — pois et volants en
+   clin d'œil aux robes de flamenco.
    ========================================================================== */
 
 :root {
-  --noir: #000105;
-  --noir-dark: #000000;
+  --noir: #2B1B14;
+  --noir-dark: #1C110B;
   --terre: #5C4A3C;
   --terre-light: #8C7A68;
   --paper: #FFFBF2;
@@ -16,8 +17,8 @@
   --or: #E8A230;
   --or-light: #F4C463;
   --orange: #D9660B;
-  --rouge: #E70026;
-  --rouge-dark: #9A0320;
+  --rouge: #E2445A;
+  --rouge-dark: #B8394C;
   --ink: #1A0E0A;
 
   --font-display: "Yeseva One", "Fraunces", Georgia, "Times New Roman", serif;
@@ -25,8 +26,8 @@
   --font-body: "Source Sans 3", "Segoe UI", Arial, sans-serif;
 
   --radius: 4px;
-  --shadow-card: 0 14px 32px -14px rgba(0, 1, 5, 0.55);
-  --shadow-soft: 0 2px 10px rgba(0, 1, 5, 0.14);
+  --shadow-card: 0 14px 32px -14px rgba(43, 27, 20, 0.45);
+  --shadow-soft: 0 2px 10px rgba(43, 27, 20, 0.12);
   --max-width: 1120px;
 
   --pois: radial-gradient(var(--white) 2.4px, transparent 2.6px);
@@ -706,6 +707,50 @@ blockquote.pull-quote {
 .hero .flourish i, .page-hero .flourish i { color: var(--or-light); }
 .section-alt .flourish span, section:not(.hero):not(.page-hero) .flourish span { background: rgba(156, 43, 51, 0.3); }
 .section-alt .flourish i, section:not(.hero):not(.page-hero) .flourish i { color: var(--rouge); }
+
+/* ---------- Cartes médias (chevaux, événements, blog) ---------- */
+
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+}
+.media-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+  border: 1px solid #EEE0C4;
+  border-top: 4px solid var(--rouge);
+  display: flex;
+  flex-direction: column;
+}
+.media-card img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  display: block;
+  background: var(--paper-warm);
+}
+.media-card .mc-body { padding: 18px 20px; flex: 1; display: flex; flex-direction: column; }
+.media-card h3 { font-size: 1.15rem; margin-bottom: 4px; color: var(--noir); }
+.media-card .mc-meta {
+  color: var(--rouge-dark);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.media-card p { color: var(--terre); font-size: 0.94rem; margin: 0; flex: 1; white-space: pre-line; }
+
+.media-feed { display: flex; flex-direction: column; gap: 24px; max-width: 760px; margin: 0 auto; }
+.media-feed .media-card { flex-direction: row; border-top: none; border-left: 4px solid var(--rouge); }
+.media-feed .media-card img { width: 220px; height: auto; flex: none; }
+@media (max-width: 620px) {
+  .media-feed .media-card { flex-direction: column; }
+  .media-feed .media-card img { width: 100%; height: 180px; }
+}
 
 /* ---------- Table (grille tarifaire publique) ---------- */
 
