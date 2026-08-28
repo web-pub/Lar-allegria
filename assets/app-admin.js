@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V08';
+const VERSION_SITE = 'V09';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -1048,10 +1048,17 @@ window.ouvrirModalChevalEcurie = (c) => {
       visiblePublic: document.getElementById('ce-visible').value === 'oui'
     };
     if (!data.nom) { alert('Merci d\'indiquer un nom.'); return; }
-    if (c) await updateDoc(doc(db, 'chevaux_ecurie', c.id), data);
-    else await addDoc(collection(db, 'chevaux_ecurie'), data);
-    window.fermerModal();
-    chargerChevauxAdmin();
+    const btnSave = document.getElementById('ce-save');
+    btnSave.disabled = true;
+    try {
+      if (c) await updateDoc(doc(db, 'chevaux_ecurie', c.id), data);
+      else await addDoc(collection(db, 'chevaux_ecurie'), data);
+      window.fermerModal();
+      chargerChevauxAdmin();
+    } catch (err) {
+      btnSave.disabled = false;
+      alert('Erreur lors de l\'enregistrement : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions" ou "insufficient permissions", il faut mettre à jour les règles Firestore dans la console Firebase (voir le README, section 4).');
+    }
   });
 };
 
@@ -1110,10 +1117,14 @@ window.ouvrirModalEvenement = (e) => {
       description: document.getElementById('ev-description').value.trim()
     };
     if (!data.titre || !data.date) { alert('Merci d\'indiquer au moins un titre et une date.'); return; }
-    if (e) await updateDoc(doc(db, 'evenements', e.id), data);
-    else await addDoc(collection(db, 'evenements'), data);
-    window.fermerModal();
-    chargerEvenementsAdmin();
+    try {
+      if (e) await updateDoc(doc(db, 'evenements', e.id), data);
+      else await addDoc(collection(db, 'evenements'), data);
+      window.fermerModal();
+      chargerEvenementsAdmin();
+    } catch (err) {
+      alert('Erreur lors de l\'enregistrement : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore (voir le README, section 4).');
+    }
   });
 };
 
@@ -1174,10 +1185,14 @@ window.ouvrirModalArticleBlog = (a) => {
       publie: document.getElementById('bl-publie').value === 'oui'
     };
     if (!data.titre) { alert('Merci d\'indiquer un titre.'); return; }
-    if (a) await updateDoc(doc(db, 'articles_blog', a.id), data);
-    else await addDoc(collection(db, 'articles_blog'), data);
-    window.fermerModal();
-    chargerBlogAdmin();
+    try {
+      if (a) await updateDoc(doc(db, 'articles_blog', a.id), data);
+      else await addDoc(collection(db, 'articles_blog'), data);
+      window.fermerModal();
+      chargerBlogAdmin();
+    } catch (err) {
+      alert('Erreur lors de l\'enregistrement : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore (voir le README, section 4).');
+    }
   });
 };
 
@@ -1224,21 +1239,29 @@ document.getElementById('btnAjouterStock').addEventListener('click', () => {
   document.getElementById('st-save').addEventListener('click', async () => {
     const nom = document.getElementById('st-nom').value.trim();
     if (!nom) { alert('Merci d\'indiquer un nom.'); return; }
-    await addDoc(collection(db, 'stock'), {
-      nom,
-      quantite: parseFloat(document.getElementById('st-quantite').value) || 0,
-      unite: document.getElementById('st-unite').value.trim()
-    });
-    window.fermerModal();
-    chargerStockAdmin();
+    try {
+      await addDoc(collection(db, 'stock'), {
+        nom,
+        quantite: parseFloat(document.getElementById('st-quantite').value) || 0,
+        unite: document.getElementById('st-unite').value.trim()
+      });
+      window.fermerModal();
+      chargerStockAdmin();
+    } catch (err) {
+      alert('Erreur lors de l\'enregistrement : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore (voir le README, section 4).');
+    }
   });
 });
 window.ajusterStock = async (id, delta) => {
   const item = window._stock[id];
   if (!item) return;
   const nouvelle = Math.max(0, (item.quantite || 0) + delta);
-  await updateDoc(doc(db, 'stock', id), { quantite: nouvelle });
-  chargerStockAdmin();
+  try {
+    await updateDoc(doc(db, 'stock', id), { quantite: nouvelle });
+    chargerStockAdmin();
+  } catch (err) {
+    alert('Erreur : ' + (err.code || err.message));
+  }
 };
 window.supprimerStock = async (id) => { if (!confirm('Supprimer cet article de stock ?')) return; await deleteDoc(doc(db, 'stock', id)); chargerStockAdmin(); };
 
@@ -1323,17 +1346,21 @@ document.getElementById('btnAjouterPlanningBenevole').addEventListener('click', 
     const tache = document.getElementById('pb-tache').value.trim();
     const dateVal = document.getElementById('pb-date').value;
     if (!membreSelect.value || !tache || !dateVal) { alert('Merci de choisir un bénévole, une tâche et une date.'); return; }
-    await addDoc(collection(db, 'planning_benevoles'), {
-      assigneA: membreSelect.value,
-      assigneNom: membre ? `${membre.prenom} ${membre.nom}` : '',
-      tache,
-      date: dateVal,
-      heure: document.getElementById('pb-heure').value,
-      statut: 'a_faire',
-      createdAt: serverTimestamp()
-    });
-    window.fermerModal();
-    chargerPlanningBenevolesAdmin();
+    try {
+      await addDoc(collection(db, 'planning_benevoles'), {
+        assigneA: membreSelect.value,
+        assigneNom: membre ? `${membre.prenom} ${membre.nom}` : '',
+        tache,
+        date: dateVal,
+        heure: document.getElementById('pb-heure').value,
+        statut: 'a_faire',
+        createdAt: serverTimestamp()
+      });
+      window.fermerModal();
+      chargerPlanningBenevolesAdmin();
+    } catch (err) {
+      alert('Erreur lors de l\'enregistrement : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore (voir le README, section 4).');
+    }
   });
 });
 
@@ -1350,14 +1377,18 @@ async function chargerContenuAdmin() {
   document.getElementById('ct-laraBio').value = c.laraBio || '';
 }
 document.getElementById('btnSauverContenu').addEventListener('click', async () => {
-  await setDoc(doc(db, 'contenu_site', 'global'), {
-    heroTitre: document.getElementById('ct-heroTitre').value.trim(),
-    heroTexte: document.getElementById('ct-heroTexte').value.trim(),
-    clubIntro: document.getElementById('ct-clubIntro').value.trim(),
-    clubOffre: document.getElementById('ct-clubOffre').value.trim(),
-    laraBio: document.getElementById('ct-laraBio').value.trim()
-  }, { merge: true });
-  alert('Textes enregistrés. Ils apparaîtront sur le site public au prochain chargement des pages.');
+  try {
+    await setDoc(doc(db, 'contenu_site', 'global'), {
+      heroTitre: document.getElementById('ct-heroTitre').value.trim(),
+      heroTexte: document.getElementById('ct-heroTexte').value.trim(),
+      clubIntro: document.getElementById('ct-clubIntro').value.trim(),
+      clubOffre: document.getElementById('ct-clubOffre').value.trim(),
+      laraBio: document.getElementById('ct-laraBio').value.trim()
+    }, { merge: true });
+    alert('Textes enregistrés. Ils apparaîtront sur le site public au prochain chargement des pages.');
+  } catch (err) {
+    alert('Erreur lors de l\'enregistrement : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore (voir le README, section 4).');
+  }
 });
 
 // ==========================================================================
@@ -1381,9 +1412,13 @@ document.getElementById('btnAjouterException').addEventListener('click', async (
     alert('Merci d\'indiquer une heure d\'ouverture et de fermeture.');
     return;
   }
-  await setDoc(doc(db, 'disponibilites_exceptions', dateISO), data);
-  document.getElementById('exc-date').value = '';
-  chargerExceptionsAdmin();
+  try {
+    await setDoc(doc(db, 'disponibilites_exceptions', dateISO), data);
+    document.getElementById('exc-date').value = '';
+    chargerExceptionsAdmin();
+  } catch (err) {
+    alert('Erreur lors de l\'enregistrement : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore (voir le README, section 4).');
+  }
 });
 async function chargerExceptionsAdmin() {
   const snap = await getDocs(collection(db, 'disponibilites_exceptions'));
