@@ -29,7 +29,10 @@
         <li><a href="index.html">Accueil</a></li>
         <li><a href="club.html">Le Club</a></li>
         <li><a href="activites.html">Activités</a></li>
+        <li><a href="chevaux.html">Nos chevaux</a></li>
         <li><a href="lara.html" class="active">Lara</a></li>
+        <li><a href="evenements.html">Événements</a></li>
+        <li><a href="blog.html">Blog</a></li>
         <li><a href="tarifs.html">Tarifs</a></li>
         <li><a href="inscription.html">Inscription</a></li>
         <li><a href="contact.html">Nous contacter</a></li>
@@ -54,7 +57,7 @@
       <div>
         <div class="info-block">
           <h2>Seule à bord, bien entourée</h2>
-          <p>Lara dirige Lar'Allegria en solo — de l'enseignement du dressage à la gestion quotidienne de l'écurie — dans un secteur encore largement masculin. Une position qu'elle assume avec exigence et passion, entourée d'une communauté de cavaliers et de membres en demi-pension fidèles.</p>
+          <p id="site-laraBio">Lara dirige Lar'Allegria en solo — de l'enseignement du dressage à la gestion quotidienne de l'écurie — dans un secteur encore largement masculin. Une position qu'elle assume avec exigence et passion, entourée d'une communauté de cavaliers et de membres en demi-pension fidèles.</p>
           <p>Le club s'est construit autour de son manège et de sa piste privés, à Grâce-Hollogne, où elle accueille aussi bien les cavaliers débutants que les membres en demi-pension, qui disposent d'un cheval de l'écurie comme s'il était le leur.</p>
         </div>
         <blockquote class="pull-quote">
@@ -85,7 +88,7 @@
     <div class="footer-grid">
       <div>
         <h4>Lar'Allegria by Lara Rossoux</h4>
-        <p>Club d'équitation ASBL proposant école d'équitation, cours de dressage, écurie privée, stages et spectacles équestres à Grâce-Hollogne.</p>
+        <p>École équestre ASBL proposant école d'équitation, cours de dressage, écurie privée, stages et spectacles équestres à Grâce-Hollogne.</p>
       </div>
       <div>
         <h4>Navigation</h4>
@@ -93,7 +96,10 @@
           <li><a href="index.html">Accueil</a></li>
           <li><a href="club.html">Le Club</a></li>
           <li><a href="activites.html">Activités</a></li>
+          <li><a href="chevaux.html">Nos chevaux</a></li>
           <li><a href="lara.html">Lara</a></li>
+          <li><a href="evenements.html">Événements</a></li>
+          <li><a href="blog.html">Blog</a></li>
           <li><a href="tarifs.html">Tarifs</a></li>
           <li><a href="inscription.html">Inscription</a></li>
           <li><a href="contact.html">Nous contacter</a></li>
@@ -114,7 +120,7 @@
     <div class="footer-bottom">
       <span>© 2026 Hélène Laruelle — Tous droits réservés</span>
       <span>TVA BE 0756.844.280</span>
-      <span>Site V05</span>
+      <span>Site V08</span>
     </div>
   </div>
 </footer>
@@ -126,6 +132,17 @@
     const isOpen = nav.classList.toggle('open');
     toggle.setAttribute('aria-expanded', isOpen);
   });
+</script>
+<script type="module">
+  import { db, doc, getDoc } from "./assets/firebase-config.js";
+  (async () => {
+    try {
+      const snap = await getDoc(doc(db, 'contenu_site', 'global'));
+      if (!snap.exists()) return;
+      const c = snap.data();
+      if (c.laraBio) document.getElementById('site-laraBio').textContent = c.laraBio;
+    } catch (err) { /* on garde le texte par défaut */ }
+  })();
 </script>
 </body>
 </html>

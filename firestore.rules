@@ -104,5 +104,66 @@ service cloud.firestore {
       allow create: if estConnecte() && request.resource.data.membreId == request.auth.uid;
       allow update, delete: if estAdmin();
     }
+
+    // Textes des pages publiques, modifiables depuis l'admin ("Contenu du site").
+    match /contenu_site/{id} {
+      allow read: if true;
+      allow write: if estAdmin();
+    }
+
+    // Chevaux de l'écurie (propriété de Lara) — page publique "Nos chevaux".
+    match /chevaux_ecurie/{id} {
+      allow read: if true;
+      allow write: if estAdmin();
+    }
+
+    // Jours fermés / horaires exceptionnels (par date), en plus des horaires
+    // hebdomadaires par défaut dans parametres/disponibilites.
+    match /disponibilites_exceptions/{date} {
+      allow read: if estConnecte();
+      allow write: if estAdmin();
+    }
+
+    // Événements (portes ouvertes, journées club...), visibles publiquement.
+    match /evenements/{id} {
+      allow read: if true;
+      allow write: if estAdmin();
+    }
+
+    // Stock (foin, nourriture...) : l'admin gère tout ; un membre connecté
+    // peut uniquement mettre à jour la quantité (pour signaler une prise).
+    match /stock/{id} {
+      allow read: if estConnecte();
+      allow create, delete: if estAdmin();
+      allow update: if estAdmin() || (
+        estConnecte() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantite'])
+      );
+    }
+
+    // Journal des prises de stock signalées par les membres.
+    match /stock_signalements/{id} {
+      allow read: if estAdmin();
+      allow create: if estConnecte() && request.resource.data.membreId == request.auth.uid;
+      allow delete: if estAdmin();
+    }
+
+    // Articles de blog / newsletter, publics.
+    match /articles_blog/{id} {
+      allow read: if true;
+      allow write: if estAdmin();
+    }
+
+    // Planning des membres bénévoles (qui vient quand, pour quelle tâche).
+    // Lecture ouverte à tout membre connecté pour que l'équipe voie le
+    // planning complet ; un bénévole ne peut cocher que ses propres créneaux.
+    match /planning_benevoles/{id} {
+      allow read: if estConnecte();
+      allow create, delete: if estAdmin();
+      allow update: if estAdmin() || (
+        estConnecte() && resource.data.assigneA == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['statut','dateRealisation'])
+      );
+    }
   }
 }

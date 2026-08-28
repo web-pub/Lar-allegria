@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lar'Allegria by Lara Rossoux — Club d'équitation à Grâce-Hollogne</title>
-<meta name="description" content="Lar'Allegria by Lara Rossoux : club d'équitation familial à Grâce-Hollogne. Cours de dressage individuels, écurie privée, stages et spectacles équestres.">
+<title>Lar'Allegria by Lara Rossoux — École équestre à Grâce-Hollogne</title>
+<meta name="description" content="Lar'Allegria by Lara Rossoux : école équestre familiale à Grâce-Hollogne. Cours de dressage individuels, écurie privée, stages et spectacles équestres.">
 <link rel="canonical" href="https://web-pub.github.io/Lar-allegria/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Lar'Allegria by Lara Rossoux">
-<meta property="og:description" content="Club d'équitation familial à Grâce-Hollogne : cours de dressage individuels, écurie privée, stages et spectacles.">
+<meta property="og:description" content="École équestre familiale à Grâce-Hollogne : cours de dressage individuels, écurie privée, stages et spectacles.">
 <meta property="og:locale" content="fr_BE">
 <link rel="icon" href="assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,7 +20,7 @@
   "@context": "https://schema.org",
   "@type": "SportsActivityLocation",
   "name": "Lar'Allegria by Lara Rossoux",
-  "description": "Club d'équitation proposant école d'équitation, spectacles équestres, écurie privée et cours de dressage à Grâce-Hollogne.",
+  "description": "École équestre proposant école d'équitation, spectacles équestres, écurie privée et cours de dressage à Grâce-Hollogne.",
   "email": "lara.rossoux@hotmail.com",
   "telephone": "+32497639618",
   "address": {
@@ -51,7 +51,10 @@
         <li><a href="index.html" class="active">Accueil</a></li>
         <li><a href="club.html">Le Club</a></li>
         <li><a href="activites.html">Activités</a></li>
+        <li><a href="chevaux.html">Nos chevaux</a></li>
         <li><a href="lara.html">Lara</a></li>
+        <li><a href="evenements.html">Événements</a></li>
+        <li><a href="blog.html">Blog</a></li>
         <li><a href="tarifs.html">Tarifs</a></li>
         <li><a href="inscription.html">Inscription</a></li>
         <li><a href="contact.html">Nous contacter</a></li>
@@ -64,9 +67,9 @@
 <section class="hero">
   <div class="hero-inner">
     <div>
-      <span class="eyebrow">Club d'équitation familial — Grâce-Hollogne</span>
-      <h1>Une écurie à taille humaine, entre passion du dressage et esprit de famille.</h1>
-      <p class="lead">Lar'Allegria by Lara Rossoux accueille cavaliers et chevaux sur le manège privé de Lara, pour des cours individuels d'une heure, en toute simplicité et avec une attention constante à chacun.</p>
+      <span class="eyebrow">École équestre familiale — Grâce-Hollogne</span>
+      <h1 id="site-heroTitre">Une écurie à taille humaine, entre passion du dressage et esprit de famille.</h1>
+      <p class="lead" id="site-heroTexte">Lar'Allegria by Lara Rossoux accueille cavaliers et chevaux sur le manège privé de Lara, pour des cours individuels d'une heure, en toute simplicité et avec une attention constante à chacun.</p>
       <div class="flourish"><span></span><i>&#10022;</i><span></span></div>
       <div class="btn-row">
         <a class="btn btn-primary" href="inscription.html">Rejoindre le club</a>
@@ -145,7 +148,7 @@
       <div class="cc-side"><img src="assets/logo.png" alt="Logo Lar'Allegria by Lara Rossoux"></div>
       <div class="cc-body">
         <h3>Lar'Allegria by Lara Rossoux</h3>
-        <div class="cc-role">Club d'équitation — Grâce-Hollogne</div>
+        <div class="cc-role">École équestre — Grâce-Hollogne</div>
         <ul class="contact-list">
           <li><span class="label">GSM</span><a href="tel:+32497639618">0497 63 96 18</a></li>
           <li><span class="label">Email</span><a href="mailto:lara.rossoux@hotmail.com">lara.rossoux@hotmail.com</a></li>
@@ -160,7 +163,7 @@
     <div class="footer-grid">
       <div>
         <h4>Lar'Allegria by Lara Rossoux</h4>
-        <p>Club d'équitation ASBL proposant école d'équitation, cours de dressage, écurie privée, stages et spectacles équestres à Grâce-Hollogne.</p>
+        <p>École équestre ASBL proposant école d'équitation, cours de dressage, écurie privée, stages et spectacles équestres à Grâce-Hollogne.</p>
       </div>
       <div>
         <h4>Navigation</h4>
@@ -168,7 +171,10 @@
           <li><a href="index.html">Accueil</a></li>
           <li><a href="club.html">Le Club</a></li>
           <li><a href="activites.html">Activités</a></li>
+          <li><a href="chevaux.html">Nos chevaux</a></li>
           <li><a href="lara.html">Lara</a></li>
+          <li><a href="evenements.html">Événements</a></li>
+          <li><a href="blog.html">Blog</a></li>
           <li><a href="tarifs.html">Tarifs</a></li>
           <li><a href="inscription.html">Inscription</a></li>
           <li><a href="contact.html">Nous contacter</a></li>
@@ -189,7 +195,7 @@
     <div class="footer-bottom">
       <span>© 2026 Hélène Laruelle — Tous droits réservés</span>
       <span>TVA BE 0756.844.280</span>
-      <span>Site V05</span>
+      <span>Site V08</span>
     </div>
   </div>
 </footer>
@@ -201,6 +207,18 @@
     const isOpen = nav.classList.toggle('open');
     toggle.setAttribute('aria-expanded', isOpen);
   });
+</script>
+<script type="module">
+  import { db, doc, getDoc } from "./assets/firebase-config.js";
+  (async () => {
+    try {
+      const snap = await getDoc(doc(db, 'contenu_site', 'global'));
+      if (!snap.exists()) return;
+      const c = snap.data();
+      if (c.heroTitre) document.getElementById('site-heroTitre').textContent = c.heroTitre;
+      if (c.heroTexte) document.getElementById('site-heroTexte').textContent = c.heroTexte;
+    } catch (err) { /* on garde le texte par défaut */ }
+  })();
 </script>
 </body>
 </html>

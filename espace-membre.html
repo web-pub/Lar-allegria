@@ -33,8 +33,10 @@
     <button class="tab-btn" data-tab="reservations">Réservations</button>
     <button class="tab-btn" data-tab="activites">Activités</button>
     <button class="tab-btn hidden" data-tab="nettoyage" id="tabNettoyageBtn">Nettoyage box</button>
+    <button class="tab-btn hidden" data-tab="benevolat" id="tabBenevolatBtn">Bénévolat</button>
     <button class="tab-btn" data-tab="tarifs">Tarifs</button>
     <button class="tab-btn" data-tab="boutique" id="tabBoutiqueBtn">Boutique</button>
+    <button class="tab-btn" data-tab="stock">Stock</button>
     <button class="tab-btn" data-tab="messages" id="tabMessagesBtn">Messages</button>
     <button class="tab-btn" data-tab="historique">Historique</button>
   </div>
@@ -162,6 +164,20 @@
     </div>
   </div>
 
+  <!-- ==================== BÉNÉVOLAT ==================== -->
+  <div id="panel-benevolat" class="tab-panel hidden">
+    <div class="app-panel">
+      <h2>Mes créneaux</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Vos créneaux de bénévolat, planifiés par Lara. Marquez-les comme faits une fois réalisés.</p>
+      <div class="data-list" id="zoneMesCreneauxBenevole"><div class="empty-state">...</div></div>
+    </div>
+    <div class="app-panel">
+      <h2>Planning de l'équipe</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Qui vient quand, pour que tout soit couvert.</p>
+      <div class="data-list" id="zonePlanningEquipeBenevole"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+
   <!-- ==================== TARIFS ==================== -->
   <div id="panel-tarifs" class="tab-panel hidden">
     <div class="app-panel">
@@ -195,6 +211,15 @@
 
       <h3 style="margin-top:18px;">Historique de mes commandes</h3>
       <div class="data-list" id="zoneMesCommandes"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+
+  <!-- ==================== STOCK ==================== -->
+  <div id="panel-stock" class="tab-panel hidden">
+    <div class="app-panel">
+      <h2>Stock du club</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Foin, nourriture, litière... Si vous prenez quelque chose, signalez-le ici pour tenir le stock à jour.</p>
+      <div class="data-list" id="zoneStockMembre"><div class="empty-state">...</div></div>
     </div>
   </div>
 

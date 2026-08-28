@@ -1,8 +1,8 @@
-# Lar'Allegria by Lara Rossoux — site du club (V04)
+# Lar'Allegria by Lara Rossoux — site du club (V08)
 
 Dépôt GitHub : **web-pub/Lar-allegria**. Projet Firebase : **Lar-allegria**.
 
-Site du club d'équitation **Lar'Allegria by Lara Rossoux** (ASBL, Grâce-Hollogne),
+Site de l'école équestre **Lar'Allegria by Lara Rossoux** (ASBL, Grâce-Hollogne),
 construit sur le même modèle que le site "Les Cabots de Fernelmont" : un site
 statique (HTML/CSS/JS, sans framework ni étape de build) hébergé sur
 **Firebase Hosting** et connecté à **Firebase Authentication** + **Firestore**
@@ -11,23 +11,39 @@ boutique...).
 
 ## 1. Ce que fait le site
 
-- Pages publiques : Accueil, Le Club, Activités, Lara, Tarifs (grille tenue à
-  jour par Lara), Inscription (formulaire public de demande d'adhésion),
-  Contact, CGV, Confidentialité.
-- **Inscription en ligne** : un visiteur choisit "membre cours" ou "membre
+- Pages publiques : Accueil, Le Club, Activités, **Nos chevaux**, Lara,
+  **Événements**, **Blog**, Tarifs (grille tenue à jour par Lara), Inscription
+  (formulaire public de demande d'adhésion), Contact, CGV, Confidentialité.
+- **Inscription en ligne** : un visiteur choisit "membre cours", "membre
   demi-pension" (les chevaux appartiennent tous à Lara ; un membre demi-pension
-  en a un mis à sa disposition comme s'il était le sien) et remplit sa fiche
-  complète. La demande part dans Firestore (`demandes_inscription`) ; Lara la
-  valide depuis l'espace admin et crée le compte membre.
+  en a un mis à sa disposition comme s'il était le sien) ou **"membre
+  bénévole"** (vient régulièrement aider au club selon un planning de tâches)
+  et remplit sa fiche complète. La demande part dans Firestore
+  (`demandes_inscription`) ; Lara la valide depuis l'espace admin et crée le
+  compte membre.
 - **Espace membre** (après connexion) : profil, cheval (si membre demi-pension),
   réservation de la piste dans une grille horaire (cours d'1h ou usage libre
-  de la piste), météo affichée sur chaque créneau, activités (stages,
-  spectacles), nettoyage du box (si assigné), tarifs, boutique, messages,
-  historique.
+  de la piste, avec prise en compte des jours fermés / horaires exceptionnels
+  fixés par Lara), météo affichée sur chaque créneau, activités (stages,
+  spectacles), nettoyage du box (si assigné), tarifs, boutique, **stock du
+  club** (signaler ce qu'on a pris), messages, historique. Un membre
+  "bénévole" voit en plus l'onglet **"Bénévolat"** : ses propres créneaux
+  (avec bouton "marquer comme fait") et le planning complet de l'équipe, pour
+  que chacun voie qui vient quand et pour quelle tâche.
 - **Espace admin** (Lara) : validation des réservations (une seule personne
   à la fois sur la piste), gestion des membres et des demandes d'inscription,
-  box et planning de nettoyage, tarifs, activités, boutique/commandes,
-  messages, horaires d'ouverture de la piste.
+  box et planning de nettoyage, **planning des bénévoles** (assigner une
+  tâche, une date et une heure à chaque bénévole, marquer fait, supprimer),
+  tarifs, activités, **fiches des chevaux de l'écurie** (nom,
+  race, photo, description — les photos sont déposées manuellement dans
+  `assets/chevaux/` sur GitHub puis leur URL est collée dans la fiche),
+  **calendrier** (jours fermés / horaires exceptionnels de la piste),
+  **événements publics** (titre, date, heure, photo, description — visibles
+  de tous les visiteurs), **articles de blog** (mode newsletter, brouillon ou
+  publié), **stock** (foin, nourriture...), boutique/commandes, messages,
+  horaires d'ouverture de la piste, et un onglet **"Contenu du site"** pour
+  modifier les textes principaux des pages publiques (titre et texte
+  d'accueil, présentation du club, bio de Lara) sans toucher au code.
 - **Météo** : via [Open-Meteo](https://open-meteo.com/) (gratuit, sans clé),
   coordonnées de Grâce-Hollogne. Une alerte (pluie, vent, chaleur, gel)
   s'affiche automatiquement sur les créneaux concernés.
@@ -150,9 +166,9 @@ dans Firebase Authentication → **Settings** → **Authorized domains**.
 
 ```
 lar-allegria/
-├── index.html, club.html, activites.html, lara.html, tarifs.html,
-│   inscription.html, contact.html, connexion.html, cgv.html,
-│   confidentialite.html          → pages publiques
+├── index.html, club.html, activites.html, chevaux.html, lara.html,
+│   evenements.html, blog.html, tarifs.html, inscription.html, contact.html,
+│   connexion.html, cgv.html, confidentialite.html   → pages publiques
 ├── espace-membre.html             → espace membre (connecté)
 ├── admin.html                     → espace admin (Lara)
 ├── assets/
@@ -161,10 +177,18 @@ lar-allegria/
 │   ├── meteo.js                   → météo Open-Meteo (Grâce-Hollogne)
 │   ├── app-membre.js              → logique espace membre
 │   ├── app-admin.js               → logique espace admin
+│   ├── chevaux/                   → photos des chevaux déposées par Lara (voir §1)
 │   ├── logo.png, photo-spectacle-lara.jpg, photo-equipe-spectacle.jpg → visuels du club
 ├── firebase.json, .firebaserc, firestore.rules, firestore.indexes.json
 └── robots.txt, sitemap.xml
 ```
+
+Nouvelles collections Firestore (V06-V08) : `contenu_site` (textes éditables des
+pages publiques), `chevaux_ecurie` (fiches chevaux), `disponibilites_exceptions`
+(jours fermés / horaires spéciaux, un document par date), `evenements`,
+`articles_blog`, `stock` et `stock_signalements` (journal des prises de stock
+par les membres), `planning_benevoles` (créneaux des membres bénévoles : qui
+vient quand et pour quelle tâche). Les règles d'accès sont dans `firestore.rules`.
 
 ## 8. Prochaines pistes d'évolution
 

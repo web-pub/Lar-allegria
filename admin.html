@@ -27,11 +27,17 @@
   <div class="tab-bar">
     <button class="tab-btn active" data-tab="reservations">Réservations</button>
     <button class="tab-btn" data-tab="membres" id="tabMembresBtn">Membres</button>
+    <button class="tab-btn" data-tab="chevaux">Chevaux</button>
     <button class="tab-btn" data-tab="nettoyage">Nettoyage box</button>
     <button class="tab-btn" data-tab="tarifs">Tarifs</button>
     <button class="tab-btn" data-tab="activites">Activités</button>
+    <button class="tab-btn" data-tab="evenements">Événements</button>
+    <button class="tab-btn" data-tab="blog">Blog</button>
     <button class="tab-btn" data-tab="boutique" id="tabBoutiqueBtn">Boutique</button>
+    <button class="tab-btn" data-tab="stock">Stock</button>
+    <button class="tab-btn" data-tab="planning-benevoles">Planning bénévoles</button>
     <button class="tab-btn" data-tab="messages" id="tabMessagesBtn">Messages</button>
+    <button class="tab-btn" data-tab="contenu">Contenu du site</button>
     <button class="tab-btn" data-tab="parametres">Paramètres</button>
   </div>
 
@@ -73,6 +79,18 @@
       <div class="data-list" id="listeMembres"><div class="empty-state">...</div></div>
       <button class="btn-sm" id="btnVoirArchives" style="margin-top:14px;">Voir les membres archivés</button>
       <div class="data-list" id="listeMembresArchives" style="margin-top:10px; display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ==================== CHEVAUX ==================== -->
+  <div id="panel-chevaux" class="tab-panel hidden">
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>Chevaux de l'écurie</h2>
+        <button class="btn-sm primary" id="btnAjouterCheval">+ Ajouter un cheval</button>
+      </div>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Ces fiches alimentent la page publique "Nos chevaux". Pour la photo, dépose l'image dans le dépôt GitHub (ex: dans <code>assets/chevaux/</code>) puis colle son chemin ou son URL ici.</p>
+      <div class="data-list" id="listeChevauxEcurie"><div class="empty-state">...</div></div>
     </div>
   </div>
 
@@ -123,6 +141,30 @@
     </div>
   </div>
 
+  <!-- ==================== ÉVÉNEMENTS ==================== -->
+  <div id="panel-evenements" class="tab-panel hidden">
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>Événements</h2>
+        <button class="btn-sm primary" id="btnAjouterEvenement">+ Créer un événement</button>
+      </div>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Affichés sur la page publique "Événements", visible de tous les visiteurs. Pour la photo, colle une URL (image déposée sur GitHub ou ailleurs).</p>
+      <div class="data-list" id="listeEvenements"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+
+  <!-- ==================== BLOG ==================== -->
+  <div id="panel-blog" class="tab-panel hidden">
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>Articles de blog</h2>
+        <button class="btn-sm primary" id="btnAjouterArticleBlog">+ Écrire un article</button>
+      </div>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Publiés sur la page publique "Blog", visible de tous les visiteurs.</p>
+      <div class="data-list" id="listeArticlesBlog"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+
   <!-- ==================== BOUTIQUE ==================== -->
   <div id="panel-boutique" class="tab-panel hidden">
     <div class="app-panel">
@@ -138,12 +180,57 @@
     </div>
   </div>
 
+  <!-- ==================== STOCK ==================== -->
+  <div id="panel-stock" class="tab-panel hidden">
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>Stock (foin, nourriture...)</h2>
+        <button class="btn-sm primary" id="btnAjouterStock">+ Ajouter un article de stock</button>
+      </div>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Les membres peuvent signaler qu'ils ont pris quelque chose depuis leur espace — la quantité se met à jour automatiquement ici.</p>
+      <div class="data-list" id="listeStock"><div class="empty-state">...</div></div>
+    </div>
+    <div class="app-panel">
+      <h2>Dernières prises signalées</h2>
+      <div class="data-list" id="listeStockSignalements"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+
+  <!-- ==================== PLANNING BÉNÉVOLES ==================== -->
+  <div id="panel-planning-benevoles" class="tab-panel hidden">
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>Planning des bénévoles</h2>
+        <button class="btn-sm primary" id="btnAjouterPlanningBenevole">+ Ajouter un créneau</button>
+      </div>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Qui vient quand, et pour faire quoi. Chaque bénévole ne voit et ne coche que ses propres créneaux, mais tous les membres connectés voient le planning complet de l'équipe.</p>
+      <div class="data-list" id="listePlanningBenevoles"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+
   <!-- ==================== MESSAGES ==================== -->
   <div id="panel-messages" class="tab-panel hidden">
     <div class="app-panel">
       <h2>Messages</h2>
       <input type="text" id="rechercheMessage" placeholder="🔍 Rechercher un membre..." style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #DCCBA8; border-radius:6px; margin-bottom:14px; font-size:0.95rem;">
       <div class="data-list" id="listeConversations"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+
+  <!-- ==================== CONTENU DU SITE ==================== -->
+  <div id="panel-contenu" class="tab-panel hidden">
+    <div class="app-panel">
+      <h2>Textes des pages publiques</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Modifie les textes affichés sur le site. Laisse un champ vide pour garder le texte par défaut.</p>
+      <h3>Accueil</h3>
+      <div class="field"><label>Titre principal</label><textarea id="ct-heroTitre" rows="2"></textarea></div>
+      <div class="field"><label>Texte d'introduction</label><textarea id="ct-heroTexte" rows="3"></textarea></div>
+      <h3 style="margin-top:18px;">Le Club</h3>
+      <div class="field"><label>"Notre philosophie" — premier paragraphe</label><textarea id="ct-clubIntro" rows="3"></textarea></div>
+      <div class="field"><label>"Ce que propose le club" — paragraphe</label><textarea id="ct-clubOffre" rows="3"></textarea></div>
+      <h3 style="margin-top:18px;">Lara</h3>
+      <div class="field"><label>"Seule à bord, bien entourée" — premier paragraphe</label><textarea id="ct-laraBio" rows="3"></textarea></div>
+      <button class="btn-sm primary" id="btnSauverContenu" style="margin-top:14px;">Enregistrer les textes</button>
     </div>
   </div>
 
@@ -171,6 +258,25 @@
       <h3 style="margin-top:14px;">Jours ouverts</h3>
       <div class="membre-check-list" id="param-jours" style="max-height:none;"></div>
       <button class="btn-sm primary" id="btnSauverDisponibilites" style="margin-top:14px;">Enregistrer les horaires</button>
+    </div>
+    <div class="app-panel">
+      <h2>Jours fermés / horaires exceptionnels</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Pour un jour précis qui déroge aux horaires habituels ci-dessus (fermeture exceptionnelle, ou horaire spécial).</p>
+      <div class="form-grid">
+        <div class="field"><label>Date</label><input type="date" id="exc-date"></div>
+        <div class="field"><label>Statut</label>
+          <select id="exc-statut">
+            <option value="ferme">Fermé ce jour-là</option>
+            <option value="horaire">Horaire spécial</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid" id="exc-horaireZone" style="display:none;">
+        <div class="field"><label>Ouverture</label><input type="time" id="exc-heureDebut"></div>
+        <div class="field"><label>Fermeture</label><input type="time" id="exc-heureFin"></div>
+      </div>
+      <button class="btn-sm primary" id="btnAjouterException">Enregistrer cette exception</button>
+      <div class="data-list" id="listeExceptions" style="margin-top:14px;"></div>
     </div>
   </div>
 
