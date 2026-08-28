@@ -1,4 +1,4 @@
-# Lar'Allegria by Lara Rossoux — site du club (V09)
+# Lar'Allegria by Lara Rossoux — site du club (V11)
 
 Dépôt GitHub : **web-pub/Lar-allegria**. Projet Firebase : **Lar-allegria**.
 
@@ -175,8 +175,13 @@ dans Firebase Authentication → **Settings** → **Authorized domains**.
 ## 6. Premiers pas une fois en ligne
 
 1. Connecte-toi en tant que Lara sur `/connexion.html`.
-2. Onglet **Paramètres** : règle les horaires d'ouverture de la piste (jours
-   + heures) — c'est cette grille qui apparaît ensuite côté membres.
+2. Onglet **Paramètres** : règle les horaires d'ouverture de la piste — un
+   horaire différent est possible pour chaque jour de la semaine (coche les
+   jours ouverts, indique l'heure d'ouverture et de fermeture pour chacun) —
+   c'est cette grille qui apparaît ensuite côté membres. Pour un jour précis
+   qui déroge à ces horaires habituels (fermeture exceptionnelle, horaire
+   spécial ponctuel), utilise le bloc "Jours fermés / horaires exceptionnels"
+   juste en dessous.
 3. Onglet **Tarifs** : encode la grille tarifaire (cours, demi-pension, stages...).
    Elle apparaît automatiquement sur la page publique `tarifs.html` et dans
    l'espace membre.

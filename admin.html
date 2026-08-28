@@ -250,13 +250,8 @@
     </div>
     <div class="app-panel">
       <h2>Horaires d'ouverture de la piste</h2>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Définit la grille de créneaux d'une heure proposée aux membres pour les réservations.</p>
-      <div class="form-grid">
-        <div class="field"><label>Heure d'ouverture</label><input type="time" id="param-heureDebut"></div>
-        <div class="field"><label>Heure de fermeture</label><input type="time" id="param-heureFin"></div>
-      </div>
-      <h3 style="margin-top:14px;">Jours ouverts</h3>
-      <div class="membre-check-list" id="param-jours" style="max-height:none;"></div>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Définit la grille de créneaux d'une heure proposée aux membres pour les réservations — les horaires peuvent être différents pour chaque jour de la semaine.</p>
+      <div id="param-jours"></div>
       <button class="btn-sm primary" id="btnSauverDisponibilites" style="margin-top:14px;">Enregistrer les horaires</button>
     </div>
     <div class="app-panel">
