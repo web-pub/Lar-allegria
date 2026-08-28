@@ -1,4 +1,4 @@
-# Lar'Allegria by Lara Rossoux — site du club (V08)
+# Lar'Allegria by Lara Rossoux — site du club (V09)
 
 Dépôt GitHub : **web-pub/Lar-allegria**. Projet Firebase : **Lar-allegria**.
 
@@ -105,7 +105,29 @@ n'y a pas encore d'espace admin accessible avant que ce compte existe.
 
 ## 4. Déployer les règles Firestore
 
-Avec le [CLI Firebase](https://firebase.google.com/docs/cli) installé :
+⚠️ **Étape indispensable à chaque fois que `firestore.rules` change** (par
+exemple à chaque nouvelle fonctionnalité livrée : chevaux, événements, blog,
+stock, planning bénévoles, contenu du site...). Uploader les fichiers sur
+GitHub ne suffit pas : les règles de sécurité vivent dans le projet Firebase
+et doivent être copiées à part. Tant que ce n'est pas fait, toute tentative
+d'écriture sur une collection qui n'existe pas encore dans les règles
+publiées échoue silencieusement (le bouton "Enregistrer" ne fait rien, ou
+affiche une erreur de type "permissions insuffisantes").
+
+**Option simple, sans rien installer (recommandée)** :
+
+1. Ouvre la [console Firebase](https://console.firebase.google.com/project/lar-allegria/firestore/rules).
+2. Va dans **Firestore Database** → onglet **Règles**.
+3. Ouvre le fichier `firestore.rules` du projet (avec un éditeur de texte, ou
+   directement sur GitHub), sélectionne tout son contenu et copie-le.
+4. Colle-le dans l'éditeur de règles de la console Firebase, à la place du
+   contenu existant.
+5. Clique sur **Publier**.
+
+C'est tout — pas besoin d'installer quoi que ce soit. À refaire à chaque fois
+que le fichier `firestore.rules` est mis à jour.
+
+**Option CLI** (si tu as déjà Node.js et que tu préfères la ligne de commande) :
 
 ```bash
 npm install -g firebase-tools
