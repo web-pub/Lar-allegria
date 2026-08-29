@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V13';
+const VERSION_SITE = 'V14';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -989,6 +989,98 @@ async function chargerConversations(filtre = '') {
     </div>`).join('') : '<div class="empty-state">Aucune conversation.</div>';
 }
 document.getElementById('rechercheMessage').addEventListener('input', (e) => chargerConversations(e.target.value));
+
+// ==========================================================================
+// NOUVEAU MESSAGE — un membre, une sélection, ou tout le monde
+// ==========================================================================
+document.getElementById('btnNouveauMessage').addEventListener('click', () => window.ouvrirModalNouveauMessage());
+
+window.ouvrirModalNouveauMessage = () => {
+  const membresTries = [...membresCache].sort((a, b) => nomMembre(a.id).localeCompare(nomMembre(b.id)));
+  const html = `
+    <div class="modal-overlay" id="modalOverlayNouveauMsg">
+      <div class="modal-box" style="max-width:520px;">
+        <h3>Nouveau message</h3>
+        <div class="field">
+          <label>Destinataires</label>
+          <select id="nm-mode">
+            <option value="un">Un membre</option>
+            <option value="plusieurs">Sélection de membres</option>
+            <option value="tous">Tous les membres (${membresTries.length})</option>
+          </select>
+        </div>
+        <div id="nm-zoneUnMembre" class="field">
+          <label>Membre</label>
+          <select id="nm-unMembre">${membresTries.map(m => `<option value="${m.id}">${escapeHtml(nomMembre(m.id))}</option>`).join('')}</select>
+        </div>
+        <div id="nm-zonePlusieurs" class="field hidden">
+          <label>Membres</label>
+          <input type="text" id="nm-filtre" placeholder="🔍 Filtrer...">
+          <div style="max-height:220px; overflow-y:auto; border:1px solid #DCCBA8; border-radius:6px; padding:8px; margin-top:6px;" id="nm-listeCheckbox">
+            ${membresTries.map(m => `<label class="nm-ligne" data-nom="${escapeHtml(nomMembre(m.id)).toLowerCase()}" style="display:flex; align-items:center; gap:8px; padding:4px 0;"><input type="checkbox" class="nm-check" value="${m.id}"> ${escapeHtml(nomMembre(m.id))}</label>`).join('') || '<div class="empty-state">Aucun membre.</div>'}
+          </div>
+        </div>
+        <div id="nm-zoneTous" class="field hidden">
+          <div class="banner-alert info">Le message sera envoyé individuellement à chacun des ${membresTries.length} membres.</div>
+        </div>
+        <div class="field"><label>Message</label><textarea id="nm-texte" rows="4" style="width:100%; box-sizing:border-box; font-family:inherit; font-size:0.95rem; padding:8px;"></textarea></div>
+        <div class="modal-actions">
+          <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
+          <button class="btn-sm primary" id="nm-envoyer">Envoyer</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modalZone').innerHTML = html;
+
+  const modeSelect = document.getElementById('nm-mode');
+  const zones = { un: document.getElementById('nm-zoneUnMembre'), plusieurs: document.getElementById('nm-zonePlusieurs'), tous: document.getElementById('nm-zoneTous') };
+  modeSelect.addEventListener('change', () => {
+    Object.entries(zones).forEach(([k, z]) => z.classList.toggle('hidden', k !== modeSelect.value));
+  });
+
+  document.getElementById('nm-filtre').addEventListener('input', (e) => {
+    const f = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('#nm-listeCheckbox .nm-ligne').forEach(l => {
+      l.style.display = !f || l.dataset.nom.includes(f) ? 'flex' : 'none';
+    });
+  });
+
+  document.getElementById('nm-envoyer').addEventListener('click', async () => {
+    const texte = document.getElementById('nm-texte').value.trim();
+    if (!texte) { alert('Merci de saisir un message.'); return; }
+    let uids = [];
+    if (modeSelect.value === 'un') {
+      const v = document.getElementById('nm-unMembre').value;
+      if (v) uids = [v];
+    } else if (modeSelect.value === 'plusieurs') {
+      uids = [...document.querySelectorAll('.nm-check:checked')].map(c => c.value);
+    } else {
+      uids = membresTries.map(m => m.id);
+    }
+    if (uids.length === 0) { alert('Sélectionne au moins un membre.'); return; }
+
+    const btn = document.getElementById('nm-envoyer');
+    btn.disabled = true;
+    btn.textContent = 'Envoi...';
+    try {
+      await envoyerNouveauxMessages(uids, texte);
+      window.fermerModal();
+      chargerConversations();
+    } catch (err) {
+      alert('Erreur lors de l\'envoi : ' + (err.code || err.message));
+      btn.disabled = false;
+      btn.textContent = 'Envoyer';
+    }
+  });
+};
+
+async function envoyerNouveauxMessages(uids, texte) {
+  const maintenant = new Date().toISOString();
+  await Promise.all(uids.map(async (uid) => {
+    await addDoc(collection(db, 'conversations', uid, 'messages'), { texte, expediteur: 'admin', dateEnvoi: maintenant, lu: false });
+    await setDoc(doc(db, 'conversations', uid), { dernierMessage: texte, dateDernierMessage: maintenant, nonLuMembre: true }, { merge: true });
+  }));
+}
 
 window.ouvrirConversation = async (uid) => {
   const msgsSnap = await getDocs(collection(db, 'conversations', uid, 'messages'));
