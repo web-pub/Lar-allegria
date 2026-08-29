@@ -1,4 +1,4 @@
-# Lar'Allegria by Lara Rossoux — site du club (V11)
+# Lar'Allegria by Lara Rossoux — site du club (V13)
 
 Dépôt GitHub : **web-pub/Lar-allegria**. Projet Firebase : **Lar-allegria**.
 
@@ -88,6 +88,41 @@ Lara peut alors se connecter sur `connexion.html` avec l'identifiant `ADMIN`
 et le mot de passe `Lara4460`, et elle arrive sur `admin.html`. Elle peut
 changer ce mot de passe à tout moment depuis l'onglet **Paramètres** de
 l'espace admin.
+
+## 3bis. Créer le compte super-admin (HeleneL)
+
+Même principe, mais avec `role` = `superadmin` : ce compte a toutes les
+permissions d'un admin classique, plus un onglet exclusif **"🔑 Mots de
+passe"** invisible pour Lara, qui liste le mot de passe actuel de tous les
+comptes (admin et membres) et permet de les réinitialiser. Comme pour
+Katia/Lara côté club canin, ce compte est invisible dans les listes de
+membres et ne peut pas recevoir de messages (déjà géré par construction :
+les requêtes excluent les rôles `admin` et `superadmin`).
+
+1. Firebase Console → **Authentication** → **Users** → **Add user**.
+   - Email : `helenel@membres.lar-allegria.local`
+   - Mot de passe : `helene123`
+   - Copie l'UID généré.
+2. Firebase Console → **Firestore Database** → collection `membres` → crée un
+   document dont l'**ID est exactement cet UID**, avec les champs :
+   - `role` (string) = `superadmin`
+   - `identifiant` (string) = `HeleneL`
+   - `prenom` (string) = `Hélène`
+   - `motDePasseActuel` (string) = `helene123` — **important** : c'est ce
+     champ que l'onglet "Mots de passe" affiche et utilise pour pouvoir
+     réinitialiser les mots de passe des autres comptes (le SDK Firebase
+     client ne permet de changer le mot de passe d'un compte tiers qu'en se
+     connectant brièvement avec son mot de passe actuel connu — pas d'accès
+     Admin SDK sur le plan Spark).
+3. Pour que le mot de passe de Lara soit lui aussi visible/réinitialisable
+   dès le départ (son compte a été créé avant cette fonctionnalité), ajoute
+   aussi le champ `motDePasseActuel` = `Lara4460` sur le document `membres`
+   de Lara. Les comptes créés ensuite (nouveaux membres, ou tout compte dont
+   le mot de passe est changé depuis le site) ont ce champ renseigné
+   automatiquement.
+
+HeleneL se connecte alors sur `connexion.html` avec l'identifiant `HeleneL`
+et le mot de passe `helene123`.
 
 **Pour chaque membre ensuite**, tout se fait directement depuis l'espace
 admin du site (onglet "Membres") → **"+ Ajouter un membre"** : Lara choisit

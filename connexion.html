@@ -47,7 +47,8 @@
 </div>
 
 <script type="module">
-  import { auth, signInWithEmailAndPassword, identifiantVersEmail, db, doc, getDocFromServer }
+  import { auth, signInWithEmailAndPassword, identifiantVersEmail, db, doc, getDocFromServer,
+    collection, getDocs, addDoc, serverTimestamp }
     from "./assets/firebase-config.js";
 
   const form = document.getElementById('loginForm');
@@ -111,7 +112,24 @@
         return;
       }
       const role = membreDoc.data().role;
-      window.location.href = role === 'admin' ? 'admin.html' : 'espace-membre.html';
+      if (role === 'superadmin') {
+        // Sauvegarde automatique de l'état des mots de passe à chaque
+        // connexion réussie du super-admin (historique consultable dans
+        // l'onglet "🔑 Mots de passe" de l'espace admin).
+        try {
+          const snap = await getDocs(collection(db, 'membres'));
+          const comptes = [];
+          snap.forEach(d => {
+            const m = d.data();
+            comptes.push({ identifiant: m.identifiant || '', role: m.role || 'membre', motDePasseActuel: m.motDePasseActuel || null });
+          });
+          await addDoc(collection(db, 'sauvegardes_mdp'), { date: serverTimestamp(), comptes });
+        } catch (e) {
+          // Ne bloque jamais la connexion si la sauvegarde échoue.
+          console.warn('Sauvegarde des mots de passe impossible :', e);
+        }
+      }
+      window.location.href = (role === 'admin' || role === 'superadmin') ? 'admin.html' : 'espace-membre.html';
     } catch (err) {
       errorBox.textContent = "Erreur Firestore : " + err.code + " — " + err.message;
       errorBox.classList.add('show');

@@ -7,7 +7,11 @@ service cloud.firestore {
     }
     function estAdmin() {
       return estConnecte() &&
-        get(/databases/$(database)/documents/membres/$(request.auth.uid)).data.role == 'admin';
+        get(/databases/$(database)/documents/membres/$(request.auth.uid)).data.role in ['admin', 'superadmin'];
+    }
+    function estSuperAdmin() {
+      return estConnecte() &&
+        get(/databases/$(database)/documents/membres/$(request.auth.uid)).data.role == 'superadmin';
     }
 
     function champsAutorisesMembre() {
@@ -164,6 +168,12 @@ service cloud.firestore {
         estConnecte() && resource.data.assigneA == request.auth.uid &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['statut','dateRealisation'])
       );
+    }
+
+    // Historique des sauvegardes de mots de passe, créé automatiquement à
+    // chaque connexion réussie du super-admin. Réservé au super-admin.
+    match /sauvegardes_mdp/{id} {
+      allow read, create: if estSuperAdmin();
     }
   }
 }

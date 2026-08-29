@@ -39,6 +39,7 @@
     <button class="tab-btn" data-tab="messages" id="tabMessagesBtn">Messages</button>
     <button class="tab-btn" data-tab="contenu">Contenu du site</button>
     <button class="tab-btn" data-tab="parametres">Paramètres</button>
+    <button class="tab-btn hidden" data-tab="motsdepasse" id="tabMotsDePasseBtn">🔑 Mots de passe</button>
   </div>
 
   <!-- ==================== RÉSERVATIONS ==================== -->
@@ -272,6 +273,20 @@
       </div>
       <button class="btn-sm primary" id="btnAjouterException">Enregistrer cette exception</button>
       <div class="data-list" id="listeExceptions" style="margin-top:14px;"></div>
+    </div>
+  </div>
+
+  <!-- ==================== MOTS DE PASSE (super-admin uniquement) ==================== -->
+  <div id="panel-motsdepasse" class="tab-panel hidden">
+    <div class="app-panel">
+      <h2>🔑 Mots de passe des comptes</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Visible uniquement par le super-administrateur. Affiche le mot de passe actuel de chaque compte (admin et membres) et permet de le réinitialiser.</p>
+      <div class="data-list" id="listeMotsDePasse"><div class="empty-state">...</div></div>
+    </div>
+    <div class="app-panel">
+      <h2>Historique des sauvegardes</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Un instantané des mots de passe est enregistré automatiquement à chaque connexion réussie du super-admin.</p>
+      <div class="data-list" id="listeSauvegardesMdp"><div class="empty-state">...</div></div>
     </div>
   </div>
 
