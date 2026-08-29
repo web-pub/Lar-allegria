@@ -213,7 +213,10 @@
   <div id="panel-messages" class="tab-panel hidden">
     <div class="app-panel">
       <h2>Messages</h2>
-      <input type="text" id="rechercheMessage" placeholder="🔍 Rechercher un membre..." style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #DCCBA8; border-radius:6px; margin-bottom:14px; font-size:0.95rem;">
+      <div style="display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+        <input type="text" id="rechercheMessage" placeholder="🔍 Rechercher un membre..." style="flex:1; min-width:200px; box-sizing:border-box; padding:10px 12px; border:1px solid #DCCBA8; border-radius:6px; font-size:0.95rem;">
+        <button class="btn-sm primary" id="btnNouveauMessage">✏️ Nouveau message</button>
+      </div>
       <div class="data-list" id="listeConversations"><div class="empty-state">...</div></div>
     </div>
   </div>
