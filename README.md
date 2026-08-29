@@ -101,14 +101,14 @@ les requêtes excluent les rôles `admin` et `superadmin`).
 
 1. Firebase Console → **Authentication** → **Users** → **Add user**.
    - Email : `helenel@membres.lar-allegria.local`
-   - Mot de passe : `helene123`
+   - Mot de passe : `Helene123`
    - Copie l'UID généré.
 2. Firebase Console → **Firestore Database** → collection `membres` → crée un
    document dont l'**ID est exactement cet UID**, avec les champs :
    - `role` (string) = `superadmin`
    - `identifiant` (string) = `HeleneL`
    - `prenom` (string) = `Hélène`
-   - `motDePasseActuel` (string) = `helene123` — **important** : c'est ce
+   - `motDePasseActuel` (string) = `Helene123` — **important** : c'est ce
      champ que l'onglet "Mots de passe" affiche et utilise pour pouvoir
      réinitialiser les mots de passe des autres comptes (le SDK Firebase
      client ne permet de changer le mot de passe d'un compte tiers qu'en se
@@ -122,7 +122,7 @@ les requêtes excluent les rôles `admin` et `superadmin`).
    automatiquement.
 
 HeleneL se connecte alors sur `connexion.html` avec l'identifiant `HeleneL`
-et le mot de passe `helene123`.
+et le mot de passe `Helene123`.
 
 **Pour chaque membre ensuite**, tout se fait directement depuis l'espace
 admin du site (onglet "Membres") → **"+ Ajouter un membre"** : Lara choisit
