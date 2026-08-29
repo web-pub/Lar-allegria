@@ -5,7 +5,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V11';
+const VERSION_SITE = 'V13';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -194,6 +194,7 @@ document.getElementById('btnChangerMotDePasse').addEventListener('click', async 
     const credential = EmailAuthProvider.credential(user.email, actuel);
     await reauthenticateWithCredential(user, credential);
     await updatePassword(user, nouveau);
+    await updateDoc(doc(db, 'membres', user.uid), { motDePasseActuel: nouveau });
     successBox.classList.add('show');
     document.getElementById('pw-actuel').value = '';
     document.getElementById('pw-nouveau').value = '';

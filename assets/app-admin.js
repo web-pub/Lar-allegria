@@ -1,12 +1,12 @@
 import {
   auth, db, onAuthStateChanged, signOut,
   updatePassword, reauthenticateWithCredential, EmailAuthProvider,
-  creerCompteMembre,
+  creerCompteMembre, reinitialiserMotDePasseCompte,
   doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, collection, addDoc, query, where, orderBy, serverTimestamp
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V11';
+const VERSION_SITE = 'V13';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -30,15 +30,22 @@ function lundiDeLaSemaine(d) {
 
 let membresCache = [];
 let membresParUid = {};
+let compteActuel = null; // { role, identifiant, ... } du compte connecté
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) { window.location.href = 'connexion.html'; return; }
   const mDoc = await getDoc(doc(db, 'membres', user.uid));
-  if (!mDoc.exists() || mDoc.data().role !== 'admin') {
+  if (!mDoc.exists() || !['admin', 'superadmin'].includes(mDoc.data().role)) {
     window.location.href = 'connexion.html';
     return;
   }
-  document.getElementById('adminNom').textContent = mDoc.data().prenom || 'Lara';
+  compteActuel = mDoc.data();
+  document.getElementById('adminNom').textContent = compteActuel.prenom || 'Lara';
+  if (compteActuel.role === 'superadmin') {
+    document.getElementById('tabMotsDePasseBtn').classList.remove('hidden');
+    chargerMotsDePasseAdmin();
+    chargerSauvegardesMdp();
+  }
 
   await chargerMembres();
   chargerMeteoResume();
@@ -112,7 +119,7 @@ async function chargerMembres() {
   membresParUid = {};
   snap.forEach(d => {
     const m = { id: d.id, ...d.data() };
-    if (m.role !== 'admin') membresCache.push(m);
+    if (m.role !== 'admin' && m.role !== 'superadmin') membresCache.push(m);
     membresParUid[d.id] = m;
   });
 }
@@ -440,6 +447,7 @@ window.ouvrirModalMembre = (membre, demandeId) => {
       archive: false
     };
     if (estNouveau) {
+      data.motDePasseActuel = motDePasse;
       data.dateInscription = new Date().toISOString();
       if (d) {
         data.dateNaissance = d.dateNaissance || '';
@@ -713,6 +721,7 @@ document.getElementById('btnChangerMotDePasse').addEventListener('click', async 
     const credential = EmailAuthProvider.credential(user.email, actuel);
     await reauthenticateWithCredential(user, credential);
     await updatePassword(user, nouveau);
+    await updateDoc(doc(db, 'membres', user.uid), { motDePasseActuel: nouveau });
     successBox.classList.add('show');
     document.getElementById('pw-actuel').value = '';
     document.getElementById('pw-nouveau').value = '';
@@ -1479,3 +1488,97 @@ window.supprimerException = async (dateISO) => {
   await deleteDoc(doc(db, 'disponibilites_exceptions', dateISO));
   chargerExceptionsAdmin();
 };
+
+// ==========================================================================
+// MOTS DE PASSE (super-admin uniquement)
+// ==========================================================================
+async function chargerMotsDePasseAdmin() {
+  const snap = await getDocs(collection(db, 'membres'));
+  let comptes = [];
+  snap.forEach(d => comptes.push({ id: d.id, ...d.data() }));
+  comptes.sort((a, b) => {
+    const ordre = { superadmin: 0, admin: 1 };
+    const oa = ordre[a.role] ?? 2, ob = ordre[b.role] ?? 2;
+    if (oa !== ob) return oa - ob;
+    return (a.identifiant || '').localeCompare(b.identifiant || '');
+  });
+  renderMotsDePasse(comptes);
+}
+function labelRoleCompte(role) {
+  if (role === 'superadmin') return '<span class="badge badge-danger">Super-admin</span>';
+  if (role === 'admin') return '<span class="badge badge-warn">Admin</span>';
+  return '<span class="badge badge-neutral">Membre</span>';
+}
+function renderMotsDePasse(comptes) {
+  const wrap = document.getElementById('listeMotsDePasse');
+  if (comptes.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun compte.</div>'; return; }
+  wrap.innerHTML = comptes.map(c => {
+    const nomComplet = `${c.prenom || ''} ${c.nom || ''}`.trim();
+    const mdp = c.motDePasseActuel;
+    return `
+    <div class="data-row">
+      <div class="data-main">
+        <div class="data-title">${escapeHtml(c.identifiant || c.id)} ${labelRoleCompte(c.role)}</div>
+        <div class="data-sub">${escapeHtml(nomComplet)}</div>
+        <div class="data-sub" style="margin-top:4px;">
+          Mot de passe actuel : ${mdp ? `<code>${escapeHtml(mdp)}</code>` : '<em>non enregistré (compte créé avant cette fonctionnalité — à renseigner via une réinitialisation)</em>'}
+        </div>
+      </div>
+      <div class="data-actions">
+        <button class="btn-sm" onclick="window.reinitialiserMotDePasse('${c.id}','${escapeHtml(c.identifiant || '')}')">Réinitialiser</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+window.reinitialiserMotDePasse = async (uid, identifiant) => {
+  const compte = membresParUid[uid] || {};
+  const ancienConnu = compte.motDePasseActuel;
+  let ancien = ancienConnu;
+  if (!ancien) {
+    ancien = prompt(`Le mot de passe actuel de "${identifiant}" n'est pas encore enregistré.\nSaisis le mot de passe actuellement en vigueur pour ce compte (nécessaire pour le changer) :`);
+    if (!ancien) return;
+  }
+  const nouveau = prompt(`Nouveau mot de passe pour "${identifiant}" (6 caractères minimum) :`);
+  if (!nouveau) return;
+  if (nouveau.length < 6) { alert('Le nouveau mot de passe doit contenir au moins 6 caractères.'); return; }
+  try {
+    await reinitialiserMotDePasseCompte(identifiant, ancien, nouveau);
+    await updateDoc(doc(db, 'membres', uid), { motDePasseActuel: nouveau });
+    alert(`Mot de passe de "${identifiant}" réinitialisé.`);
+    await chargerMembres();
+    chargerMotsDePasseAdmin();
+  } catch (err) {
+    if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+      alert('Le mot de passe actuel saisi est incorrect — réinitialisation annulée.');
+    } else {
+      alert('Erreur lors de la réinitialisation : ' + (err.code || err.message));
+    }
+  }
+};
+
+async function chargerSauvegardesMdp() {
+  const snap = await getDocs(collection(db, 'sauvegardes_mdp'));
+  let sauvegardes = [];
+  snap.forEach(d => sauvegardes.push({ id: d.id, ...d.data() }));
+  sauvegardes.sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
+  sauvegardes = sauvegardes.slice(0, 20);
+  const wrap = document.getElementById('listeSauvegardesMdp');
+  if (sauvegardes.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucune sauvegarde pour l\'instant — la première sera créée à la prochaine connexion du super-admin.</div>'; return; }
+  wrap.innerHTML = sauvegardes.map(s => {
+    const dateLabel = s.date?.seconds
+      ? new Date(s.date.seconds * 1000).toLocaleString('fr-BE', { dateStyle: 'medium', timeStyle: 'short' })
+      : 'Date inconnue';
+    const detailId = 'sauv-' + s.id;
+    const comptesHtml = (s.comptes || []).map(c =>
+      `<div class="data-sub">${escapeHtml(c.identifiant)} (${c.role}) : ${c.motDePasseActuel ? `<code>${escapeHtml(c.motDePasseActuel)}</code>` : '<em>non enregistré</em>'}</div>`
+    ).join('');
+    return `
+    <div class="data-row" style="flex-direction:column; align-items:stretch;">
+      <div class="data-main" style="cursor:pointer;" onclick="document.getElementById('${detailId}').classList.toggle('hidden')">
+        <div class="data-title">${dateLabel}</div>
+        <div class="data-sub">${(s.comptes || []).length} compte(s) — clique pour afficher le détail</div>
+      </div>
+      <div id="${detailId}" class="hidden" style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.08);">${comptesHtml}</div>
+    </div>`;
+  }).join('');
+}

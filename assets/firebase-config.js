@@ -62,6 +62,26 @@ export async function creerCompteMembre(identifiant, motDePasse) {
   }
 }
 
+// Réinitialise le mot de passe d'un compte existant (utilisé par le super-
+// administrateur pour changer le mot de passe de n'importe quel compte).
+// On se connecte brièvement à ce compte avec son mot de passe ACTUEL connu
+// (via une app temporaire isolée, sans déconnecter la personne en cours),
+// puis on définit le nouveau mot de passe. C'est pour cela que le mot de
+// passe en clair de chaque compte doit être conservé dans Firestore : sans
+// Cloud Functions (plan Spark), il n'existe pas d'autre moyen de changer le
+// mot de passe d'un compte tiers depuis le site.
+export async function reinitialiserMotDePasseCompte(identifiant, ancienMotDePasse, nouveauMotDePasse) {
+  const appTemp = initializeApp(firebaseConfig, 'temp-' + Date.now());
+  const authTemp = getAuth(appTemp);
+  try {
+    const cred = await signInWithEmailAndPassword(authTemp, identifiantVersEmail(identifiant), ancienMotDePasse);
+    await updatePassword(cred.user, nouveauMotDePasse);
+    await signOut(authTemp);
+  } finally {
+    await deleteApp(appTemp);
+  }
+}
+
 // Les identifiants membres/admin ne sont pas de vraies adresses e-mail.
 // On les transforme en "faux e-mail" pour utiliser l'authentification
 // Firebase par e-mail/mot de passe avec un simple identifiant
