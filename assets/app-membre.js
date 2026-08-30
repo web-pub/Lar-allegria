@@ -5,7 +5,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V14';
+const VERSION_SITE = 'V15';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -723,6 +723,19 @@ window.marquerPlanningBenevoleFait = async (id) => {
   chargerMesCreneauxBenevole();
   chargerPlanningEquipeBenevole();
 };
+window.prendreCreneauBenevole = async (id) => {
+  try {
+    await updateDoc(doc(db, 'planning_benevoles', id), {
+      assigneA: membreUid,
+      assigneNom: `${membreData.prenom || ''} ${membreData.nom || ''}`.trim()
+    });
+    chargerMesCreneauxBenevole();
+    chargerPlanningEquipeBenevole();
+  } catch (err) {
+    alert('Erreur : ' + (err.code || err.message) + '\n\nCe créneau a peut-être déjà été pris par quelqu\'un d\'autre entre-temps.');
+    chargerPlanningEquipeBenevole();
+  }
+};
 
 async function chargerPlanningEquipeBenevole() {
   const wrap = document.getElementById('zonePlanningEquipeBenevole');
@@ -740,12 +753,14 @@ async function chargerPlanningEquipeBenevole() {
   }
   wrap.innerHTML = creneaux.map(c => {
     const dateLabel = c.date ? capitalize(new Date(c.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'})) : '';
+    const estOuvert = !c.assigneA;
     return `
     <div class="data-row">
       <div class="data-main">
         <div class="data-title">${escapeHtml(c.tache)} — ${dateLabel}${c.heure ? ' à ' + escapeHtml(c.heure) : ''}</div>
-        <div class="data-sub">Bénévole : ${escapeHtml(c.assigneNom || '—')}</div>
+        <div class="data-sub">Bénévole : ${estOuvert ? '<em>Non assigné</em>' : escapeHtml(c.assigneNom || '—')}</div>
       </div>
+      ${estOuvert ? `<div class="data-actions"><button class="btn-sm primary" onclick="window.prendreCreneauBenevole('${c.id}')">Je m'en occupe</button></div>` : ''}
     </div>`;
   }).join('');
 }

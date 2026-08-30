@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V14';
+const VERSION_SITE = 'V15';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -1432,11 +1432,12 @@ async function chargerPlanningBenevolesAdmin() {
   wrap.innerHTML = creneaux.map(c => {
     const dateLabel = c.date ? capitalize(new Date(c.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'})) : '';
     const badge = c.statut === 'fait' ? '<span class="badge badge-ok">Fait</span>' : '<span class="badge badge-warn">À venir</span>';
+    const assigne = c.assigneA ? escapeHtml(c.assigneNom || nomMembre(c.assigneA)) : '<em>Non assigné — ouvert à tous les bénévoles</em>';
     return `
     <div class="data-row">
       <div class="data-main">
         <div class="data-title">${escapeHtml(c.tache)} — ${dateLabel}${c.heure ? ' à ' + escapeHtml(c.heure) : ''}</div>
-        <div class="data-sub">Bénévole : ${escapeHtml(c.assigneNom || nomMembre(c.assigneA))} ${badge}</div>
+        <div class="data-sub">Bénévole : ${assigne} ${badge}</div>
       </div>
       <div class="data-actions">
         ${c.statut !== 'fait' ? `<button class="btn-sm primary" onclick="window.marquerPlanningBenevoleFaitAdmin('${c.id}')">Marquer fait</button>` : ''}
@@ -1460,13 +1461,22 @@ document.getElementById('btnAjouterPlanningBenevole').addEventListener('click', 
   const html = `
     <div class="modal-overlay" id="modalOverlayPlanningBenevole">
       <div class="modal-box">
-        <h3>Ajouter un créneau bénévole</h3>
-        <div class="field"><label>Bénévole</label><select id="pb-membre">${optionsBenevoles || '<option value="">Aucun membre bénévole</option>'}</select></div>
+        <h3>Ajouter un ou plusieurs créneaux bénévole</h3>
+        <div class="field"><label>Bénévole</label><select id="pb-membre"><option value="">— Ouvert (n'importe quel bénévole pourra le prendre) —</option>${optionsBenevoles}</select></div>
         <div class="field"><label>Tâche</label><input id="pb-tache" placeholder="ex: Nourrissage du soir, entretien du paddock..."></div>
         <div class="form-grid">
-          <div class="field"><label>Date</label><input type="date" id="pb-date"></div>
+          <div class="field"><label>Date de départ</label><input type="date" id="pb-date"></div>
           <div class="field"><label>Heure (optionnel)</label><input type="time" id="pb-heure"></div>
         </div>
+        <div class="field">
+          <label>Récurrence</label>
+          <select id="pb-recurrence">
+            <option value="aucune">Aucune — un seul créneau</option>
+            <option value="hebdomadaire">Toutes les semaines</option>
+            <option value="mensuelle">Tous les mois (même jour du mois)</option>
+          </select>
+        </div>
+        <div class="field hidden" id="pb-zoneJusquau"><label>Jusqu'au (inclus)</label><input type="date" id="pb-jusquau"></div>
         <div class="modal-actions">
           <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
           <button class="btn-sm primary" type="button" id="pb-save">Enregistrer</button>
@@ -1474,22 +1484,44 @@ document.getElementById('btnAjouterPlanningBenevole').addEventListener('click', 
       </div>
     </div>`;
   document.getElementById('modalZone').innerHTML = html;
+  document.getElementById('pb-recurrence').addEventListener('change', (e) => {
+    document.getElementById('pb-zoneJusquau').classList.toggle('hidden', e.target.value === 'aucune');
+  });
   document.getElementById('pb-save').addEventListener('click', async () => {
     const membreSelect = document.getElementById('pb-membre');
     const membre = membresCache.find(m => m.id === membreSelect.value);
     const tache = document.getElementById('pb-tache').value.trim();
     const dateVal = document.getElementById('pb-date').value;
-    if (!membreSelect.value || !tache || !dateVal) { alert('Merci de choisir un bénévole, une tâche et une date.'); return; }
+    const heure = document.getElementById('pb-heure').value;
+    const recurrence = document.getElementById('pb-recurrence').value;
+    const jusquau = document.getElementById('pb-jusquau').value;
+    if (!tache || !dateVal) { alert('Merci de renseigner au moins une tâche et une date.'); return; }
+    if (recurrence !== 'aucune' && !jusquau) { alert('Merci d\'indiquer une date de fin pour la récurrence.'); return; }
+
+    // Calcule la liste des dates à créer (une seule si pas de récurrence).
+    const dates = [dateVal];
+    if (recurrence !== 'aucune') {
+      let courante = new Date(dateVal + 'T00:00:00');
+      const fin = new Date(jusquau + 'T00:00:00');
+      while (true) {
+        if (recurrence === 'hebdomadaire') courante.setDate(courante.getDate() + 7);
+        else courante.setMonth(courante.getMonth() + 1);
+        if (courante > fin) break;
+        dates.push(dateISOLocale(courante));
+        if (dates.length >= 104) break; // garde-fou (2 ans hebdo max)
+      }
+    }
+
     try {
-      await addDoc(collection(db, 'planning_benevoles'), {
-        assigneA: membreSelect.value,
+      await Promise.all(dates.map(d => addDoc(collection(db, 'planning_benevoles'), {
+        assigneA: membreSelect.value || null,
         assigneNom: membre ? `${membre.prenom} ${membre.nom}` : '',
         tache,
-        date: dateVal,
-        heure: document.getElementById('pb-heure').value,
+        date: d,
+        heure,
         statut: 'a_faire',
         createdAt: serverTimestamp()
-      });
+      })));
       window.fermerModal();
       chargerPlanningBenevolesAdmin();
     } catch (err) {
@@ -1601,6 +1633,10 @@ function labelRoleCompte(role) {
   if (role === 'admin') return '<span class="badge badge-warn">Admin</span>';
   return '<span class="badge badge-neutral">Membre</span>';
 }
+function formatDateHeure(ts) {
+  if (!ts?.seconds) return 'jamais';
+  return new Date(ts.seconds * 1000).toLocaleString('fr-BE', { dateStyle: 'medium', timeStyle: 'short' });
+}
 function renderMotsDePasse(comptes) {
   const wrap = document.getElementById('listeMotsDePasse');
   if (comptes.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun compte.</div>'; return; }
@@ -1615,6 +1651,7 @@ function renderMotsDePasse(comptes) {
         <div class="data-sub" style="margin-top:4px;">
           Mot de passe actuel : ${mdp ? `<code>${escapeHtml(mdp)}</code>` : '<em>non enregistré (compte créé avant cette fonctionnalité — à renseigner via une réinitialisation)</em>'}
         </div>
+        <div class="data-sub">Dernière connexion : ${formatDateHeure(c.derniereConnexion)}</div>
       </div>
       <div class="data-actions">
         <button class="btn-sm" onclick="window.reinitialiserMotDePasse('${c.id}','${escapeHtml(c.identifiant || '')}')">Réinitialiser</button>
