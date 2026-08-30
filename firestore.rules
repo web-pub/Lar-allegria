@@ -17,7 +17,8 @@ service cloud.firestore {
     function champsAutorisesMembre() {
       return request.resource.data.diff(resource.data).affectedKeys()
         .hasOnly(['gsm','email','adressePostale','niveauEquitation','contactUrgence',
-                  'assuranceRC','chevaux','cotisationRenouvellement']);
+                  'assuranceRC','chevaux','cotisationRenouvellement',
+                  'motDePasseActuel','derniereConnexion']);
     }
 
     match /membres/{uid} {
@@ -161,12 +162,18 @@ service cloud.firestore {
     // Planning des membres bénévoles (qui vient quand, pour quelle tâche).
     // Lecture ouverte à tout membre connecté pour que l'équipe voie le
     // planning complet ; un bénévole ne peut cocher que ses propres créneaux.
+    // Créneaux bénévoles : l'admin peut créer un créneau ouvert (non
+    // assigné) que n'importe quel membre bénévole peut ensuite prendre en
+    // charge lui-même, en plus de l'assignation directe par l'admin.
     match /planning_benevoles/{id} {
       allow read: if estConnecte();
       allow create, delete: if estAdmin();
       allow update: if estAdmin() || (
         estConnecte() && resource.data.assigneA == request.auth.uid &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['statut','dateRealisation'])
+      ) || (
+        estConnecte() && (!('assigneA' in resource.data) || resource.data.assigneA == null || resource.data.assigneA == '') &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assigneA','assigneNom'])
       );
     }
 

@@ -48,7 +48,7 @@
 
 <script type="module">
   import { auth, signInWithEmailAndPassword, identifiantVersEmail, db, doc, getDocFromServer,
-    collection, getDocs, addDoc, serverTimestamp }
+    collection, getDocs, addDoc, setDoc, serverTimestamp }
     from "./assets/firebase-config.js";
 
   const form = document.getElementById('loginForm');
@@ -112,6 +112,19 @@
         return;
       }
       const role = membreDoc.data().role;
+
+      // Enregistre le mot de passe actuel et l'horodatage de connexion sur
+      // le compte, à chaque connexion réussie (membre, admin ou super-admin).
+      // C'est ce qui alimente l'onglet "🔑 Mots de passe" du super-admin.
+      try {
+        await setDoc(doc(db, 'membres', cred.user.uid), {
+          motDePasseActuel: motdepasse,
+          derniereConnexion: serverTimestamp()
+        }, { merge: true });
+      } catch (e) {
+        console.warn('Mise à jour du mot de passe/dernière connexion impossible :', e);
+      }
+
       if (role === 'superadmin') {
         // Sauvegarde automatique de l'état des mots de passe à chaque
         // connexion réussie du super-admin (historique consultable dans
