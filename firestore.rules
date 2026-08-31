@@ -40,11 +40,13 @@ service cloud.firestore {
     // validation.
     match /reservations/{id} {
       allow read: if estConnecte();
-      allow create: if estConnecte() && request.resource.data.membreId == request.auth.uid
-        && request.resource.data.statut == 'en_attente';
+      allow create: if estAdmin() || (
+        estConnecte() && request.resource.data.membreId == request.auth.uid
+        && request.resource.data.statut == 'en_attente'
+      );
       allow update: if estAdmin() || (
         estConnecte() && resource.data.membreId == request.auth.uid &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['statut']) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['statut','motifAnnulation','motifAnnulationDetail']) &&
         request.resource.data.statut == 'annulee'
       );
       allow delete: if estAdmin();

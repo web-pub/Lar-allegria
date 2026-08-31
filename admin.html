@@ -59,8 +59,15 @@
         <h3 id="resaAdminSemaineLabel">Semaine du ...</h3>
         <button class="btn-sm" id="resaAdminSemaineSuiv">Semaine suivante →</button>
       </div>
-      <h2>Planning de la piste</h2>
+      <div class="section-heading"><h2>Planning de la piste</h2>
+        <button class="btn-sm primary" id="btnAjouterReservation">+ Ajouter une réservation</button>
+      </div>
       <div class="data-list" id="listePlanningSemaine"><div class="empty-state">...</div></div>
+    </div>
+    <div class="app-panel">
+      <h2>Calendrier — 2 prochaines semaines</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Vue d'ensemble des 14 prochains jours. Cliquez sur un créneau libre pour l'attribuer directement à un membre (ex : un cavalier qui vient chaque samedi de 13h à 14h).</p>
+      <div class="resa-jours" id="calendrierDeuxSemaines"><div class="empty-state">Chargement...</div></div>
     </div>
   </div>
 
@@ -295,8 +302,11 @@
 
 </main>
 
+<div style="text-align:center; padding:14px 0 4px; font-size:0.72rem; color:var(--terre); opacity:0.6;">© 2026 Hélène Laruelle — Tous droits réservés · Site développé par Hélène Laruelle · Contenu sous la responsabilité de Lara Rossoux</div>
+
 <div id="modalZone"></div>
 
 <script type="module" src="assets/app-admin.js"></script>
+<script src="assets/protection.js" defer></script>
 </body>
 </html>
