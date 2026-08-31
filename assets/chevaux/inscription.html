@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inscription — Lar'Allegria by Lara Rossoux</title>
+<meta name="description" content="Demande d'inscription à l'école équestre Lar'Allegria by Lara Rossoux : membre cours ou membre demi-pension.">
+<link rel="canonical" href="https://web-pub.github.io/Lar-allegria/inscription.html">
+<link rel="icon" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yeseva+One&family=Playball&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="index.html">
+      <span class="brand-logo"><img src="assets/logo.png" alt="Logo Lar'Allegria by Lara Rossoux"></span>
+      <span class="brand-text">
+        <span class="brand-name">Lar'Allegria</span>
+        <span class="brand-tagline">by Lara Rossoux — Grâce-Hollogne</span>
+      </span>
+    </a>
+    <button class="nav-toggle" aria-expanded="false" aria-controls="main-nav" aria-label="Ouvrir le menu"><span class="bars"></span></button>
+    <nav class="main-nav" id="main-nav" aria-label="Navigation principale">
+      <ul>
+        <li><a href="index.html">Accueil</a></li>
+        <li><a href="club.html">Le Club</a></li>
+        <li><a href="activites.html">Activités</a></li>
+        <li><a href="chevaux.html">Nos chevaux</a></li>
+        <li><a href="lara.html">Lara</a></li>
+        <li><a href="evenements.html">Événements</a></li>
+        <li><a href="blog.html">Blog</a></li>
+        <li><a href="tarifs.html">Tarifs</a></li>
+        <li><a href="inscription.html" class="active">Inscription</a></li>
+        <li><a href="contact.html">Nous contacter</a></li>
+        <li><a href="connexion.html">Connexion</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow">Rejoindre le club</span>
+    <h1>Demande d'inscription</h1>
+    <p class="lead">Complétez votre fiche membre ci-dessous. Lara examine chaque demande et vous recontacte pour finaliser votre inscription et créer votre accès à l'espace membre.</p>
+    <div class="flourish"><span></span><i>&#10022;</i><span></span></div>
+  </div>
+</section>
+
+<section>
+  <div class="container" style="max-width: 760px;">
+    <div class="app-panel">
+
+      <div class="form-success" id="formSuccess">
+        ✅ Votre demande a bien été envoyée à Lara. Elle vous recontactera pour finaliser votre inscription.
+      </div>
+      <div class="login-error" id="formError">Une erreur est survenue. Merci de réessayer ou de nous contacter directement.</div>
+
+      <form id="inscriptionForm">
+
+        <h3>Type de membre</h3>
+        <p style="color:var(--terre); font-size:0.85rem; margin-bottom:10px;">Choisissez la formule qui correspond à votre situation.</p>
+        <div class="membre-check-list" style="margin-bottom:20px;">
+          <label class="membre-check-row">
+            <input type="radio" name="typeMembre" value="cours" checked>
+            <span><strong>Membre "cours"</strong> — je viens suivre des cours de dressage d'une heure sur les chevaux du club</span>
+          </label>
+          <label class="membre-check-row">
+            <input type="radio" name="typeMembre" value="pension">
+            <span><strong>Membre "demi-pension"</strong> — je souhaite disposer d'un cheval de l'écurie à temps plein, comme s'il était le mien</span>
+          </label>
+          <label class="membre-check-row">
+            <input type="radio" name="typeMembre" value="benevole">
+            <span><strong>Membre "bénévole"</strong> — je viens régulièrement donner un coup de main au club, selon un planning de tâches</span>
+          </label>
+        </div>
+
+        <h3>Vos coordonnées</h3>
+        <div class="form-grid">
+          <div class="field"><label>Prénom *</label><input id="ins-prenom" required></div>
+          <div class="field"><label>Nom *</label><input id="ins-nom" required></div>
+        </div>
+        <div class="form-grid">
+          <div class="field"><label>Date de naissance *</label><input type="date" id="ins-naissance" required></div>
+          <div class="field"><label>Téléphone / GSM *</label><input type="tel" id="ins-telephone" placeholder="ex: 0470 00 00 00" required></div>
+        </div>
+        <div class="field"><label>E-mail *</label><input type="email" id="ins-email" required></div>
+        <div class="form-grid">
+          <div class="field"><label>Adresse (rue, numéro) *</label><input id="ins-rue" required></div>
+          <div class="field"><label>Code postal *</label><input id="ins-cp" required></div>
+        </div>
+        <div class="field"><label>Ville *</label><input id="ins-ville" required></div>
+
+        <h3 style="margin-top:20px;">Contact d'urgence</h3>
+        <div class="form-grid">
+          <div class="field"><label>Nom *</label><input id="ins-urgenceNom" required></div>
+          <div class="field"><label>Lien de parenté</label><input id="ins-urgenceLien" placeholder="ex: parent, conjoint..."></div>
+        </div>
+        <div class="field"><label>Téléphone *</label><input type="tel" id="ins-urgenceTelephone" required></div>
+
+        <h3 style="margin-top:20px;">Équitation</h3>
+        <div class="form-grid">
+          <div class="field">
+            <label>Niveau</label>
+            <select id="ins-niveau">
+              <option value="debutant">Débutant(e)</option>
+              <option value="intermediaire">Intermédiaire</option>
+              <option value="confirme">Confirmé(e)</option>
+            </select>
+          </div>
+          <div class="field"><label>Certificat médical — date</label><input type="date" id="ins-certifDate"></div>
+        </div>
+        <div class="field"><label>Expérience équestre (facultatif)</label><textarea id="ins-experience" rows="3" placeholder="Depuis combien de temps montez-vous, dans quel(s) club(s), quel niveau de compétition éventuel..."></textarea></div>
+
+        <h3 style="margin-top:20px;">Assurance RC familiale</h3>
+        <div class="form-grid">
+          <div class="field"><label>Compagnie</label><input id="ins-rcCompagnie"></div>
+          <div class="field"><label>N° de police</label><input id="ins-rcNumero"></div>
+        </div>
+        <div class="field" style="max-width:220px;"><label>Échéance</label><input type="month" id="ins-rcEcheance"></div>
+
+        <div id="zoneCheval" class="hidden">
+          <h3 style="margin-top:20px;">Cheval en demi-pension</h3>
+          <p style="color:var(--terre); font-size:0.85rem; margin-bottom:10px;">Les chevaux appartiennent à l'écurie. Si vous savez déjà quel cheval vous sera confié, vous pouvez renseigner ses informations ci-dessous — sinon, laissez cette section vide, Lara la complétera avec vous lors de l'attribution. Vous pourrez aussi compléter ces informations plus tard depuis votre espace membre.</p>
+          <div class="form-grid">
+            <div class="field"><label>Nom du cheval</label><input id="ins-chevalNom"></div>
+            <div class="field"><label>Race</label><input id="ins-chevalRace"></div>
+          </div>
+          <div class="form-grid">
+            <div class="field"><label>Robe</label><input id="ins-chevalRobe"></div>
+            <div class="field"><label>Date de naissance</label><input type="date" id="ins-chevalNaissance"></div>
+          </div>
+          <div class="form-grid">
+            <div class="field"><label>Sexe</label>
+              <select id="ins-chevalSexe">
+                <option value="hongre">Hongre</option>
+                <option value="jument">Jument</option>
+                <option value="etalon">Étalon</option>
+              </select>
+            </div>
+            <div class="field"><label>N° de puce</label><input id="ins-chevalPuce"></div>
+          </div>
+          <div class="form-grid">
+            <div class="field"><label>Vétérinaire traitant</label><input id="ins-chevalVeto"></div>
+            <div class="field"><label>Maréchal-ferrant</label><input id="ins-chevalMarechal"></div>
+          </div>
+          <div class="form-grid">
+            <div class="field"><label>Dernier vaccin grippe</label><input type="date" id="ins-vaccinGrippe"></div>
+            <div class="field"><label>Dernier vaccin tétanos</label><input type="date" id="ins-vaccinTetanos"></div>
+          </div>
+          <div class="field"><label>Alimentation particulière / allergies</label><textarea id="ins-chevalAlimentation" rows="2"></textarea></div>
+        </div>
+
+        <h3 style="margin-top:20px;">Consentements</h3>
+        <label class="membre-check-row" style="margin-bottom:8px;">
+          <input type="checkbox" id="ins-droitImage">
+          <span>J'autorise Lar'Allegria by Lara Rossoux à utiliser des photos/vidéos de moi (et de mon cheval le cas échéant) prises au club à des fins de communication (site, réseaux sociaux).</span>
+        </label>
+        <label class="membre-check-row" style="margin-bottom:8px;">
+          <input type="checkbox" id="ins-certifAptitude">
+          <span>Je certifie être apte à la pratique de l'équitation (ou avoir un certificat médical en règle).</span>
+        </label>
+        <label class="membre-check-row">
+          <input type="checkbox" id="ins-cgv" required>
+          <span>J'ai pris connaissance des <a href="cgv.html" target="_blank" style="color:var(--rouge-dark);">conditions générales</a> et de la <a href="confidentialite.html" target="_blank" style="color:var(--rouge-dark);">politique de confidentialité</a> et je les accepte. *</span>
+        </label>
+
+        <button type="submit" class="btn btn-primary" style="margin-top:22px;" id="ins-submit">Envoyer ma demande d'inscription</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <h4>Lar'Allegria by Lara Rossoux</h4>
+        <p>École équestre ASBL proposant école d'équitation, cours de dressage, écurie privée, stages et spectacles équestres à Grâce-Hollogne.</p>
+      </div>
+      <div>
+        <h4>Navigation</h4>
+        <ul>
+          <li><a href="index.html">Accueil</a></li>
+          <li><a href="club.html">Le Club</a></li>
+          <li><a href="activites.html">Activités</a></li>
+          <li><a href="chevaux.html">Nos chevaux</a></li>
+          <li><a href="lara.html">Lara</a></li>
+          <li><a href="evenements.html">Événements</a></li>
+          <li><a href="blog.html">Blog</a></li>
+          <li><a href="tarifs.html">Tarifs</a></li>
+          <li><a href="inscription.html">Inscription</a></li>
+          <li><a href="contact.html">Nous contacter</a></li>
+          <li><a href="connexion.html">Connexion</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Contact</h4>
+        <ul>
+          <li><a href="tel:+32497639618">0497 63 96 18</a></li>
+          <li><a href="mailto:lara.rossoux@hotmail.com">lara.rossoux@hotmail.com</a></li>
+          <li>Rue Mahay 66, 4460 Grâce-Hollogne</li>
+          <li><a href="confidentialite.html">Confidentialité</a></li>
+          <li><a href="cgv.html">CGV</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Hélène Laruelle — Tous droits réservés</span>
+      <span>Site développé par Hélène Laruelle</span>
+      <span>Contenu sous la responsabilité de Lara Rossoux</span>
+      <span>TVA BE 0756.844.280</span>
+      <span>Site V26</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const toggle = document.querySelector('.nav-toggle');
+  const nav = document.getElementById('main-nav');
+  toggle.addEventListener('click', () => {
+    const isOpen = nav.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', isOpen);
+  });
+
+  document.querySelectorAll('input[name="typeMembre"]').forEach(r => {
+    r.addEventListener('change', () => {
+      document.getElementById('zoneCheval').classList.toggle('hidden', document.querySelector('input[name="typeMembre"]:checked').value !== 'pension');
+    });
+  });
+</script>
+<script type="module">
+  import { db, collection, addDoc, serverTimestamp } from "./assets/firebase-config.js";
+
+  const form = document.getElementById('inscriptionForm');
+  const successBox = document.getElementById('formSuccess');
+  const errorBox = document.getElementById('formError');
+  const submitBtn = document.getElementById('ins-submit');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    successBox.classList.remove('show');
+    errorBox.classList.remove('show');
+
+    const typeMembre = document.querySelector('input[name="typeMembre"]:checked').value;
+
+    if (!document.getElementById('ins-cgv').checked) {
+      errorBox.textContent = "Merci d'accepter les conditions générales et la politique de confidentialité pour continuer.";
+      errorBox.classList.add('show');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Envoi en cours...';
+
+    const data = {
+      typeMembre,
+      prenom: document.getElementById('ins-prenom').value.trim(),
+      nom: document.getElementById('ins-nom').value.trim(),
+      dateNaissance: document.getElementById('ins-naissance').value,
+      telephone: document.getElementById('ins-telephone').value.trim(),
+      email: document.getElementById('ins-email').value.trim(),
+      adresse: {
+        rue: document.getElementById('ins-rue').value.trim(),
+        cp: document.getElementById('ins-cp').value.trim(),
+        ville: document.getElementById('ins-ville').value.trim()
+      },
+      contactUrgence: {
+        nom: document.getElementById('ins-urgenceNom').value.trim(),
+        lien: document.getElementById('ins-urgenceLien').value.trim(),
+        telephone: document.getElementById('ins-urgenceTelephone').value.trim()
+      },
+      niveauEquitation: document.getElementById('ins-niveau').value,
+      experience: document.getElementById('ins-experience').value.trim(),
+      certificatMedicalDate: document.getElementById('ins-certifDate').value,
+      certificatMedicalAptitude: document.getElementById('ins-certifAptitude').checked,
+      assuranceRC: {
+        compagnie: document.getElementById('ins-rcCompagnie').value.trim(),
+        numeroPolice: document.getElementById('ins-rcNumero').value.trim(),
+        dateEcheance: document.getElementById('ins-rcEcheance').value
+      },
+      droitImage: document.getElementById('ins-droitImage').checked,
+      accepteCgv: true,
+      statut: 'en_attente',
+      dateCreation: serverTimestamp()
+    };
+
+    if (typeMembre === 'pension') {
+      data.cheval = {
+        nom: document.getElementById('ins-chevalNom').value.trim(),
+        race: document.getElementById('ins-chevalRace').value.trim(),
+        robe: document.getElementById('ins-chevalRobe').value.trim(),
+        naissance: document.getElementById('ins-chevalNaissance').value,
+        sexe: document.getElementById('ins-chevalSexe').value,
+        puce: document.getElementById('ins-chevalPuce').value.trim(),
+        veterinaire: document.getElementById('ins-chevalVeto').value.trim(),
+        marechal: document.getElementById('ins-chevalMarechal').value.trim(),
+        vaccinGrippeDate: document.getElementById('ins-vaccinGrippe').value,
+        vaccinTetanosDate: document.getElementById('ins-vaccinTetanos').value,
+        alimentationParticuliere: document.getElementById('ins-chevalAlimentation').value.trim()
+      };
+    }
+
+    try {
+      await addDoc(collection(db, 'demandes_inscription'), data);
+      form.reset();
+      document.getElementById('zoneCheval').classList.add('hidden');
+      successBox.classList.add('show');
+      window.scrollTo({ top: successBox.offsetTop - 100, behavior: 'smooth' });
+    } catch (err) {
+      errorBox.textContent = "Erreur lors de l'envoi (" + (err.code || err.message) + "). Vous pouvez aussi nous contacter directement par téléphone ou par email.";
+      errorBox.classList.add('show');
+    }
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Envoyer ma demande d\'inscription';
+  });
+</script>
+<script src="assets/protection.js" defer></script>
+</body>
+</html>

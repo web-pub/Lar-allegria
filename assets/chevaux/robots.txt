@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /espace-membre.html
+Disallow: /admin.html
+Disallow: /connexion.html
+
+Sitemap: https://web-pub.github.io/Lar-allegria/sitemap.xml

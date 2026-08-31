@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Événements — Lar'Allegria by Lara Rossoux | École équestre</title>
+<meta name="description" content="Retrouvez tous les événements de l'école équestre Lar'Allegria by Lara Rossoux à Grâce-Hollogne : portes ouvertes, spectacles, stages et journées spéciales.">
+<link rel="canonical" href="https://web-pub.github.io/Lar-allegria/evenements.html">
+<link rel="icon" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yeseva+One&family=Playball&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="index.html">
+      <span class="brand-logo"><img src="assets/logo.png" alt="Logo Lar'Allegria by Lara Rossoux"></span>
+      <span class="brand-text">
+        <span class="brand-name">Lar'Allegria</span>
+        <span class="brand-tagline">by Lara Rossoux — Grâce-Hollogne</span>
+      </span>
+    </a>
+    <button class="nav-toggle" aria-expanded="false" aria-controls="main-nav" aria-label="Ouvrir le menu"><span class="bars"></span></button>
+    <nav class="main-nav" id="main-nav" aria-label="Navigation principale">
+      <ul>
+        <li><a href="index.html">Accueil</a></li>
+        <li><a href="club.html">Le Club</a></li>
+        <li><a href="activites.html">Activités</a></li>
+        <li><a href="chevaux.html">Nos chevaux</a></li>
+        <li><a href="lara.html">Lara</a></li>
+        <li><a href="evenements.html" class="active">Événements</a></li>
+        <li><a href="blog.html">Blog</a></li>
+        <li><a href="tarifs.html">Tarifs</a></li>
+        <li><a href="inscription.html">Inscription</a></li>
+        <li><a href="contact.html">Nous contacter</a></li>
+        <li><a href="connexion.html">Connexion</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow">Ça se passe chez nous</span>
+    <h1>Événements</h1>
+    <p class="lead">Portes ouvertes, spectacles, stages et journées spéciales : suivez ici l'actualité de l'école équestre.</p>
+    <div class="flourish"><span></span><i>&#10022;</i><span></span></div>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <div class="media-grid" id="zoneEvenementsPublic">
+      <div class="empty-state">Chargement des événements...</div>
+    </div>
+  </div>
+</section>
+
+<section class="cta-band">
+  <div class="container">
+    <h2>Ne manquez aucun événement</h2>
+    <p>Rejoignez-nous en cours ou en demi-pension, et venez vivre ces moments avec nous.</p>
+    <a class="btn btn-primary" href="inscription.html">Faire ma demande d'inscription</a>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <h4>Lar'Allegria by Lara Rossoux</h4>
+        <p>École équestre ASBL proposant école d'équitation, cours de dressage, écurie privée, stages et spectacles équestres à Grâce-Hollogne.</p>
+      </div>
+      <div>
+        <h4>Navigation</h4>
+        <ul>
+          <li><a href="index.html">Accueil</a></li>
+          <li><a href="club.html">Le Club</a></li>
+          <li><a href="activites.html">Activités</a></li>
+          <li><a href="chevaux.html">Nos chevaux</a></li>
+          <li><a href="lara.html">Lara</a></li>
+          <li><a href="evenements.html">Événements</a></li>
+          <li><a href="blog.html">Blog</a></li>
+          <li><a href="tarifs.html">Tarifs</a></li>
+          <li><a href="inscription.html">Inscription</a></li>
+          <li><a href="contact.html">Nous contacter</a></li>
+          <li><a href="connexion.html">Connexion</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Contact</h4>
+        <ul>
+          <li><a href="tel:+32497639618">0497 63 96 18</a></li>
+          <li><a href="mailto:lara.rossoux@hotmail.com">lara.rossoux@hotmail.com</a></li>
+          <li>Rue Mahay 66, 4460 Grâce-Hollogne</li>
+          <li><a href="confidentialite.html">Confidentialité</a></li>
+          <li><a href="cgv.html">CGV</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Hélène Laruelle — Tous droits réservés</span>
+      <span>Site développé par Hélène Laruelle</span>
+      <span>Contenu sous la responsabilité de Lara Rossoux</span>
+      <span>TVA BE 0756.844.280</span>
+      <span>Site V26</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const toggle = document.querySelector('.nav-toggle');
+  const nav = document.getElementById('main-nav');
+  toggle.addEventListener('click', () => {
+    const isOpen = nav.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', isOpen);
+  });
+</script>
+<script type="module">
+  import { db, collection, getDocs } from "./assets/firebase-config.js";
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function formatDateFr(iso) {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-');
+    if (!y || !m || !d) return iso;
+    const mois = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+    return `${parseInt(d,10)} ${mois[parseInt(m,10)-1]} ${y}`;
+  }
+
+  (async () => {
+    const zone = document.getElementById('zoneEvenementsPublic');
+    try {
+      const snap = await getDocs(collection(db, 'evenements'));
+      const evenements = [];
+      snap.forEach(d => evenements.push(d.data()));
+      evenements.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+      if (evenements.length === 0) {
+        zone.innerHTML = '<div class="empty-state">Aucun événement programmé pour l\'instant. Revenez bientôt !</div>';
+        return;
+      }
+
+      zone.innerHTML = evenements.map(e => `
+        <div class="media-card">
+          ${e.photoUrl ? `<img src="${escapeHtml(e.photoUrl)}" alt="${escapeHtml(e.titre)}">` : ''}
+          <div class="mc-body">
+            <h3>${escapeHtml(e.titre)}</h3>
+            <div class="mc-meta">${formatDateFr(e.date)}${e.heure ? ' à ' + escapeHtml(e.heure) : ''}</div>
+            <p>${escapeHtml(e.description || '')}</p>
+          </div>
+        </div>`).join('');
+    } catch (err) {
+      zone.innerHTML = '<div class="empty-state">Les événements ne sont pas disponibles pour le moment.</div>';
+    }
+  })();
+</script>
+<script src="assets/protection.js" defer></script>
+</body>
+</html>
