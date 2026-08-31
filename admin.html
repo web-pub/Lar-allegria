@@ -54,6 +54,13 @@
       <div class="data-list" id="listeReservationsAttente"><div class="empty-state">...</div></div>
     </div>
     <div class="app-panel">
+      <div class="section-heading"><h2>Réservations orphelines</h2>
+        <button class="btn-sm" id="btnVerifierOrphelines">Vérifier</button>
+      </div>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Réservations qui pointent vers un compte membre qui n'existe plus (ex : compte supprimé directement depuis Firebase). Elles s'affichent avec un identifiant brut au lieu d'un nom dans les autres listes.</p>
+      <div class="data-list" id="listeOrphelines"><div class="empty-state">Clique sur "Vérifier" pour lancer la recherche.</div></div>
+    </div>
+    <div class="app-panel">
       <div class="resa-nav">
         <button class="btn-sm" id="resaAdminSemainePrec">← Semaine précédente</button>
         <h3 id="resaAdminSemaineLabel">Semaine du ...</h3>
