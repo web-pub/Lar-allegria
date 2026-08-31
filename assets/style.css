@@ -651,6 +651,14 @@ blockquote.pull-quote {
   font-size: 0.82rem;
   color: #A8927C;
 }
+.footer-legal-links {
+  margin-top: 10px;
+  font-size: 0.76rem;
+  color: #8A7660;
+  line-height: 1.8;
+}
+.footer-legal-links a { color: #C9B48E; text-decoration: none; }
+.footer-legal-links a:hover { text-decoration: underline; }
 
 /* ---------- Utility ---------- */
 

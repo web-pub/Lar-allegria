@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V26';
+const VERSION_SITE = 'V28';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -104,7 +104,7 @@ async function chargerMeteoResume() {
       <div class="data-main">
         <div class="data-title">${capitalize(d.toLocaleDateString('fr-BE', {weekday:'short', day:'numeric'}))}</div>
         <div class="data-sub">${m ? `${iconeCode(m.code)} ${m.temperature}°C` : 'Météo indisponible'}</div>
-        ${alerte ? `<div class="badge" style="margin-top:4px; background:${alerte.couleur}; border-color:${alerte.couleur}; color:#fff; text-transform:none; letter-spacing:0; white-space:normal; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${alerte.texte}</div>` : ''}
+        ${alerte ? `<div class="badge" style="margin-top:4px; background:${alerte.couleur}; border-color:${alerte.couleur}; color:#fff; text-transform:none; letter-spacing:0; white-space:normal; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; border-radius:6px; padding:4px 8px;">${alerte.texte}</div>` : ''}
       </div>
     </div>`;
   }));
@@ -257,6 +257,8 @@ async function exceptionJourAdmin(dateISO) {
 }
 
 document.getElementById('btnAjouterReservation').addEventListener('click', () => window.ouvrirModalAjouterReservation());
+document.getElementById('calBlocPrec').addEventListener('click', () => { calBlocOffset -= 15; chargerCalendrierDeuxSemaines(); });
+document.getElementById('calBlocSuiv').addEventListener('click', () => { calBlocOffset += 15; chargerCalendrierDeuxSemaines(); });
 
 window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
   const membresTries = [...membresCache].sort((a, b) => nomMembre(a.id).localeCompare(nomMembre(b.id)));
@@ -349,12 +351,15 @@ window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
   });
 };
 
+let calBlocOffset = 0; // en jours, multiple de 15
 async function chargerCalendrierDeuxSemaines() {
   const zone = document.getElementById('calendrierDeuxSemaines');
   const jours = [];
-  for (let i = 0; i < 15; i++) { const d = new Date(); d.setDate(d.getDate() + i); jours.push(d); }
+  for (let i = 0; i < 15; i++) { const d = new Date(); d.setDate(d.getDate() + calBlocOffset + i); jours.push(d); }
   const dateDebut = dateISOLocale(jours[0]);
   const dateFin = dateISOLocale(jours[14]);
+  document.getElementById('calBlocLabel').textContent =
+    `Du ${jours[0].toLocaleDateString('fr-BE', {day:'numeric', month:'long'})} au ${jours[14].toLocaleDateString('fr-BE', {day:'numeric', month:'long'})}`;
   const snap = await getDocs(query(collection(db, 'reservations'), where('date', '>=', dateDebut), where('date', '<=', dateFin)));
   const parCle = {};
   snap.forEach(d => {
