@@ -132,7 +132,7 @@
     try {
       const snap = await getDocs(collection(db, 'chevaux_ecurie'));
       const chevaux = [];
-      snap.forEach(d => { const c = d.data(); if (c.visiblePublic !== false) chevaux.push(c); });
+      snap.forEach(d => { const c = d.data(); if (c.visiblePublic !== false && !c.archive) chevaux.push(c); });
 
       if (chevaux.length === 0) {
         zone.innerHTML = '<div class="empty-state">Les fiches des chevaux arrivent bientôt. Contactez Lara pour en savoir plus.</div>';
