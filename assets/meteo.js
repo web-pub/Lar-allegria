@@ -64,16 +64,16 @@ export function alerteMeteo(m) {
   if (!m) return null;
   const risques = [];
   if (typeof m.pluie === 'number' && m.pluie >= 40) {
-    risques.push({ intensite: Math.min(1, (m.pluie - 40) / 60), texte: 'Pluie possible' });
+    risques.push({ intensite: Math.min(1, (m.pluie - 40) / 60), texte: `Pluie possible (${m.pluie}%)` });
   }
   if (typeof m.vent === 'number' && m.vent >= 30) {
-    risques.push({ intensite: Math.min(1, (m.vent - 30) / 30), texte: 'Vent fort possible' });
+    risques.push({ intensite: Math.min(1, (m.vent - 30) / 30), texte: `Vent fort possible (${m.vent} km/h)` });
   }
   if (typeof m.temperature === 'number' && m.temperature >= 28) {
-    risques.push({ intensite: Math.min(1, (m.temperature - 28) / 10), texte: 'Forte chaleur possible' });
+    risques.push({ intensite: Math.min(1, (m.temperature - 28) / 10), texte: `Forte chaleur possible (${m.temperature}°C)` });
   }
   if (typeof m.temperature === 'number' && m.temperature <= -2) {
-    risques.push({ intensite: Math.min(1, (-2 - m.temperature) / 8), texte: 'Risque de gel' });
+    risques.push({ intensite: Math.min(1, (-2 - m.temperature) / 8), texte: `Risque de gel (${m.temperature}°C)` });
   }
   if (risques.length === 0) return null;
   risques.sort((a, b) => b.intensite - a.intensite);

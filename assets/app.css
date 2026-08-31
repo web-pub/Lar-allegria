@@ -490,6 +490,18 @@
   border-bottom: 1px solid #E9DEC8;
 }
 .resa-jour-titre .meteo { display: block; font-weight: 400; font-size: 0.76rem; color: var(--terre); margin-top: 2px; }
+/* Calendrier admin sur 15 jours : exactement 5 colonnes × 3 lignes sur les
+   écrans larges (la 1ère case en haut à gauche = aujourd'hui), et un
+   repli progressif sur les petits écrans pour rester lisible. */
+#calendrierDeuxSemaines {
+  grid-template-columns: repeat(5, 1fr);
+}
+@media (max-width: 900px) {
+  #calendrierDeuxSemaines { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 560px) {
+  #calendrierDeuxSemaines { grid-template-columns: repeat(2, 1fr); }
+}
 .resa-creneaux { display: flex; flex-direction: column; gap: 4px; padding: 8px; }
 .creneau-btn {
   border: 1px solid #DCCBA8;

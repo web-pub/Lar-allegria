@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V19';
+const VERSION_SITE = 'V20';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -100,15 +100,15 @@ async function chargerMeteoResume() {
     const dateISO = dateISOLocale(d);
     const m = await meteoPour(dateISO, '13:00');
     const alerte = alerteMeteo(m);
-    return `<div class="data-row" style="flex:1 1 130px;">
+    return `<div class="data-row" style="flex:1 1 0; min-width:0;">
       <div class="data-main">
         <div class="data-title">${capitalize(d.toLocaleDateString('fr-BE', {weekday:'short', day:'numeric'}))}</div>
         <div class="data-sub">${m ? `${iconeCode(m.code)} ${m.temperature}°C` : 'Météo indisponible'}</div>
-        ${alerte ? `<div class="badge" style="margin-top:4px; background:${alerte.couleur}; border-color:${alerte.couleur}; color:#fff;">⚠️ ${alerte.texte}</div>` : ''}
+        ${alerte ? `<div class="badge" style="margin-top:4px; background:${alerte.couleur}; border-color:${alerte.couleur}; color:#fff; white-space:normal;">⚠️ ${alerte.texte}</div>` : ''}
       </div>
     </div>`;
   }));
-  zone.innerHTML = `<div style="display:flex; flex-wrap:wrap; gap:10px;">${blocs.join('')}</div>`;
+  zone.innerHTML = `<div style="display:flex; flex-wrap:nowrap; gap:8px; overflow-x:auto; padding-bottom:4px;">${blocs.join('')}</div>`;
 }
 
 // ==========================================================================
@@ -352,9 +352,9 @@ window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
 async function chargerCalendrierDeuxSemaines() {
   const zone = document.getElementById('calendrierDeuxSemaines');
   const jours = [];
-  for (let i = 0; i < 14; i++) { const d = new Date(); d.setDate(d.getDate() + i); jours.push(d); }
+  for (let i = 0; i < 15; i++) { const d = new Date(); d.setDate(d.getDate() + i); jours.push(d); }
   const dateDebut = dateISOLocale(jours[0]);
-  const dateFin = dateISOLocale(jours[13]);
+  const dateFin = dateISOLocale(jours[14]);
   const snap = await getDocs(query(collection(db, 'reservations'), where('date', '>=', dateDebut), where('date', '<=', dateFin)));
   const parCle = {};
   snap.forEach(d => {
@@ -375,7 +375,9 @@ async function chargerCalendrierDeuxSemaines() {
     }
     const h = horaires[jourISO] || { ouvert: false };
     const ouvertParException = exception && (exception.heureDebut || exception.heureFin);
-    if (!h.ouvert && !ouvertParException) return '';
+    if (!h.ouvert && !ouvertParException) {
+      return `<div class="resa-jour"><div class="resa-jour-titre">${capitalize(d.toLocaleDateString('fr-BE', {weekday:'short', day:'numeric', month:'short'}))}</div><div class="empty-state" style="margin:0;">Fermé</div></div>`;
+    }
     const heures = creneauxHorairesAdmin(exception?.heureDebut || h.heureDebut, exception?.heureFin || h.heureFin);
     const boutons = heures.map(heure => {
       const cle = `${dateISO}_${heure}`;
