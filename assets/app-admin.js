@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V30';
+const VERSION_SITE = 'V33';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -127,7 +127,8 @@ async function chargerMembres() {
 }
 function nomMembre(uid) {
   const m = membresParUid[uid];
-  return m ? `${m.prenom || ''} ${m.nom || ''}`.trim() || m.identifiant || uid : uid;
+  if (m) return `${m.prenom || ''} ${m.nom || ''}`.trim() || m.identifiant || uid;
+  return uid ? `Compte introuvable (${uid})` : '—';
 }
 function labelTypeMembre(type) {
   if (type === 'pension') return 'Membre demi-pension';
@@ -262,13 +263,42 @@ document.getElementById('btnAjouterReservation').addEventListener('click', () =>
 document.getElementById('calBlocPrec').addEventListener('click', () => { calBlocOffset -= 15; chargerCalendrierDeuxSemaines(); });
 document.getElementById('calBlocSuiv').addEventListener('click', () => { calBlocOffset += 15; chargerCalendrierDeuxSemaines(); });
 
-document.querySelectorAll('.collapse-toggle').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const cible = document.getElementById(btn.dataset.target);
-    const maintenantCache = cible.classList.toggle('hidden');
-    btn.textContent = maintenantCache ? '▸' : '▾';
-    btn.setAttribute('aria-expanded', String(!maintenantCache));
+document.getElementById('btnVerifierOrphelines').addEventListener('click', async () => {
+  const wrap = document.getElementById('listeOrphelines');
+  wrap.innerHTML = '<div class="empty-state">Recherche en cours...</div>';
+  const aujourdhui = dateISOLocale(new Date());
+  const snap = await getDocs(query(collection(db, 'reservations'), where('date', '>=', aujourdhui)));
+  const orphelines = [];
+  snap.forEach(d => {
+    const r = d.data();
+    if (r.statut === 'annulee' || r.statut === 'refusee') return;
+    if (!membresParUid[r.membreId]) orphelines.push({ id: d.id, ...r });
   });
+  if (orphelines.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucune réservation orpheline trouvée à venir.</div>'; return; }
+  orphelines.sort((a, b) => a.date.localeCompare(b.date));
+  wrap.innerHTML = orphelines.map(r => {
+    const dateLabel = capitalize(new Date(r.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
+    return `
+    <div class="data-row">
+      <div class="data-main">
+        <div class="data-title">${dateLabel} — ${r.heureDebut}</div>
+        <div class="data-sub">Identifiant du compte introuvable : <code>${escapeHtml(r.membreId||'')}</code></div>
+      </div>
+      <div class="data-actions">
+        <button class="btn-sm danger" onclick="window.annulerReservationAdmin('${r.id}')">Annuler ce créneau</button>
+      </div>
+    </div>`;
+  }).join('');
+});
+
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.collapse-toggle');
+  if (!btn) return;
+  const cible = document.getElementById(btn.dataset.target);
+  if (!cible) return;
+  const maintenantCache = cible.classList.toggle('hidden');
+  btn.textContent = maintenantCache ? '▸' : '▾';
+  btn.setAttribute('aria-expanded', String(!maintenantCache));
 });
 
 window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
@@ -507,6 +537,7 @@ window.voirDemande = (id) => {
       <div class="modal-box" style="max-width:560px;">
         <h3>Demande de ${escapeHtml(d.prenom)} ${escapeHtml(d.nom)}</h3>
         <div style="font-size:0.9rem; line-height:1.7; max-height:50vh; overflow-y:auto;">
+          ${d.identifiantSouhaite ? `<div class="banner-alert info">Identifiant et mot de passe souhaités par le membre : <strong>${escapeHtml(d.identifiantSouhaite)}</strong> / <strong>${escapeHtml(d.motDePasseSouhaite||'')}</strong> — pré-remplis à l'étape suivante, tu peux les modifier si besoin (ex : identifiant déjà pris).</div>` : ''}
           <p><strong>Type :</strong> ${labelTypeMembre(d.typeMembre)}<br>
           <strong>Naissance :</strong> ${d.dateNaissance || '—'}<br>
           <strong>Téléphone :</strong> ${escapeHtml(d.telephone)}<br>
@@ -594,7 +625,7 @@ window.ouvrirModalMembre = (membre, demandeId) => {
         <h3>${membre ? 'Modifier le membre' : 'Ajouter un membre'}</h3>
         ${estNouveau ? `<div class="banner-alert info">Le compte de connexion (identifiant + mot de passe) est créé automatiquement quand tu cliques sur "Enregistrer" — rien à faire dans Firebase.</div>` : ''}
         <div class="form-grid">
-          <div class="field"><label>Identifiant de connexion *</label><input id="fm-identifiant" value="${escapeHtml(src.identifiant||src.prenom||'')}"></div>
+          <div class="field"><label>Identifiant de connexion *</label><input id="fm-identifiant" value="${escapeHtml(src.identifiant||src.identifiantSouhaite||src.prenom||'')}"></div>
           <div class="field"><label>Type de membre</label>
             <select id="fm-type">
               <option value="cours" ${(src.typeMembre||'cours')==='cours'?'selected':''}>Membre cours</option>
@@ -604,8 +635,8 @@ window.ouvrirModalMembre = (membre, demandeId) => {
           </div>
         </div>
         ${estNouveau ? `<div class="form-grid">
-          <div class="field"><label>Mot de passe temporaire *</label><input id="fm-motdepasse" type="text" placeholder="ex: club4460" value="club${Math.floor(1000+Math.random()*9000)}"></div>
-          <div class="field"><label></label><div style="font-size:0.85rem;color:var(--terre);padding-top:8px;">À communiquer au membre — il pourra le changer une fois connecté.</div></div>
+          <div class="field"><label>${d?.motDePasseSouhaite ? 'Mot de passe choisi par le membre *' : 'Mot de passe temporaire *'}</label><input id="fm-motdepasse" type="text" placeholder="ex: club4460" value="${escapeHtml(d?.motDePasseSouhaite || ('club' + Math.floor(1000+Math.random()*9000)))}"></div>
+          <div class="field"><label></label><div style="font-size:0.85rem;color:var(--terre);padding-top:8px;">${d?.motDePasseSouhaite ? "C'est ce que le membre a choisi lui-même — modifie si besoin (ex: en cas de doublon)." : "À communiquer au membre — il pourra le changer une fois connecté."}</div></div>
         </div>` : ''}
         <div class="form-grid">
           <div class="field"><label>Prénom *</label><input id="fm-prenom" value="${escapeHtml(src.prenom||'')}"></div>
@@ -632,6 +663,17 @@ window.ouvrirModalMembre = (membre, demandeId) => {
             <option value="bimensuelle" ${src.recurrenceCours==='bimensuelle'?'selected':''}>1x toutes les deux semaines</option>
           </select>
         </div>
+        ${!estNouveau ? `
+        <div class="field">
+          <div class="section-heading" style="margin-bottom:8px;">
+            <label style="margin-bottom:0;">Cours — historique et à venir</label>
+            <button class="collapse-toggle" type="button" data-target="wrapHistoriqueCoursMembre" aria-expanded="false">▸</button>
+          </div>
+          <div id="wrapHistoriqueCoursMembre" class="hidden">
+            <div id="zoneCoursAVenirMembre"><div class="empty-state">Chargement...</div></div>
+            <div id="zoneHistoriqueCoursMembre" style="margin-top:10px;"></div>
+          </div>
+        </div>` : ''}
         <div class="modal-actions">
           <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
           <button class="btn-sm primary" type="button" id="fm-save">Enregistrer</button>
@@ -639,6 +681,7 @@ window.ouvrirModalMembre = (membre, demandeId) => {
       </div>
     </div>`;
   document.getElementById('modalZone').innerHTML = html;
+  if (!estNouveau) chargerCoursMembre(membre.id);
 
   document.getElementById('fm-save').addEventListener('click', async () => {
     const identifiant = document.getElementById('fm-identifiant').value.trim();
@@ -719,6 +762,37 @@ window.ouvrirModalMembre = (membre, demandeId) => {
     }
   });
 };
+
+async function chargerCoursMembre(membreId) {
+  const aujourdhui = dateISOLocale(new Date());
+  const snap = await getDocs(query(collection(db, 'reservations'), where('membreId', '==', membreId)));
+  let toutes = [];
+  snap.forEach(d => toutes.push({ id: d.id, ...d.data() }));
+
+  const ligne = (r) => {
+    const dateLabel = r.date ? capitalize(new Date(r.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'})) : '';
+    const badge = r.statut === 'validee' ? '<span class="badge badge-ok">Validée</span>'
+      : r.statut === 'en_attente' ? '<span class="badge badge-warn">En attente</span>'
+      : r.statut === 'refusee' ? '<span class="badge badge-danger">Refusée</span>'
+      : '<span class="badge badge-neutral">Annulée</span>';
+    return `<div class="data-row"><div class="data-main"><div class="data-title">${dateLabel} — ${r.heureDebut || ''}</div><div class="data-sub">${r.type === 'libre' ? 'Piste libre' : 'Cours'} ${badge}${r.recurrenceId ? ' <span class="badge badge-neutral">Récurrence</span>' : ''}</div></div></div>`;
+  };
+
+  // À venir : les 3 prochaines occurrences seulement (pour ne pas afficher
+  // des dizaines de créneaux identiques pour un cours récurrent).
+  const aVenir = toutes.filter(r => r.date >= aujourdhui && r.statut !== 'annulee' && r.statut !== 'refusee')
+    .sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3);
+  document.getElementById('zoneCoursAVenirMembre').innerHTML =
+    `<h4 style="font-size:0.8rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--terre); margin-bottom:8px;">Prochains cours</h4>` +
+    (aVenir.length ? aVenir.map(ligne).join('') : '<div class="empty-state">Aucun cours à venir.</div>');
+
+  // Historique : tout ce qui est passé, depuis le début.
+  const historique = toutes.filter(r => r.date < aujourdhui)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  document.getElementById('zoneHistoriqueCoursMembre').innerHTML =
+    `<h4 style="font-size:0.8rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--terre); margin-bottom:8px;">Historique (${historique.length})</h4>` +
+    (historique.length ? historique.map(ligne).join('') : '<div class="empty-state">Aucun cours passé enregistré.</div>');
+}
 
 // ==========================================================================
 // BOX & NETTOYAGE
