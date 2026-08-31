@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V29';
+const VERSION_SITE = 'V30';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -101,7 +101,7 @@ async function chargerMeteoResume() {
     const dateISO = dateISOLocale(d);
     const m = await meteoPour(dateISO, '13:00');
     const alerte = alerteMeteo(m);
-    return `<div class="data-row" style="flex:1 1 0; min-width:118px;">
+    return `<div class="data-row" style="min-width:0;">
       <div class="data-main">
         <div class="data-title">${capitalize(d.toLocaleDateString('fr-BE', {weekday:'short', day:'numeric'}))}</div>
         <div class="data-sub">${m ? `${iconeCode(m.code)} ${m.temperature}°C` : 'Météo indisponible'}</div>
@@ -109,7 +109,7 @@ async function chargerMeteoResume() {
       </div>
     </div>`;
   }));
-  zone.innerHTML = `<div style="display:flex; flex-wrap:nowrap; gap:8px; overflow-x:auto; padding-bottom:4px;">${blocs.join('')}</div>`;
+  zone.innerHTML = `<div class="meteo-resume-grid">${blocs.join('')}</div>`;
 }
 
 // ==========================================================================
@@ -262,6 +262,15 @@ document.getElementById('btnAjouterReservation').addEventListener('click', () =>
 document.getElementById('calBlocPrec').addEventListener('click', () => { calBlocOffset -= 15; chargerCalendrierDeuxSemaines(); });
 document.getElementById('calBlocSuiv').addEventListener('click', () => { calBlocOffset += 15; chargerCalendrierDeuxSemaines(); });
 
+document.querySelectorAll('.collapse-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const cible = document.getElementById(btn.dataset.target);
+    const maintenantCache = cible.classList.toggle('hidden');
+    btn.textContent = maintenantCache ? '▸' : '▾';
+    btn.setAttribute('aria-expanded', String(!maintenantCache));
+  });
+});
+
 window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
   const membresTries = [...membresCache].sort((a, b) => nomMembre(a.id).localeCompare(nomMembre(b.id)));
   const html = `
@@ -366,7 +375,7 @@ async function chargerRecurrencesAdmin() {
     if (r.date < aujourdhui) return;
     (parRecurrence[r.recurrenceId] ||= []).push(r);
   });
-  const groupes = Object.values(parRecurrence).map(occurrences => {
+  const groupes = Object.entries(parRecurrence).map(([recurrenceId, occurrences]) => {
     occurrences.sort((a, b) => a.date.localeCompare(b.date));
     const prochaine = occurrences[0];
     let frequence = 'Toutes les semaines';
@@ -374,7 +383,7 @@ async function chargerRecurrencesAdmin() {
       const diffJours = Math.round((new Date(occurrences[1].date + 'T00:00:00') - new Date(occurrences[0].date + 'T00:00:00')) / 86400000);
       frequence = diffJours >= 13 ? 'Une semaine sur deux' : 'Toutes les semaines';
     }
-    return { membreId: prochaine.membreId, heure: prochaine.heureDebut, prochaineDate: prochaine.date, frequence, nb: occurrences.length };
+    return { recurrenceId, membreId: prochaine.membreId, heure: prochaine.heureDebut, prochaineDate: prochaine.date, frequence, nb: occurrences.length };
   });
   groupes.sort((a, b) => nomMembre(a.membreId).localeCompare(nomMembre(b.membreId)));
   const wrap = document.getElementById('listeRecurrences');
@@ -387,9 +396,26 @@ async function chargerRecurrencesAdmin() {
         <div class="data-title">${escapeHtml(nomMembre(g.membreId))} — ${jourLabel} ${g.heure}</div>
         <div class="data-sub">${g.frequence} · ${g.nb} prochaine(s) occurrence(s) planifiée(s), à partir du ${capitalize(new Date(g.prochaineDate+'T00:00:00').toLocaleDateString('fr-BE',{day:'numeric', month:'long'}))}</div>
       </div>
+      <div class="data-actions">
+        <button class="btn-sm danger" onclick="window.supprimerRecurrence('${g.recurrenceId}')">Supprimer la récurrence</button>
+      </div>
     </div>`;
   }).join('');
 }
+window.supprimerRecurrence = async (recurrenceId) => {
+  if (!confirm('Supprimer toute cette récurrence ? Toutes les prochaines occurrences de ce créneau seront annulées (les occurrences passées restent inchangées).')) return;
+  const aujourdhui = dateISOLocale(new Date());
+  const snap = await getDocs(query(collection(db, 'reservations'), where('recurrenceId', '==', recurrenceId)));
+  await Promise.all(snap.docs.map(d => {
+    const r = d.data();
+    if (r.date < aujourdhui || r.statut === 'annulee' || r.statut === 'refusee') return Promise.resolve();
+    return updateDoc(doc(db, 'reservations', d.id), { statut: 'annulee', motifAnnulation: 'autre', motifAnnulationDetail: 'Récurrence supprimée par l\'administrateur' });
+  }));
+  chargerReservationsAttente();
+  renderPlanningSemaine();
+  chargerRecurrencesAdmin();
+  chargerCalendrierDeuxSemaines();
+};
 async function chargerCalendrierDeuxSemaines() {
   const zone = document.getElementById('calendrierDeuxSemaines');
   const jours = [];
