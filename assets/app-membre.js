@@ -1,11 +1,11 @@
 import {
   auth, db, onAuthStateChanged, signOut,
   updatePassword, reauthenticateWithCredential, EmailAuthProvider,
-  doc, getDoc, getDocAvecReessai, setDoc, getDocs, collection, addDoc, updateDoc, query, where, serverTimestamp
+  doc, getDoc, getDocAvecReessai, setDoc, getDocs, collection, addDoc, updateDoc, query, where, serverTimestamp, motDePasseValide
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V15';
+const VERSION_SITE = 'V19';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -180,6 +180,11 @@ document.getElementById('btnChangerMotDePasse').addEventListener('click', async 
   }
   if (nouveau.length < 6) {
     errorBox.textContent = 'Le nouveau mot de passe doit contenir au moins 6 caractères.';
+    errorBox.classList.add('show');
+    return;
+  }
+  if (!motDePasseValide(nouveau)) {
+    errorBox.textContent = 'Le mot de passe ne peut contenir que des lettres et des chiffres (pas d\'espace, pas de caractère spécial).';
     errorBox.classList.add('show');
     return;
   }
@@ -476,7 +481,7 @@ async function renderGrilleReservations() {
     const m = await meteoPour(dateISO, '13:00');
     const alerte = alerteMeteo(m);
     const meteoHtml = m
-      ? `<span class="meteo" style="${alerte ? 'color:#8A2E2E; font-weight:700;' : ''}">${iconeCode(m.code)} ${m.temperature}°C${alerte ? ' ⚠️' : ''}</span>`
+      ? `<span class="meteo" style="${alerte ? `color:${alerte.couleur}; font-weight:700;` : ''}">${iconeCode(m.code)} ${m.temperature}°C${alerte ? ' ⚠️' : ''}</span>`
       : '';
     const boutons = heures.map(h => {
       const cle = `${dateISO}_${h}`;
@@ -539,21 +544,25 @@ async function chargerMesReservations() {
     if (avecMeteo) {
       const m = await meteoPour(r.date, r.heureDebut);
       const alerte = alerteMeteo(m);
-      meteoHtml = m ? `<div class="data-sub">${iconeCode(m.code)} ${m.temperature}°C · pluie ${m.pluie}%</div>${alerte ? `<div class="banner-alert" style="margin-top:6px; padding:6px 10px;">⚠️ ${alerte.texte}</div>` : ''}` : '';
+      meteoHtml = m ? `<div class="data-sub">${iconeCode(m.code)} ${m.temperature}°C</div>${alerte ? `<div class="banner-alert" style="margin-top:6px; padding:6px 10px; background:${alerte.couleur}1a; border-color:${alerte.couleur}; color:${alerte.couleur};">⚠️ ${alerte.texte}</div>` : ''}` : '';
     }
     const badge = r.statut === 'validee' ? '<span class="badge badge-ok">Validée par Lara</span>'
       : r.statut === 'en_attente' ? '<span class="badge badge-warn">En attente de validation</span>'
       : r.statut === 'refusee' ? '<span class="badge badge-danger">Refusée</span>'
       : '<span class="badge badge-neutral">Annulée</span>';
+    const motifLabel = { vacances: 'Vacances', malade: 'Malade' }[r.motifAnnulation] || (r.motifAnnulation === 'autre' ? r.motifAnnulationDetail : '');
+    const motifHtml = (r.statut === 'annulee' && motifLabel) ? `<div class="data-sub">Motif : ${escapeHtml(motifLabel)}</div>` : '';
     const peutAnnuler = (r.statut === 'en_attente' || r.statut === 'validee') && r.date >= aujourdhui;
+    const libelleAnnuler = r.recurrenceId ? 'Libérer ce créneau' : 'Annuler';
     return `
     <div class="data-row">
       <div class="data-main">
         <div class="data-title">${dateLabel} — ${r.heureDebut} (${r.type === 'libre' ? 'piste libre' : 'cours'})</div>
         <div class="data-sub">${badge}</div>
+        ${motifHtml}
         ${meteoHtml}
       </div>
-      ${peutAnnuler ? `<div class="data-actions"><button class="btn-sm danger" onclick="window.annulerMaReservation('${r.id}')">Annuler</button></div>` : ''}
+      ${peutAnnuler ? `<div class="data-actions"><button class="btn-sm danger" onclick="window.demanderAnnulationReservation('${r.id}','${escapeHtml(dateLabel)}','${r.heureDebut}',${r.recurrenceId ? 'true' : 'false'})">${libelleAnnuler}</button></div>` : ''}
     </div>`;
   };
 
@@ -562,11 +571,48 @@ async function chargerMesReservations() {
   wrapHisto.innerHTML = passees.length ? (await Promise.all(passees.map(r => ligneResa(r, false)))).join('') : '<div class="empty-state">Aucun historique pour l\'instant.</div>';
 }
 
-window.annulerMaReservation = async (id) => {
-  if (!confirm('Annuler cette réservation ?')) return;
-  await updateDoc(doc(db, 'reservations', id), { statut: 'annulee' });
-  await renderGrilleReservations();
-  await chargerMesReservations();
+window.demanderAnnulationReservation = (id, dateLabel, heure, estRecurrence) => {
+  const html = `
+    <div class="modal-overlay" id="modalOverlayAnnulResa">
+      <div class="modal-box" style="max-width:440px;">
+        <h3>Libérer ce créneau</h3>
+        <p style="color:var(--terre); font-size:0.85rem;">${dateLabel} à ${heure}.${estRecurrence ? ' Ce créneau fait partie d\'une récurrence : seule cette occurrence sera libérée, vos prochains créneaux restent réservés.' : ''}</p>
+        <div class="field">
+          <label>Motif</label>
+          <select id="cr-motif">
+            <option value="vacances">Vacances</option>
+            <option value="malade">Malade</option>
+            <option value="autre">Autre — à préciser</option>
+          </select>
+        </div>
+        <div class="field hidden" id="cr-zoneAutre"><label>Précisez</label><input type="text" id="cr-motifAutre"></div>
+        <div class="modal-actions">
+          <button class="btn-sm" type="button" onclick="document.getElementById('modalOverlayAnnulResa').remove()">Retour</button>
+          <button class="btn-sm danger" type="button" id="cr-confirmer">Libérer le créneau</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('cr-motif').addEventListener('change', (e) => {
+    document.getElementById('cr-zoneAutre').classList.toggle('hidden', e.target.value !== 'autre');
+  });
+  document.getElementById('cr-confirmer').addEventListener('click', async () => {
+    const motif = document.getElementById('cr-motif').value;
+    const motifAutre = document.getElementById('cr-motifAutre').value.trim();
+    if (motif === 'autre' && !motifAutre) { alert('Merci de préciser le motif.'); return; }
+    try {
+      await updateDoc(doc(db, 'reservations', id), {
+        statut: 'annulee',
+        motifAnnulation: motif,
+        motifAnnulationDetail: motif === 'autre' ? motifAutre : ''
+      });
+      document.getElementById('modalOverlayAnnulResa').remove();
+      await renderGrilleReservations();
+      await chargerMesReservations();
+    } catch (err) {
+      alert('Erreur : ' + (err.code || err.message));
+    }
+  });
 };
 
 // ==========================================================================

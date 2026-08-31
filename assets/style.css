@@ -785,3 +785,19 @@ blockquote.pull-quote {
   font-size: 0.78rem;
   letter-spacing: 0.06em;
 }
+
+/* Protection légère du contenu (dissuasive uniquement) : empêche la
+   sélection de texte sur les pages publiques du site, pas dans l'espace
+   membre/admin où il faut pouvoir copier des informations (IBAN,
+   identifiants, textes des messages...). */
+body:not(.app-body) {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+body:not(.app-body) input,
+body:not(.app-body) textarea {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
+}

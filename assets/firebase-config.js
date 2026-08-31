@@ -90,6 +90,17 @@ export function identifiantVersEmail(identifiant) {
   return identifiant.trim().toLowerCase() + "@membres.lar-allegria.local";
 }
 
+// Interdit tout caractère spécial dans les identifiants et mots de passe
+// (lettres avec ou sans accent, chiffres uniquement — pas d'espace, pas de
+// ponctuation, pas de symbole).
+const REGEX_SANS_CARACTERES_SPECIAUX = /^[A-Za-zÀ-ÖØ-öø-ÿ0-9]+$/;
+export function identifiantValide(identifiant) {
+  return REGEX_SANS_CARACTERES_SPECIAUX.test(identifiant || '');
+}
+export function motDePasseValide(motDePasse) {
+  return REGEX_SANS_CARACTERES_SPECIAUX.test(motDePasse || '');
+}
+
 // Lecture d'un document avec plusieurs tentatives (absorbe un éventuel
 // petit délai de propagation Firestore juste après une modification).
 export async function getDocAvecReessai(refDoc, maxEssais = 3, delaiMs = 900) {

@@ -46,17 +46,39 @@ export async function meteoPour(dateISO, heureHHMM) {
   };
 }
 
-// Un cours/une réservation en extérieur mérite une alerte au-delà de ces seuils.
+// Calcule une couleur allant d'un ton chaud modéré vers le rouge d'alerte,
+// proportionnellement à l'intensité du risque (0 = seuil d'alerte tout
+// juste atteint, 1 = risque maximal).
+function couleurRisque(intensite) {
+  const t = Math.max(0, Math.min(1, intensite));
+  const debut = [201, 138, 58];   // ocre chaud
+  const fin = [138, 46, 46];      // rouge alerte (identique au reste du site)
+  const rgb = debut.map((c, i) => Math.round(c + (fin[i] - c) * t));
+  return `rgb(${rgb.join(',')})`;
+}
+
+// Un cours/une réservation en extérieur mérite une alerte au-delà de ces
+// seuils. Le texte reste générique (pas de pourcentage/degré affiché) et
+// c'est la couleur qui monte vers le rouge selon l'intensité du risque.
 export function alerteMeteo(m) {
   if (!m) return null;
-  if (m.pluie >= 70) return { niveau: 'danger', texte: `Risque de pluie important (${m.pluie}%)` };
-  if (typeof m.vent === 'number' && m.vent >= 45) return { niveau: 'danger', texte: `Vent fort (${m.vent} km/h)` };
-  if (typeof m.temperature === 'number' && m.temperature >= 32) return { niveau: 'danger', texte: `Chaleur extrême (${m.temperature}°C)` };
-  if (typeof m.temperature === 'number' && m.temperature <= -2) return { niveau: 'danger', texte: `Gel (${m.temperature}°C)` };
-  if (m.pluie >= 40) return { niveau: 'warn', texte: `Pluie possible (${m.pluie}%)` };
-  if (typeof m.vent === 'number' && m.vent >= 30) return { niveau: 'warn', texte: `Vent soutenu (${m.vent} km/h)` };
-  if (typeof m.temperature === 'number' && m.temperature >= 28) return { niveau: 'warn', texte: `Forte chaleur (${m.temperature}°C)` };
-  return null;
+  const risques = [];
+  if (typeof m.pluie === 'number' && m.pluie >= 40) {
+    risques.push({ intensite: Math.min(1, (m.pluie - 40) / 60), texte: 'Pluie possible' });
+  }
+  if (typeof m.vent === 'number' && m.vent >= 30) {
+    risques.push({ intensite: Math.min(1, (m.vent - 30) / 30), texte: 'Vent fort possible' });
+  }
+  if (typeof m.temperature === 'number' && m.temperature >= 28) {
+    risques.push({ intensite: Math.min(1, (m.temperature - 28) / 10), texte: 'Forte chaleur possible' });
+  }
+  if (typeof m.temperature === 'number' && m.temperature <= -2) {
+    risques.push({ intensite: Math.min(1, (-2 - m.temperature) / 8), texte: 'Risque de gel' });
+  }
+  if (risques.length === 0) return null;
+  risques.sort((a, b) => b.intensite - a.intensite);
+  const pire = risques[0];
+  return { niveau: pire.intensite >= 0.5 ? 'danger' : 'warn', texte: pire.texte, couleur: couleurRisque(pire.intensite) };
 }
 
 function descriptionCode(code) {

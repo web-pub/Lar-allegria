@@ -1,12 +1,12 @@
 import {
   auth, db, onAuthStateChanged, signOut,
   updatePassword, reauthenticateWithCredential, EmailAuthProvider,
-  creerCompteMembre, reinitialiserMotDePasseCompte,
+  creerCompteMembre, reinitialiserMotDePasseCompte, identifiantValide, motDePasseValide,
   doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, collection, addDoc, query, where, orderBy, serverTimestamp
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V15';
+const VERSION_SITE = 'V19';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -51,6 +51,7 @@ onAuthStateChanged(auth, async (user) => {
   chargerMeteoResume();
   chargerReservationsAttente();
   renderPlanningSemaine();
+  chargerCalendrierDeuxSemaines();
   chargerDemandesInscription();
   renderMembres();
   chargerBoxes();
@@ -91,7 +92,7 @@ window.fermerModal = () => { document.getElementById('modalZone').innerHTML = ''
 async function chargerMeteoResume() {
   const zone = document.getElementById('meteoResume');
   const jours = [];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 7; i++) {
     const d = new Date(); d.setDate(d.getDate() + i);
     jours.push(d);
   }
@@ -99,11 +100,11 @@ async function chargerMeteoResume() {
     const dateISO = dateISOLocale(d);
     const m = await meteoPour(dateISO, '13:00');
     const alerte = alerteMeteo(m);
-    return `<div class="data-row" style="flex:1 1 140px;">
+    return `<div class="data-row" style="flex:1 1 130px;">
       <div class="data-main">
         <div class="data-title">${capitalize(d.toLocaleDateString('fr-BE', {weekday:'short', day:'numeric'}))}</div>
-        <div class="data-sub">${m ? `${iconeCode(m.code)} ${m.temperature}°C · pluie ${m.pluie}%` : 'Météo indisponible'}</div>
-        ${alerte ? `<div class="badge badge-${alerte.niveau === 'danger' ? 'danger' : 'warn'}" style="margin-top:4px;">⚠️ ${alerte.texte}</div>` : ''}
+        <div class="data-sub">${m ? `${iconeCode(m.code)} ${m.temperature}°C` : 'Météo indisponible'}</div>
+        ${alerte ? `<div class="badge" style="margin-top:4px; background:${alerte.couleur}; border-color:${alerte.couleur}; color:#fff;">⚠️ ${alerte.texte}</div>` : ''}
       </div>
     </div>`;
   }));
@@ -152,13 +153,13 @@ async function chargerReservationsAttente() {
     const dateLabel = capitalize(new Date(r.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
     const m = await meteoPour(r.date, r.heureDebut);
     const alerte = alerteMeteo(m);
-    const meteoHtml = m ? `<span class="badge badge-neutral">${iconeCode(m.code)} ${m.temperature}°C · pluie ${m.pluie}%</span>` : '';
+    const meteoHtml = m ? `<span class="badge badge-neutral">${iconeCode(m.code)} ${m.temperature}°C</span>` : '';
     return `
     <div class="data-row">
       <div class="data-main">
         <div class="data-title">${escapeHtml(nomMembre(r.membreId))} — ${dateLabel} ${r.heureDebut}</div>
         <div class="data-sub">${r.type === 'libre' ? 'Piste libre' : 'Cours de dressage'} ${meteoHtml}</div>
-        ${alerte ? `<div class="banner-alert" style="margin-top:6px; padding:6px 10px;">⚠️ ${alerte.texte}</div>` : ''}
+        ${alerte ? `<div class="banner-alert" style="margin-top:6px; padding:6px 10px; background:${alerte.couleur}1a; border-color:${alerte.couleur}; color:${alerte.couleur};">⚠️ ${alerte.texte}</div>` : ''}
       </div>
       <div class="data-actions">
         <button class="btn-sm primary" onclick="window.validerReservation('${r.id}','${r.date}','${r.heureDebut}')">Valider</button>
@@ -233,7 +234,164 @@ window.annulerReservationAdmin = async (id) => {
   await updateDoc(doc(db, 'reservations', id), { statut: 'annulee' });
   chargerReservationsAttente();
   renderPlanningSemaine();
+  chargerCalendrierDeuxSemaines();
 };
+
+// ==========================================================================
+// AJOUT MANUEL D'UNE RÉSERVATION (admin/super-admin) + CALENDRIER 2 SEMAINES
+// ==========================================================================
+function creneauxHorairesAdmin(heureDebut, heureFin) {
+  const [hD, mD] = (heureDebut || '09:00').split(':').map(Number);
+  const [hF, mF] = (heureFin || '19:00').split(':').map(Number);
+  const creneaux = [];
+  let h = hD, m = mD || 0;
+  while (h < hF || (h === hF && m < mF)) {
+    creneaux.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+    h += 1;
+  }
+  return creneaux;
+}
+async function exceptionJourAdmin(dateISO) {
+  const d = await getDoc(doc(db, 'disponibilites_exceptions', dateISO));
+  return d.exists() ? d.data() : null;
+}
+
+document.getElementById('btnAjouterReservation').addEventListener('click', () => window.ouvrirModalAjouterReservation());
+
+window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
+  const membresTries = [...membresCache].sort((a, b) => nomMembre(a.id).localeCompare(nomMembre(b.id)));
+  const html = `
+    <div class="modal-overlay" id="modalOverlayAjoutResa">
+      <div class="modal-box">
+        <h3>Ajouter une réservation</h3>
+        <div class="field"><label>Membre *</label><select id="ar-membre"><option value="">— Choisir —</option>${membresTries.map(m => `<option value="${m.id}">${escapeHtml(nomMembre(m.id))}</option>`).join('')}</select></div>
+        <div class="field"><label>Type</label><select id="ar-type"><option value="cours">Cours de dressage avec Lara</option><option value="libre">Utilisation libre de la piste</option></select></div>
+        <div class="form-grid">
+          <div class="field"><label>Date de départ</label><input type="date" id="ar-date" value="${prefillDate || ''}"></div>
+          <div class="field"><label>Heure</label><input type="time" id="ar-heure" value="${prefillHeure || ''}"></div>
+        </div>
+        <div class="field">
+          <label>Récurrence <span class="hint">— pour un créneau fixe (ex: chaque samedi 13h-14h)</span></label>
+          <select id="ar-recurrence">
+            <option value="aucune">Aucune — une seule fois</option>
+            <option value="hebdomadaire">Toutes les semaines</option>
+            <option value="bimensuelle">Une semaine sur deux</option>
+          </select>
+        </div>
+        <div class="field hidden" id="ar-zoneJusquau"><label>Jusqu'au (inclus)</label><input type="date" id="ar-jusquau"></div>
+        <p style="color:var(--terre); font-size:0.8rem;">Une réservation ajoutée ici est automatiquement <strong>validée</strong> (pas besoin de confirmation).</p>
+        <div class="modal-actions">
+          <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
+          <button class="btn-sm primary" type="button" id="ar-save">Enregistrer</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modalZone').innerHTML = html;
+  document.getElementById('ar-recurrence').addEventListener('change', (e) => {
+    document.getElementById('ar-zoneJusquau').classList.toggle('hidden', e.target.value === 'aucune');
+  });
+  document.getElementById('ar-save').addEventListener('click', async () => {
+    const membreId = document.getElementById('ar-membre').value;
+    const type = document.getElementById('ar-type').value;
+    const dateVal = document.getElementById('ar-date').value;
+    const heure = document.getElementById('ar-heure').value;
+    const recurrence = document.getElementById('ar-recurrence').value;
+    const jusquau = document.getElementById('ar-jusquau').value;
+    if (!membreId || !dateVal || !heure) { alert('Merci de choisir un membre, une date et une heure.'); return; }
+    if (recurrence !== 'aucune' && !jusquau) { alert('Merci d\'indiquer une date de fin pour la récurrence.'); return; }
+
+    const dates = [dateVal];
+    if (recurrence !== 'aucune') {
+      const pas = recurrence === 'hebdomadaire' ? 7 : 14;
+      let courante = new Date(dateVal + 'T00:00:00');
+      const fin = new Date(jusquau + 'T00:00:00');
+      while (true) {
+        courante = new Date(courante); courante.setDate(courante.getDate() + pas);
+        if (courante > fin) break;
+        dates.push(dateISOLocale(courante));
+        if (dates.length >= 104) break; // garde-fou
+      }
+    }
+
+    const btn = document.getElementById('ar-save');
+    btn.disabled = true;
+    btn.textContent = 'Enregistrement...';
+    try {
+      // Vérifie les créneaux déjà occupés sur toute la plage concernée pour éviter les doublons.
+      const dateMin = dates.reduce((a, b) => a < b ? a : b);
+      const dateMax = dates.reduce((a, b) => a > b ? a : b);
+      const snapExistant = await getDocs(query(collection(db, 'reservations'), where('date', '>=', dateMin), where('date', '<=', dateMax)));
+      const occupes = new Set();
+      snapExistant.forEach(d => {
+        const r = d.data();
+        if (r.statut === 'validee' || r.statut === 'en_attente') occupes.add(`${r.date}_${r.heureDebut}`);
+      });
+      const recurrenceId = recurrence !== 'aucune' ? ('rec_' + Date.now()) : null;
+      const aCreer = dates.filter(d => !occupes.has(`${d}_${heure}`));
+      const ignores = dates.filter(d => occupes.has(`${d}_${heure}`));
+      await Promise.all(aCreer.map(d => addDoc(collection(db, 'reservations'), {
+        membreId, type, date: d, heureDebut: heure, statut: 'validee',
+        ajouteParAdmin: true, recurrenceId,
+        createdAt: serverTimestamp()
+      })));
+      window.fermerModal();
+      chargerReservationsAttente();
+      renderPlanningSemaine();
+      chargerCalendrierDeuxSemaines();
+      if (ignores.length > 0) {
+        alert(`${aCreer.length} créneau(x) créé(s).\n${ignores.length} déjà occupé(s), non modifié(s) : ${ignores.join(', ')}`);
+      }
+    } catch (err) {
+      alert('Erreur lors de l\'enregistrement : ' + (err.code || err.message));
+      btn.disabled = false;
+      btn.textContent = 'Enregistrer';
+    }
+  });
+};
+
+async function chargerCalendrierDeuxSemaines() {
+  const zone = document.getElementById('calendrierDeuxSemaines');
+  const jours = [];
+  for (let i = 0; i < 14; i++) { const d = new Date(); d.setDate(d.getDate() + i); jours.push(d); }
+  const dateDebut = dateISOLocale(jours[0]);
+  const dateFin = dateISOLocale(jours[13]);
+  const snap = await getDocs(query(collection(db, 'reservations'), where('date', '>=', dateDebut), where('date', '<=', dateFin)));
+  const parCle = {};
+  snap.forEach(d => {
+    const r = d.data();
+    if (r.statut === 'annulee' || r.statut === 'refusee') return;
+    parCle[`${r.date}_${r.heureDebut}`] = { id: d.id, ...r };
+  });
+  const disp = await getDoc(doc(db, 'parametres', 'disponibilites'));
+  const horaires = horairesParJourDepuis(disp.exists() ? disp.data() : {});
+  const maintenant = new Date();
+
+  const blocs = await Promise.all(jours.map(async (d) => {
+    const jourISO = d.getDay() === 0 ? 7 : d.getDay();
+    const dateISO = dateISOLocale(d);
+    const exception = await exceptionJourAdmin(dateISO);
+    if (exception?.ferme) {
+      return `<div class="resa-jour"><div class="resa-jour-titre">${capitalize(d.toLocaleDateString('fr-BE', {weekday:'short', day:'numeric', month:'short'}))}</div><div class="empty-state" style="margin:0;">Fermé</div></div>`;
+    }
+    const h = horaires[jourISO] || { ouvert: false };
+    const ouvertParException = exception && (exception.heureDebut || exception.heureFin);
+    if (!h.ouvert && !ouvertParException) return '';
+    const heures = creneauxHorairesAdmin(exception?.heureDebut || h.heureDebut, exception?.heureFin || h.heureFin);
+    const boutons = heures.map(heure => {
+      const cle = `${dateISO}_${heure}`;
+      const resa = parCle[cle];
+      const estPasse = new Date(`${dateISO}T${heure}:00`) < maintenant;
+      if (estPasse) return `<button class="creneau-btn passe" disabled>${heure}</button>`;
+      if (resa) {
+        const cls = resa.statut === 'validee' ? 'valide' : 'attente';
+        return `<button class="creneau-btn ${cls}" onclick="window.annulerReservationAdmin('${resa.id}')" title="${escapeHtml(nomMembre(resa.membreId))} — cliquer pour annuler">${heure} — ${escapeHtml(nomMembre(resa.membreId))}</button>`;
+      }
+      return `<button class="creneau-btn" onclick="window.ouvrirModalAjouterReservation('${dateISO}','${heure}')">${heure}</button>`;
+    }).join('');
+    return `<div class="resa-jour"><div class="resa-jour-titre">${capitalize(d.toLocaleDateString('fr-BE', {weekday:'short', day:'numeric', month:'short'}))}</div><div class="resa-creneaux">${boutons}</div></div>`;
+  }));
+  zone.innerHTML = blocs.join('') || '<div class="empty-state">Aucun jour d\'ouverture sur ces 2 semaines.</div>';
+}
 
 // ==========================================================================
 // DEMANDES D'INSCRIPTION
@@ -408,7 +566,9 @@ window.ouvrirModalMembre = (membre, demandeId) => {
     const identifiant = document.getElementById('fm-identifiant').value.trim();
     const motDePasse = estNouveau ? document.getElementById('fm-motdepasse').value.trim() : '';
     if (!identifiant) { alert('L\'identifiant est obligatoire.'); return; }
+    if (!identifiantValide(identifiant)) { alert('L\'identifiant ne peut contenir que des lettres et des chiffres (pas d\'espace, pas de caractère spécial).'); return; }
     if (estNouveau && motDePasse.length < 6) { alert('Le mot de passe temporaire doit contenir au moins 6 caractères.'); return; }
+    if (estNouveau && !motDePasseValide(motDePasse)) { alert('Le mot de passe ne peut contenir que des lettres et des chiffres (pas d\'espace, pas de caractère spécial).'); return; }
 
     const btnSave = document.getElementById('fm-save');
     let uid;
@@ -707,6 +867,11 @@ document.getElementById('btnChangerMotDePasse').addEventListener('click', async 
   }
   if (nouveau.length < 6) {
     errorBox.textContent = 'Le nouveau mot de passe doit contenir au moins 6 caractères.';
+    errorBox.classList.add('show');
+    return;
+  }
+  if (!motDePasseValide(nouveau)) {
+    errorBox.textContent = 'Le mot de passe ne peut contenir que des lettres et des chiffres (pas d\'espace, pas de caractère spécial).';
     errorBox.classList.add('show');
     return;
   }
@@ -1670,6 +1835,7 @@ window.reinitialiserMotDePasse = async (uid, identifiant) => {
   const nouveau = prompt(`Nouveau mot de passe pour "${identifiant}" (6 caractères minimum) :`);
   if (!nouveau) return;
   if (nouveau.length < 6) { alert('Le nouveau mot de passe doit contenir au moins 6 caractères.'); return; }
+  if (!motDePasseValide(nouveau)) { alert('Le mot de passe ne peut contenir que des lettres et des chiffres (pas d\'espace, pas de caractère spécial).'); return; }
   try {
     await reinitialiserMotDePasseCompte(identifiant, ancien, nouveau);
     await updateDoc(doc(db, 'membres', uid), { motDePasseActuel: nouveau });

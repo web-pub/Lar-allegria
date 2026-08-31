@@ -125,6 +125,17 @@
   border-color: var(--or);
   box-shadow: 0 0 0 3px rgba(184,132,44,0.18);
 }
+/* Les cases à cocher (ex: sélection de plusieurs membres pour un message)
+   ne doivent pas hériter du style "champ texte pleine largeur" ci-dessus. */
+.field input[type="checkbox"] {
+  width: 16px;
+  max-width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid #DCCBA8;
+  flex-shrink: 0;
+  accent-color: var(--rouge-dark);
+}
 .field .toggle-pw {
   position: absolute;
   right: 10px;
@@ -506,3 +517,11 @@
 }
 .box-card.fait { border-left: 4px solid #2C6E3F; }
 .box-card.a-faire { border-left: 4px solid var(--rouge); }
+
+/* Dans le calendrier 2 semaines de l'admin, les créneaux occupés restent
+   cliquables (pour annuler directement), contrairement à la grille membre
+   où ils sont juste informatifs. */
+#calendrierDeuxSemaines .creneau-btn.valide,
+#calendrierDeuxSemaines .creneau-btn.attente {
+  cursor: pointer;
+}
