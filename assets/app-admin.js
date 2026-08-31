@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V28';
+const VERSION_SITE = 'V29';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -51,6 +51,7 @@ onAuthStateChanged(auth, async (user) => {
   chargerMeteoResume();
   chargerReservationsAttente();
   renderPlanningSemaine();
+  chargerRecurrencesAdmin();
   chargerCalendrierDeuxSemaines();
   chargerDemandesInscription();
   renderMembres();
@@ -234,6 +235,7 @@ window.annulerReservationAdmin = async (id) => {
   await updateDoc(doc(db, 'reservations', id), { statut: 'annulee' });
   chargerReservationsAttente();
   renderPlanningSemaine();
+  chargerRecurrencesAdmin();
   chargerCalendrierDeuxSemaines();
 };
 
@@ -339,6 +341,7 @@ window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
       window.fermerModal();
       chargerReservationsAttente();
       renderPlanningSemaine();
+      chargerRecurrencesAdmin();
       chargerCalendrierDeuxSemaines();
       if (ignores.length > 0) {
         alert(`${aCreer.length} créneau(x) créé(s).\n${ignores.length} déjà occupé(s), non modifié(s) : ${ignores.join(', ')}`);
@@ -352,6 +355,41 @@ window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
 };
 
 let calBlocOffset = 0; // en jours, multiple de 15
+
+async function chargerRecurrencesAdmin() {
+  const snap = await getDocs(collection(db, 'reservations'));
+  const aujourdhui = dateISOLocale(new Date());
+  const parRecurrence = {};
+  snap.forEach(d => {
+    const r = d.data();
+    if (!r.recurrenceId || r.statut === 'annulee' || r.statut === 'refusee') return;
+    if (r.date < aujourdhui) return;
+    (parRecurrence[r.recurrenceId] ||= []).push(r);
+  });
+  const groupes = Object.values(parRecurrence).map(occurrences => {
+    occurrences.sort((a, b) => a.date.localeCompare(b.date));
+    const prochaine = occurrences[0];
+    let frequence = 'Toutes les semaines';
+    if (occurrences.length > 1) {
+      const diffJours = Math.round((new Date(occurrences[1].date + 'T00:00:00') - new Date(occurrences[0].date + 'T00:00:00')) / 86400000);
+      frequence = diffJours >= 13 ? 'Une semaine sur deux' : 'Toutes les semaines';
+    }
+    return { membreId: prochaine.membreId, heure: prochaine.heureDebut, prochaineDate: prochaine.date, frequence, nb: occurrences.length };
+  });
+  groupes.sort((a, b) => nomMembre(a.membreId).localeCompare(nomMembre(b.membreId)));
+  const wrap = document.getElementById('listeRecurrences');
+  if (groupes.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun cours récurrent actif pour le moment.</div>'; return; }
+  wrap.innerHTML = groupes.map(g => {
+    const jourLabel = capitalize(new Date(g.prochaineDate + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long'}));
+    return `
+    <div class="data-row">
+      <div class="data-main">
+        <div class="data-title">${escapeHtml(nomMembre(g.membreId))} — ${jourLabel} ${g.heure}</div>
+        <div class="data-sub">${g.frequence} · ${g.nb} prochaine(s) occurrence(s) planifiée(s), à partir du ${capitalize(new Date(g.prochaineDate+'T00:00:00').toLocaleDateString('fr-BE',{day:'numeric', month:'long'}))}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
 async function chargerCalendrierDeuxSemaines() {
   const zone = document.getElementById('calendrierDeuxSemaines');
   const jours = [];
@@ -834,7 +872,7 @@ window.ouvrirModalTarif = (t) => {
         <div class="field"><label>Nom</label><input id="tf-nom" value="${escapeHtml(t?.nom||'')}" placeholder="ex: Cours de dressage 1h"></div>
         <div class="form-grid">
           <div class="field"><label>Prix (€)</label><input type="number" step="0.01" id="tf-prix" value="${t?.prix ?? ''}"></div>
-          <div class="field"><label>Unité</label><input id="tf-unite" value="${escapeHtml(t?.unite||'')}" placeholder="ex: heure, mois"></div>
+          <div class="field"><label>Unité</label><input id="tf-unite" value="${escapeHtml(t?.unite||'')}" placeholder="ex: heure, mois, abonnement, séance"></div>
         </div>
         <div class="field"><label>Conditions (facultatif)</label><input id="tf-conditions" value="${escapeHtml(t?.conditions||'')}"></div>
         <div class="field"><label>Visible sur le site public</label>

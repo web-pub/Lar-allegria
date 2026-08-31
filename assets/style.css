@@ -764,7 +764,8 @@ blockquote.pull-quote {
 
 /* Vignette cheval : toute la photo reste visible (pas de recadrage brutal),
    posée sur un fond doux qui reprend les couleurs du site. */
-.cheval-vignette {
+.cheval-vignette,
+.evenement-vignette {
   width: 100%;
   height: 230px;
   background: linear-gradient(160deg, var(--paper-warm) 0%, #EDE0C4 100%);
@@ -773,7 +774,8 @@ blockquote.pull-quote {
   justify-content: center;
   overflow: hidden;
 }
-.cheval-vignette img {
+.cheval-vignette img,
+.evenement-vignette img {
   width: 100%;
   height: 100%;
   object-fit: contain;
