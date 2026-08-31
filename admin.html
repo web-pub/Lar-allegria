@@ -60,14 +60,23 @@
         <button class="btn-sm" id="resaAdminSemaineSuiv">Semaine suivante →</button>
       </div>
       <div class="section-heading"><h2>Planning de la piste</h2>
-        <button class="btn-sm primary" id="btnAjouterReservation">+ Ajouter une réservation</button>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button class="btn-sm primary" id="btnAjouterReservation">+ Ajouter une réservation</button>
+          <button class="collapse-toggle" data-target="wrapPlanningPiste" aria-expanded="true" aria-label="Afficher/masquer">▾</button>
+        </div>
       </div>
-      <div class="data-list" id="listePlanningSemaine"><div class="empty-state">...</div></div>
+      <div id="wrapPlanningPiste">
+        <div class="data-list" id="listePlanningSemaine"><div class="empty-state">...</div></div>
+      </div>
     </div>
     <div class="app-panel">
-      <h2>Cours avec récurrence en cours</h2>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Qui a un créneau fixe régulier, et à quelle heure — calculé à partir des réservations récurrentes actives.</p>
-      <div class="data-list" id="listeRecurrences"><div class="empty-state">...</div></div>
+      <div class="section-heading"><h2>Cours avec récurrence en cours</h2>
+        <button class="collapse-toggle" data-target="wrapRecurrences" aria-expanded="false" aria-label="Afficher/masquer">▸</button>
+      </div>
+      <div id="wrapRecurrences" class="hidden">
+        <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Qui a un créneau fixe régulier, et à quelle heure — calculé à partir des réservations récurrentes actives.</p>
+        <div class="data-list" id="listeRecurrences"><div class="empty-state">...</div></div>
+      </div>
     </div>
     <div class="app-panel">
       <div class="resa-nav">
@@ -75,9 +84,13 @@
         <h3 id="calBlocLabel">Du ... au ...</h3>
         <button class="btn-sm" id="calBlocSuiv">15 jours suivants →</button>
       </div>
-      <h2>Calendrier — 15 jours</h2>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Vue d'ensemble par blocs de 15 jours (3 lignes de 5 jours). Cliquez sur un créneau libre pour l'attribuer directement à un membre (ex : un cavalier qui vient chaque samedi de 13h à 14h).</p>
-      <div class="resa-jours" id="calendrierDeuxSemaines"><div class="empty-state">Chargement...</div></div>
+      <div class="section-heading"><h2>Calendrier — 15 jours</h2>
+        <button class="collapse-toggle" data-target="wrapCalendrier15j" aria-expanded="true" aria-label="Afficher/masquer">▾</button>
+      </div>
+      <div id="wrapCalendrier15j">
+        <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Vue d'ensemble par blocs de 15 jours (3 lignes de 5 jours). Cliquez sur un créneau libre pour l'attribuer directement à un membre (ex : un cavalier qui vient chaque samedi de 13h à 14h).</p>
+        <div class="resa-jours" id="calendrierDeuxSemaines"><div class="empty-state">Chargement...</div></div>
+      </div>
     </div>
   </div>
 

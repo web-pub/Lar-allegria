@@ -1,5 +1,5 @@
 // Projet : Lar-allegria
-// Site : Lar'Allegria by Lara Rossoux — V29
+// Site : Lar'Allegria by Lara Rossoux — V30
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
