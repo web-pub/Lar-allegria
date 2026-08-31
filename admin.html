@@ -65,8 +65,13 @@
       <div class="data-list" id="listePlanningSemaine"><div class="empty-state">...</div></div>
     </div>
     <div class="app-panel">
-      <h2>Calendrier — 15 prochains jours</h2>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Vue d'ensemble des 15 prochains jours (3 lignes de 5 jours, à partir d'aujourd'hui). Cliquez sur un créneau libre pour l'attribuer directement à un membre (ex : un cavalier qui vient chaque samedi de 13h à 14h).</p>
+      <div class="resa-nav">
+        <button class="btn-sm" id="calBlocPrec">← 15 jours précédents</button>
+        <h3 id="calBlocLabel">Du ... au ...</h3>
+        <button class="btn-sm" id="calBlocSuiv">15 jours suivants →</button>
+      </div>
+      <h2>Calendrier — 15 jours</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Vue d'ensemble par blocs de 15 jours (3 lignes de 5 jours). Cliquez sur un créneau libre pour l'attribuer directement à un membre (ex : un cavalier qui vient chaque samedi de 13h à 14h).</p>
       <div class="resa-jours" id="calendrierDeuxSemaines"><div class="empty-state">Chargement...</div></div>
     </div>
   </div>

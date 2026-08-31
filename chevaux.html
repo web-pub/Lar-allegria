@@ -106,8 +106,9 @@
       <span>Site développé par Hélène Laruelle</span>
       <span>Contenu sous la responsabilité de Lara Rossoux</span>
       <span>TVA BE 0756.844.280</span>
-      <span>Site V15</span>
+      <span>Site V28</span>
     </div>
+    <div class="footer-legal-links"><a href="securisation.html">Sécurisation</a> | <a href="confidentialite.html">Déclaration de confidentialité</a> | <a href="business-ethics-gouvernance.html">Business Ethics &amp; Governance</a> | <a href="confidentialite.html#cookies">Politique en matière de cookies</a> | <a href="limitation-responsabilite.html">Limitation de responsabilité</a> | <a href="mentions-legales.html">Mentions légales</a> / <a href="confidentialite.html#rgpd">RGPD</a> / <a href="cgv.html">CGV</a></div>
   </div>
 </footer>
 
@@ -139,9 +140,10 @@
         return;
       }
 
-      zone.innerHTML = chevaux.map(c => `
-        <div class="media-card">
-          ${c.photoUrl ? `<img src="${escapeHtml(c.photoUrl)}" alt="${escapeHtml(c.nom)}">` : ''}
+      window._chevauxPublic = chevaux;
+      zone.innerHTML = chevaux.map((c, i) => `
+        <div class="media-card clickable" onclick="window.ouvrirFicheCheval(${i})">
+          <div class="cheval-vignette">${c.photoUrl ? `<img src="${escapeHtml(c.photoUrl)}" alt="${escapeHtml(c.nom)}" loading="lazy">` : ''}</div>
           <div class="mc-body">
             <h3>${escapeHtml(c.nom)}</h3>
             ${c.race ? `<div class="mc-meta">${escapeHtml(c.race)}</div>` : ''}
@@ -152,6 +154,33 @@
       zone.innerHTML = '<div class="empty-state">Les fiches des chevaux ne sont pas disponibles pour le moment.</div>';
     }
   })();
+
+  window.ouvrirFicheCheval = (i) => {
+    const c = window._chevauxPublic[i];
+    if (!c) return;
+    const rubrique = (titre, texte) => texte ? `<div class="lb-fiche-item"><h4>${titre}</h4><p>${escapeHtml(texte)}</p></div>` : '';
+    const html = `
+      <div class="lightbox-overlay" id="lightboxCheval" onclick="if(event.target===this) window.fermerFicheCheval()">
+        <div class="lightbox-box">
+          <button class="lightbox-close" onclick="window.fermerFicheCheval()" aria-label="Fermer">✕</button>
+          <div class="lb-photo">${c.photoUrl ? `<img src="${escapeHtml(c.photoUrl)}" alt="${escapeHtml(c.nom)}">` : ''}</div>
+          <div class="lb-body">
+            <h3>${escapeHtml(c.nom)}</h3>
+            ${c.race ? `<div class="mc-meta">${escapeHtml(c.race)}</div>` : ''}
+            ${rubrique('À propos', c.description)}
+            ${rubrique('Caractère', c.caractere)}
+            ${rubrique('Signe particulier', c.signeParticulier)}
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    document.addEventListener('keydown', window._fermerFicheChevalEsc);
+  };
+  window._fermerFicheChevalEsc = (e) => { if (e.key === 'Escape') window.fermerFicheCheval(); };
+  window.fermerFicheCheval = () => {
+    document.getElementById('lightboxCheval')?.remove();
+    document.removeEventListener('keydown', window._fermerFicheChevalEsc);
+  };
 </script>
 <script src="assets/protection.js" defer></script>
 </body>
