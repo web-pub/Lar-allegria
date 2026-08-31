@@ -751,6 +751,57 @@ blockquote.pull-quote {
   .media-feed .media-card { flex-direction: column; }
   .media-feed .media-card img { width: 100%; height: 180px; }
 }
+.media-card.clickable { cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.media-card.clickable:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,0,0,0.12); }
+
+/* Vignette cheval : toute la photo reste visible (pas de recadrage brutal),
+   posée sur un fond doux qui reprend les couleurs du site. */
+.cheval-vignette {
+  width: 100%;
+  height: 230px;
+  background: linear-gradient(160deg, var(--paper-warm) 0%, #EDE0C4 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.cheval-vignette img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* ---------- Mini-fiche (lightbox) — ex: fiche cheval publique ---------- */
+.lightbox-overlay {
+  position: fixed; inset: 0; background: rgba(20,12,8,0.72);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 999; padding: 20px;
+}
+.lightbox-box {
+  background: var(--white); border-radius: var(--radius);
+  max-width: 520px; width: 100%; max-height: 88vh; overflow-y: auto;
+  box-shadow: var(--shadow-soft); position: relative;
+}
+.lightbox-box .lb-photo {
+  width: 100%; height: 320px;
+  background: linear-gradient(160deg, var(--paper-warm) 0%, #EDE0C4 100%);
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.lightbox-box .lb-photo img { width: 100%; height: 100%; object-fit: contain; }
+.lightbox-box .lb-body { padding: 22px 24px 26px; }
+.lightbox-box h3 { font-size: 1.4rem; margin-bottom: 4px; color: var(--noir); }
+.lightbox-box .lb-fiche-item { margin-top: 14px; }
+.lightbox-box .lb-fiche-item h4 {
+  font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--rouge-dark); font-weight: 700; margin-bottom: 4px;
+}
+.lightbox-box .lb-fiche-item p { color: var(--terre); font-size: 0.94rem; margin: 0; white-space: pre-line; }
+.lightbox-close {
+  position: absolute; top: 10px; right: 10px; width: 34px; height: 34px;
+  border-radius: 50%; border: none; background: rgba(0,0,0,0.55); color: #fff;
+  font-size: 1.1rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.lightbox-close:hover { background: rgba(0,0,0,0.75); }
 
 /* ---------- Table (grille tarifaire publique) ---------- */
 

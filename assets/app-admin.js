@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V22';
+const VERSION_SITE = 'V26';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -104,7 +104,7 @@ async function chargerMeteoResume() {
       <div class="data-main">
         <div class="data-title">${capitalize(d.toLocaleDateString('fr-BE', {weekday:'short', day:'numeric'}))}</div>
         <div class="data-sub">${m ? `${iconeCode(m.code)} ${m.temperature}°C` : 'Météo indisponible'}</div>
-        ${alerte ? `<div class="badge" style="margin-top:4px; background:${alerte.couleur}; border-color:${alerte.couleur}; color:#fff; text-transform:none; letter-spacing:0; white-space:normal; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">⚠️ ${alerte.texte}</div>` : ''}
+        ${alerte ? `<div class="badge" style="margin-top:4px; background:${alerte.couleur}; border-color:${alerte.couleur}; color:#fff; text-transform:none; letter-spacing:0; white-space:normal; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${alerte.texte}</div>` : ''}
       </div>
     </div>`;
   }));
@@ -159,7 +159,7 @@ async function chargerReservationsAttente() {
       <div class="data-main">
         <div class="data-title">${escapeHtml(nomMembre(r.membreId))} — ${dateLabel} ${r.heureDebut}</div>
         <div class="data-sub">${r.type === 'libre' ? 'Piste libre' : 'Cours de dressage'} ${meteoHtml}</div>
-        ${alerte ? `<div class="banner-alert" style="margin-top:6px; padding:6px 10px; background:${alerte.couleur}1a; border-color:${alerte.couleur}; color:${alerte.couleur};">⚠️ ${alerte.texte}</div>` : ''}
+        ${alerte ? `<div class="banner-alert" style="margin-top:6px; padding:6px 10px; background:${alerte.couleur}1a; border-color:${alerte.couleur}; color:${alerte.couleur};">${alerte.texte}</div>` : ''}
       </div>
       <div class="data-actions">
         <button class="btn-sm primary" onclick="window.validerReservation('${r.id}','${r.date}','${r.heureDebut}')">Valider</button>
@@ -477,7 +477,7 @@ function renderMembres(filtre = '') {
       <div class="data-row">
         <div class="data-main">
           <div class="data-title">${escapeHtml(m.prenom)} ${escapeHtml(m.nom)}</div>
-          <div class="data-sub">${labelTypeMembre(m.typeMembre)} · ${escapeHtml(m.email||'')} ${m.cotisationPayee ? '<span class="badge badge-ok">Cotisation OK</span>' : '<span class="badge badge-warn">Cotisation à régler</span>'}</div>
+          <div class="data-sub">${labelTypeMembre(m.typeMembre)} · ${escapeHtml(m.email||'')} ${m.cotisationPayee ? '<span class="badge badge-ok">Cotisation OK</span>' : '<span class="badge badge-warn">Cotisation à régler</span>'} ${m.recurrenceCours === 'hebdomadaire' ? '<span class="badge badge-neutral">Cours 1x/semaine</span>' : m.recurrenceCours === 'bimensuelle' ? '<span class="badge badge-neutral">Cours 1x/2 semaines</span>' : ''}</div>
         </div>
         <div class="data-actions">
           <button class="btn-sm" onclick="window.editerMembre('${m.id}')">Modifier</button>
@@ -556,6 +556,13 @@ window.ouvrirModalMembre = (membre, demandeId) => {
           </div>
           <div class="field"><label>Échéance cotisation</label><input type="date" id="fm-cotisationEcheance" value="${src.cotisationDateEcheance||''}"></div>
         </div>
+        <div class="field"><label>Cours avec récurrence <span class="hint">— si ce membre a un cours fixe régulier</span></label>
+          <select id="fm-recurrenceCours">
+            <option value="" ${!src.recurrenceCours?'selected':''}>Aucune</option>
+            <option value="hebdomadaire" ${src.recurrenceCours==='hebdomadaire'?'selected':''}>1x par semaine</option>
+            <option value="bimensuelle" ${src.recurrenceCours==='bimensuelle'?'selected':''}>1x toutes les deux semaines</option>
+          </select>
+        </div>
         <div class="modal-actions">
           <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
           <button class="btn-sm primary" type="button" id="fm-save">Enregistrer</button>
@@ -606,6 +613,7 @@ window.ouvrirModalMembre = (membre, demandeId) => {
       adressePostale: document.getElementById('fm-adresse').value.trim(),
       cotisationPayee: document.getElementById('fm-cotisationPayee').value === 'oui',
       cotisationDateEcheance: document.getElementById('fm-cotisationEcheance').value,
+      recurrenceCours: document.getElementById('fm-recurrenceCours').value,
       archive: false
     };
     if (estNouveau) {
@@ -1345,6 +1353,8 @@ window.ouvrirModalChevalEcurie = (c) => {
         </div>
         <div class="field"><label>Photo (URL — ex: assets/chevaux/nom.jpg si déposée sur GitHub)</label><input id="ce-photo" value="${escapeHtml(c?.photoUrl||'')}"></div>
         <div class="field"><label>Description</label><textarea id="ce-description" rows="3">${escapeHtml(c?.description||'')}</textarea></div>
+        <div class="field"><label>Caractère <span class="hint">— joueur, câlin, curieux, un peu têtu...</span></label><textarea id="ce-caractere" rows="2">${escapeHtml(c?.caractere||'')}</textarea></div>
+        <div class="field"><label>Signe particulier <span class="hint">— étoile en tête, balzane, tache atypique...</span></label><input id="ce-signe" value="${escapeHtml(c?.signeParticulier||'')}"></div>
         <div class="form-grid">
           <div class="field"><label>Visible sur le site public</label>
             <select id="ce-visible"><option value="oui" ${c?.visiblePublic!==false?'selected':''}>Oui</option><option value="non" ${c?.visiblePublic===false?'selected':''}>Non</option></select>
@@ -1369,6 +1379,8 @@ window.ouvrirModalChevalEcurie = (c) => {
       race: document.getElementById('ce-race').value.trim(),
       photoUrl: document.getElementById('ce-photo').value.trim(),
       description: document.getElementById('ce-description').value.trim(),
+      caractere: document.getElementById('ce-caractere').value.trim(),
+      signeParticulier: document.getElementById('ce-signe').value.trim(),
       visiblePublic: document.getElementById('ce-visible').value === 'oui',
       decede: document.getElementById('ce-decede').value === 'oui',
       archive: document.getElementById('ce-archive').value === 'oui'

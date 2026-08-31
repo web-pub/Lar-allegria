@@ -5,7 +5,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V22';
+const VERSION_SITE = 'V26';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -544,7 +544,7 @@ async function chargerMesReservations() {
     if (avecMeteo) {
       const m = await meteoPour(r.date, r.heureDebut);
       const alerte = alerteMeteo(m);
-      meteoHtml = m ? `<div class="data-sub">${iconeCode(m.code)} ${m.temperature}°C</div>${alerte ? `<div class="banner-alert" style="margin-top:6px; padding:6px 10px; background:${alerte.couleur}1a; border-color:${alerte.couleur}; color:${alerte.couleur};">⚠️ ${alerte.texte}</div>` : ''}` : '';
+      meteoHtml = m ? `<div class="data-sub">${iconeCode(m.code)} ${m.temperature}°C</div>${alerte ? `<div class="banner-alert" style="margin-top:6px; padding:6px 10px; background:${alerte.couleur}1a; border-color:${alerte.couleur}; color:${alerte.couleur};">${alerte.texte}</div>` : ''}` : '';
     }
     const badge = r.statut === 'validee' ? '<span class="badge badge-ok">Validée par Lara</span>'
       : r.statut === 'en_attente' ? '<span class="badge badge-warn">En attente de validation</span>'
