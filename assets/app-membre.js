@@ -5,7 +5,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V20';
+const VERSION_SITE = 'V22';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -716,11 +716,29 @@ async function chargerNettoyage() {
     wrap.innerHTML = '<div class="empty-state">Aucune tâche de nettoyage assignée pour l\'instant.</div>';
     return;
   }
+
+  // Petite vignette ronde avec la photo du cheval du box concerné.
+  const [snapBoxes, snapChevaux] = await Promise.all([
+    getDocs(collection(db, 'boxes')),
+    getDocs(collection(db, 'chevaux_ecurie'))
+  ]);
+  const chevalParBox = {};
+  snapBoxes.forEach(d => { chevalParBox[d.id] = d.data().chevalActuel; });
+  const photoParNomCheval = {};
+  snapChevaux.forEach(d => {
+    const c = d.data();
+    if (c.nom && c.photoUrl) photoParNomCheval[c.nom.trim().toLowerCase()] = c.photoUrl;
+  });
+
   wrap.innerHTML = taches.map(t => {
     const dateLabel = t.date ? capitalize(new Date(t.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'})) : '';
     const badge = t.statut === 'fait' ? '<span class="badge badge-ok">Fait</span>' : '<span class="badge badge-warn">À faire</span>';
+    const nomCheval = chevalParBox[t.boxId]?.trim();
+    const photoCheval = nomCheval ? photoParNomCheval[nomCheval.toLowerCase()] : null;
+    const vignette = photoCheval ? `<img src="${escapeHtml(photoCheval)}" style="width:36px; height:36px; border-radius:50%; object-fit:cover; flex:none;">` : '';
     return `
     <div class="data-row">
+      ${vignette}
       <div class="data-main">
         <div class="data-title">${escapeHtml(t.boxNom || 'Box')} — ${dateLabel}</div>
         <div class="data-sub">${badge}</div>

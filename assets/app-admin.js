@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V20';
+const VERSION_SITE = 'V22';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -100,11 +100,11 @@ async function chargerMeteoResume() {
     const dateISO = dateISOLocale(d);
     const m = await meteoPour(dateISO, '13:00');
     const alerte = alerteMeteo(m);
-    return `<div class="data-row" style="flex:1 1 0; min-width:0;">
+    return `<div class="data-row" style="flex:1 1 0; min-width:118px;">
       <div class="data-main">
         <div class="data-title">${capitalize(d.toLocaleDateString('fr-BE', {weekday:'short', day:'numeric'}))}</div>
         <div class="data-sub">${m ? `${iconeCode(m.code)} ${m.temperature}°C` : 'Météo indisponible'}</div>
-        ${alerte ? `<div class="badge" style="margin-top:4px; background:${alerte.couleur}; border-color:${alerte.couleur}; color:#fff; white-space:normal;">⚠️ ${alerte.texte}</div>` : ''}
+        ${alerte ? `<div class="badge" style="margin-top:4px; background:${alerte.couleur}; border-color:${alerte.couleur}; color:#fff; text-transform:none; letter-spacing:0; white-space:normal; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">⚠️ ${alerte.texte}</div>` : ''}
       </div>
     </div>`;
   }));
@@ -713,13 +713,28 @@ async function chargerNettoyages() {
   let taches = [];
   snap.forEach(d => taches.push({ id: d.id, ...d.data() }));
   taches.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+  // Retrouve la photo du cheval du box concerné (par nom, insensible à la
+  // casse) pour afficher une petite vignette ronde devant chaque tâche.
+  const snapChevaux = await getDocs(collection(db, 'chevaux_ecurie'));
+  const photoParNomCheval = {};
+  snapChevaux.forEach(d => {
+    const c = d.data();
+    if (c.nom && c.photoUrl) photoParNomCheval[c.nom.trim().toLowerCase()] = c.photoUrl;
+  });
+
   const wrap = document.getElementById('listeNettoyages');
   if (taches.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucune tâche planifiée.</div>'; return; }
   wrap.innerHTML = taches.map(t => {
     const dateLabel = t.date ? capitalize(new Date(t.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'})) : '';
     const badge = t.statut === 'fait' ? '<span class="badge badge-ok">Fait</span>' : '<span class="badge badge-warn">À faire</span>';
+    const boxRef = boxesCache.find(b => b.id === t.boxId);
+    const nomCheval = boxRef?.chevalActuel?.trim();
+    const photoCheval = nomCheval ? photoParNomCheval[nomCheval.toLowerCase()] : null;
+    const vignette = photoCheval ? `<img src="${escapeHtml(photoCheval)}" style="width:36px; height:36px; border-radius:50%; object-fit:cover; flex:none;">` : '';
     return `
     <div class="data-row">
+      ${vignette}
       <div class="data-main">
         <div class="data-title">${escapeHtml(t.boxNom)} — ${dateLabel}</div>
         <div class="data-sub">Assigné à : ${escapeHtml(nomMembre(t.assigneA))} ${badge}</div>
@@ -1307,7 +1322,7 @@ async function chargerChevauxAdmin() {
       ${c.photoUrl ? `<img src="${escapeHtml(c.photoUrl)}" style="width:52px; height:52px; border-radius:6px; object-fit:cover; flex:none;">` : ''}
       <div class="data-main">
         <div class="data-title">${escapeHtml(c.nom)}</div>
-        <div class="data-sub">${escapeHtml(c.race || '')} ${c.visiblePublic === false ? '<span class="badge badge-neutral">Masqué du site public</span>' : ''}</div>
+        <div class="data-sub">${escapeHtml(c.race || '')} ${c.visiblePublic === false ? '<span class="badge badge-neutral">Masqué du site public</span>' : ''} ${c.decede ? '<span class="badge badge-neutral">Décédé</span>' : ''} ${c.archive ? '<span class="badge badge-danger">Archivée</span>' : ''}</div>
       </div>
       <div class="data-actions">
         <button class="btn-sm" onclick="window.editerChevalEcurie('${c.id}')">Modifier</button>
@@ -1330,8 +1345,16 @@ window.ouvrirModalChevalEcurie = (c) => {
         </div>
         <div class="field"><label>Photo (URL — ex: assets/chevaux/nom.jpg si déposée sur GitHub)</label><input id="ce-photo" value="${escapeHtml(c?.photoUrl||'')}"></div>
         <div class="field"><label>Description</label><textarea id="ce-description" rows="3">${escapeHtml(c?.description||'')}</textarea></div>
-        <div class="field"><label>Visible sur le site public</label>
-          <select id="ce-visible"><option value="oui" ${c?.visiblePublic!==false?'selected':''}>Oui</option><option value="non" ${c?.visiblePublic===false?'selected':''}>Non</option></select>
+        <div class="form-grid">
+          <div class="field"><label>Visible sur le site public</label>
+            <select id="ce-visible"><option value="oui" ${c?.visiblePublic!==false?'selected':''}>Oui</option><option value="non" ${c?.visiblePublic===false?'selected':''}>Non</option></select>
+          </div>
+          <div class="field"><label>Statut</label>
+            <select id="ce-decede"><option value="non" ${!c?.decede?'selected':''}>Vivant</option><option value="oui" ${c?.decede?'selected':''}>Décédé</option></select>
+          </div>
+        </div>
+        <div class="field"><label>Archiver cette fiche <span class="hint">— masque la fiche de la page publique "Nos chevaux" sans la supprimer ni perdre l'historique</span></label>
+          <select id="ce-archive"><option value="non" ${!c?.archive?'selected':''}>Non — reste sur le site</option><option value="oui" ${c?.archive?'selected':''}>Oui — archivée</option></select>
         </div>
         <div class="modal-actions">
           <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
@@ -1346,7 +1369,9 @@ window.ouvrirModalChevalEcurie = (c) => {
       race: document.getElementById('ce-race').value.trim(),
       photoUrl: document.getElementById('ce-photo').value.trim(),
       description: document.getElementById('ce-description').value.trim(),
-      visiblePublic: document.getElementById('ce-visible').value === 'oui'
+      visiblePublic: document.getElementById('ce-visible').value === 'oui',
+      decede: document.getElementById('ce-decede').value === 'oui',
+      archive: document.getElementById('ce-archive').value === 'oui'
     };
     if (!data.nom) { alert('Merci d\'indiquer un nom.'); return; }
     const btnSave = document.getElementById('ce-save');
