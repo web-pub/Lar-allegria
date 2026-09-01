@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V34';
+const VERSION_SITE = 'V35';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -264,6 +264,9 @@ document.getElementById('calBlocPrec').addEventListener('click', () => { calBloc
 document.getElementById('calBlocSuiv').addEventListener('click', () => { calBlocOffset += 15; chargerCalendrierDeuxSemaines(); });
 
 document.getElementById('btnVerifierOrphelines').addEventListener('click', async () => {
+  document.getElementById('wrapOrphelines').classList.remove('hidden');
+  const toggleBtn = document.querySelector('.collapse-toggle[data-target="wrapOrphelines"]');
+  if (toggleBtn) { toggleBtn.textContent = '▾'; toggleBtn.setAttribute('aria-expanded', 'true'); }
   const wrap = document.getElementById('listeOrphelines');
   wrap.innerHTML = '<div class="empty-state">Recherche en cours...</div>';
   const aujourdhui = dateISOLocale(new Date());
@@ -1162,7 +1165,7 @@ document.getElementById('btnAjouterActivite').addEventListener('click', () => {
         </div>
         <div class="field"><label>Lieu</label><input id="ac-lieu" value="Rue Mahay 66, Grâce-Hollogne"></div>
         <div class="field"><label>Prix par personne (€, facultatif)</label><input type="number" step="0.01" id="ac-prix"></div>
-        <div class="field"><label>Description</label><textarea id="ac-description" rows="3"></textarea></div>
+        <div class="field"><label>Description</label><textarea id="ac-description" rows="3" spellcheck="true" lang="fr"></textarea></div>
         <div class="modal-actions">
           <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
           <button class="btn-sm primary" type="button" id="ac-save">Créer</button>
@@ -1356,7 +1359,7 @@ window.ouvrirModalNouveauMessage = () => {
         <div id="nm-zoneTous" class="field hidden">
           <div class="banner-alert info">Le message sera envoyé individuellement à chacun des ${membresTries.length} membres.</div>
         </div>
-        <div class="field"><label>Message</label><textarea id="nm-texte" rows="4" style="width:100%; box-sizing:border-box; font-family:inherit; font-size:0.95rem; padding:8px;"></textarea></div>
+        <div class="field"><label>Message</label><textarea id="nm-texte" rows="4" spellcheck="true" lang="fr" style="width:100%; box-sizing:border-box; font-family:inherit; font-size:0.95rem; padding:8px;"></textarea></div>
         <div class="modal-actions">
           <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
           <button class="btn-sm primary" id="nm-envoyer">Envoyer</button>
@@ -1495,8 +1498,8 @@ window.ouvrirModalChevalEcurie = (c) => {
           <div class="field"><label>Race</label><input id="ce-race" value="${escapeHtml(c?.race||'')}"></div>
         </div>
         <div class="field"><label>Photo (URL — ex: assets/chevaux/nom.jpg si déposée sur GitHub)</label><input id="ce-photo" value="${escapeHtml(c?.photoUrl||'')}"></div>
-        <div class="field"><label>Description</label><textarea id="ce-description" rows="3">${escapeHtml(c?.description||'')}</textarea></div>
-        <div class="field"><label>Caractère <span class="hint">— joueur, câlin, curieux, un peu têtu...</span></label><textarea id="ce-caractere" rows="2">${escapeHtml(c?.caractere||'')}</textarea></div>
+        <div class="field"><label>Description</label><textarea id="ce-description" rows="3" spellcheck="true" lang="fr">${escapeHtml(c?.description||'')}</textarea></div>
+        <div class="field"><label>Caractère <span class="hint">— joueur, câlin, curieux, un peu têtu...</span></label><textarea id="ce-caractere" rows="2" spellcheck="true" lang="fr">${escapeHtml(c?.caractere||'')}</textarea></div>
         <div class="field"><label>Signe particulier <span class="hint">— étoile en tête, balzane, tache atypique...</span></label><input id="ce-signe" value="${escapeHtml(c?.signeParticulier||'')}"></div>
         <div class="form-grid">
           <div class="field"><label>Visible sur le site public</label>
@@ -1581,7 +1584,7 @@ window.ouvrirModalEvenement = (e) => {
           <div class="field"><label>Heure (facultatif)</label><input type="time" id="ev-heure" value="${e?.heure||''}"></div>
         </div>
         <div class="field"><label>Photo (URL)</label><input id="ev-photo" value="${escapeHtml(e?.photoUrl||'')}"></div>
-        <div class="field"><label>Description</label><textarea id="ev-description" rows="3">${escapeHtml(e?.description||'')}</textarea></div>
+        <div class="field"><label>Description</label><textarea id="ev-description" rows="3" spellcheck="true" lang="fr">${escapeHtml(e?.description||'')}</textarea></div>
         <div class="modal-actions">
           <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
           <button class="btn-sm primary" type="button" id="ev-save">Enregistrer</button>
@@ -1646,7 +1649,7 @@ window.ouvrirModalArticleBlog = (a) => {
           <div class="field"><label>Date</label><input type="date" id="bl-date" value="${a?.date || new Date().toISOString().slice(0,10)}"></div>
         </div>
         <div class="field"><label>Photo (URL, facultatif)</label><input id="bl-photo" value="${escapeHtml(a?.photoUrl||'')}"></div>
-        <div class="field"><label>Contenu</label><textarea id="bl-contenu" rows="6">${escapeHtml(a?.contenu||'')}</textarea></div>
+        <div class="field"><label>Contenu</label><textarea id="bl-contenu" rows="6" spellcheck="true" lang="fr">${escapeHtml(a?.contenu||'')}</textarea></div>
         <div class="field"><label>Statut</label>
           <select id="bl-publie"><option value="oui" ${a?.publie!==false?'selected':''}>Publié</option><option value="non" ${a?.publie===false?'selected':''}>Brouillon (pas visible du public)</option></select>
         </div>
@@ -1888,6 +1891,11 @@ async function chargerContenuAdmin() {
   document.getElementById('ct-clubIntro').value = c.clubIntro || '';
   document.getElementById('ct-clubOffre').value = c.clubOffre || '';
   document.getElementById('ct-laraBio').value = c.laraBio || '';
+  document.getElementById('ct-laraBio2').value = c.laraBio2 || '';
+  document.getElementById('ct-laraMethode').value = c.laraMethode || '';
+  document.getElementById('ct-activitesIntro').value = c.activitesIntro || '';
+  document.getElementById('ct-contactCours').value = c.contactCours || '';
+  document.getElementById('ct-contactRejoindre').value = c.contactRejoindre || '';
 }
 document.getElementById('btnSauverContenu').addEventListener('click', async () => {
   try {
@@ -1896,7 +1904,12 @@ document.getElementById('btnSauverContenu').addEventListener('click', async () =
       heroTexte: document.getElementById('ct-heroTexte').value.trim(),
       clubIntro: document.getElementById('ct-clubIntro').value.trim(),
       clubOffre: document.getElementById('ct-clubOffre').value.trim(),
-      laraBio: document.getElementById('ct-laraBio').value.trim()
+      laraBio: document.getElementById('ct-laraBio').value.trim(),
+      laraBio2: document.getElementById('ct-laraBio2').value.trim(),
+      laraMethode: document.getElementById('ct-laraMethode').value.trim(),
+      activitesIntro: document.getElementById('ct-activitesIntro').value.trim(),
+      contactCours: document.getElementById('ct-contactCours').value.trim(),
+      contactRejoindre: document.getElementById('ct-contactRejoindre').value.trim()
     }, { merge: true });
     alert('Textes enregistrés. Ils apparaîtront sur le site public au prochain chargement des pages.');
   } catch (err) {

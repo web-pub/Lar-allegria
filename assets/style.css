@@ -884,3 +884,10 @@ body:not(.app-body) textarea {
 @media (max-width: 600px) {
   .badge-helene { width: 36px; bottom: 12px; right: 12px; }
 }
+
+/* Textes modifiables depuis l'admin ("Contenu du site") : respecte les
+   retours à la ligne / paragraphes tapés dans le champ, au lieu de tout
+   afficher sur une seule ligne comme le fait le HTML par défaut. */
+[id^="site-"] {
+  white-space: pre-line;
+}
