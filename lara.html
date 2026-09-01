@@ -58,14 +58,14 @@
         <div class="info-block">
           <h2>Seule à bord, bien entourée</h2>
           <p id="site-laraBio">Lara dirige Lar'Allegria en solo — de l'enseignement du dressage à la gestion quotidienne de l'écurie — dans un secteur encore largement masculin. Une position qu'elle assume avec exigence et passion, entourée d'une communauté de cavaliers et de membres en demi-pension fidèles.</p>
-          <p>Le club s'est construit autour de son manège et de sa piste privés, à Grâce-Hollogne, où elle accueille aussi bien les cavaliers débutants que les membres en demi-pension, qui disposent d'un cheval de l'écurie comme s'il était le leur.</p>
+          <p id="site-laraBio2">Le club s'est construit autour de son manège et de sa piste privés, à Grâce-Hollogne, où elle accueille aussi bien les cavaliers débutants que les membres en demi-pension, qui disposent d'un cheval de l'écurie comme s'il était le leur.</p>
         </div>
         <blockquote class="pull-quote">
           Un seul cavalier à la fois sur la piste — pour que chaque heure de cours compte vraiment.
         </blockquote>
         <div class="info-block">
           <h2>Sa méthode</h2>
-          <p>Lara privilégie les cours individuels d'une heure, pour un suivi personnalisé de chaque couple cavalier-cheval. Elle attache une attention particulière au bien-être des chevaux de l'écurie comme à celui des cavaliers, quel que soit leur niveau.</p>
+          <p id="site-laraMethode">Lara privilégie les cours individuels d'une heure, pour un suivi personnalisé de chaque couple cavalier-cheval. Elle attache une attention particulière au bien-être des chevaux de l'écurie comme à celui des cavaliers, quel que soit leur niveau.</p>
         </div>
       </div>
       <aside class="portrait-frame">
@@ -122,7 +122,7 @@
       <span>Site développé par Hélène Laruelle</span>
       <span>Contenu sous la responsabilité de Lara Rossoux</span>
       <span>TVA BE 0756.844.280</span>
-      <span>Site V34</span>
+      <span>Site V35</span>
     </div>
     <div class="footer-legal-links"><a href="securisation.html">Sécurisation</a> | <a href="confidentialite.html">Déclaration de confidentialité</a> | <a href="business-ethics-gouvernance.html">Business Ethics &amp; Governance</a> | <a href="confidentialite.html#cookies">Politique en matière de cookies</a> | <a href="limitation-responsabilite.html">Limitation de responsabilité</a> | <a href="mentions-legales.html">Mentions légales</a> / <a href="confidentialite.html#rgpd">RGPD</a> / <a href="cgv.html">CGV</a></div>
   </div>
@@ -144,6 +144,8 @@
       if (!snap.exists()) return;
       const c = snap.data();
       if (c.laraBio) document.getElementById('site-laraBio').textContent = c.laraBio;
+      if (c.laraBio2) document.getElementById('site-laraBio2').textContent = c.laraBio2;
+      if (c.laraMethode) document.getElementById('site-laraMethode').textContent = c.laraMethode;
     } catch (err) { /* on garde le texte par défaut */ }
   })();
 </script>

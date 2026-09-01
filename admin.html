@@ -54,13 +54,6 @@
       <div class="data-list" id="listeReservationsAttente"><div class="empty-state">...</div></div>
     </div>
     <div class="app-panel">
-      <div class="section-heading"><h2>Réservations orphelines</h2>
-        <button class="btn-sm" id="btnVerifierOrphelines">Vérifier</button>
-      </div>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Réservations qui pointent vers un compte membre qui n'existe plus (ex : compte supprimé directement depuis Firebase). Elles s'affichent avec un identifiant brut au lieu d'un nom dans les autres listes.</p>
-      <div class="data-list" id="listeOrphelines"><div class="empty-state">Clique sur "Vérifier" pour lancer la recherche.</div></div>
-    </div>
-    <div class="app-panel">
       <div class="resa-nav">
         <button class="btn-sm" id="resaAdminSemainePrec">← Semaine précédente</button>
         <h3 id="resaAdminSemaineLabel">Semaine du ...</h3>
@@ -97,6 +90,18 @@
       <div id="wrapCalendrier15j">
         <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Vue d'ensemble par blocs de 15 jours (3 lignes de 5 jours). Cliquez sur un créneau libre pour l'attribuer directement à un membre (ex : un cavalier qui vient chaque samedi de 13h à 14h).</p>
         <div class="resa-jours" id="calendrierDeuxSemaines"><div class="empty-state">Chargement...</div></div>
+      </div>
+    </div>
+    <div class="app-panel">
+      <div class="section-heading"><h2>Réservations orphelines</h2>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button class="btn-sm" id="btnVerifierOrphelines">Vérifier</button>
+          <button class="collapse-toggle" data-target="wrapOrphelines" aria-expanded="false" aria-label="Afficher/masquer">▸</button>
+        </div>
+      </div>
+      <div id="wrapOrphelines" class="hidden">
+        <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Réservations qui pointent vers un compte membre qui n'existe plus (ex : compte supprimé directement depuis Firebase). Elles s'affichent avec un identifiant brut au lieu d'un nom dans les autres listes.</p>
+        <div class="data-list" id="listeOrphelines"><div class="empty-state">Clique sur "Vérifier" pour lancer la recherche.</div></div>
       </div>
     </div>
   </div>
@@ -264,13 +269,20 @@
       <h2>Textes des pages publiques</h2>
       <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Modifie les textes affichés sur le site. Laisse un champ vide pour garder le texte par défaut.</p>
       <h3>Accueil</h3>
-      <div class="field"><label>Titre principal</label><textarea id="ct-heroTitre" rows="2"></textarea></div>
-      <div class="field"><label>Texte d'introduction</label><textarea id="ct-heroTexte" rows="3"></textarea></div>
+      <div class="field"><label>Titre principal</label><textarea id="ct-heroTitre" rows="2" spellcheck="true" lang="fr"></textarea></div>
+      <div class="field"><label>Texte d'introduction</label><textarea id="ct-heroTexte" rows="3" spellcheck="true" lang="fr"></textarea></div>
       <h3 style="margin-top:18px;">Le Club</h3>
-      <div class="field"><label>"Notre philosophie" — premier paragraphe</label><textarea id="ct-clubIntro" rows="3"></textarea></div>
-      <div class="field"><label>"Ce que propose le club" — paragraphe</label><textarea id="ct-clubOffre" rows="3"></textarea></div>
+      <div class="field"><label>"Notre philosophie" — premier paragraphe</label><textarea id="ct-clubIntro" rows="3" spellcheck="true" lang="fr"></textarea></div>
+      <div class="field"><label>"Ce que propose le club" — paragraphe</label><textarea id="ct-clubOffre" rows="3" spellcheck="true" lang="fr"></textarea></div>
       <h3 style="margin-top:18px;">Lara</h3>
-      <div class="field"><label>"Seule à bord, bien entourée" — premier paragraphe</label><textarea id="ct-laraBio" rows="3"></textarea></div>
+      <div class="field"><label>"Seule à bord, bien entourée" — premier paragraphe</label><textarea id="ct-laraBio" rows="3" spellcheck="true" lang="fr"></textarea></div>
+      <div class="field"><label>"Seule à bord, bien entourée" — second paragraphe</label><textarea id="ct-laraBio2" rows="3" spellcheck="true" lang="fr"></textarea></div>
+      <div class="field"><label>"Sa méthode" — paragraphe</label><textarea id="ct-laraMethode" rows="3" spellcheck="true" lang="fr"></textarea></div>
+      <h3 style="margin-top:18px;">Activités</h3>
+      <div class="field"><label>"Membre cours ou membre demi-pension" — paragraphe</label><textarea id="ct-activitesIntro" rows="3" spellcheck="true" lang="fr"></textarea></div>
+      <h3 style="margin-top:18px;">Nous contacter</h3>
+      <div class="field"><label>"Nos cours" — paragraphe</label><textarea id="ct-contactCours" rows="3" spellcheck="true" lang="fr"></textarea></div>
+      <div class="field"><label>"Rejoindre le club" — paragraphe</label><textarea id="ct-contactRejoindre" rows="3" spellcheck="true" lang="fr"></textarea></div>
       <button class="btn-sm primary" id="btnSauverContenu" style="margin-top:14px;">Enregistrer les textes</button>
     </div>
   </div>

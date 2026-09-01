@@ -70,11 +70,11 @@
       <div>
         <div class="info-block">
           <h2>Nos cours</h2>
-          <p>Les cours de dressage se donnent en individuel, une heure à la fois, sur le manège privé de Lara. Pour connaître les prochains créneaux disponibles ou organiser une première séance, le plus simple est de nous appeler ou de nous envoyer un email — Lara vous répondra directement.</p>
+          <p id="site-contactCours">Les cours de dressage se donnent en individuel, une heure à la fois, sur le manège privé de Lara. Pour connaître les prochains créneaux disponibles ou organiser une première séance, le plus simple est de nous appeler ou de nous envoyer un email — Lara vous répondra directement.</p>
         </div>
         <div class="info-block">
           <h2>Rejoindre le club</h2>
-          <p>Vous pouvez dès à présent compléter votre fiche membre en ligne, que vous veniez pour un cours ponctuel ou pour un cheval du club en demi-pension.</p>
+          <p id="site-contactRejoindre">Vous pouvez dès à présent compléter votre fiche membre en ligne, que vous veniez pour un cours ponctuel ou pour un cheval du club en demi-pension.</p>
           <a class="btn btn-primary" href="inscription.html">Faire ma demande d'inscription</a>
         </div>
       </div>
@@ -121,7 +121,7 @@
       <span>Site développé par Hélène Laruelle</span>
       <span>Contenu sous la responsabilité de Lara Rossoux</span>
       <span>TVA BE 0756.844.280</span>
-      <span>Site V34</span>
+      <span>Site V35</span>
     </div>
     <div class="footer-legal-links"><a href="securisation.html">Sécurisation</a> | <a href="confidentialite.html">Déclaration de confidentialité</a> | <a href="business-ethics-gouvernance.html">Business Ethics &amp; Governance</a> | <a href="confidentialite.html#cookies">Politique en matière de cookies</a> | <a href="limitation-responsabilite.html">Limitation de responsabilité</a> | <a href="mentions-legales.html">Mentions légales</a> / <a href="confidentialite.html#rgpd">RGPD</a> / <a href="cgv.html">CGV</a></div>
   </div>
@@ -134,6 +134,18 @@
     const isOpen = nav.classList.toggle('open');
     toggle.setAttribute('aria-expanded', isOpen);
   });
+</script>
+<script type="module">
+  import { db, doc, getDoc } from "./assets/firebase-config.js";
+  (async () => {
+    try {
+      const snap = await getDoc(doc(db, 'contenu_site', 'global'));
+      if (!snap.exists()) return;
+      const c = snap.data();
+      if (c.contactCours) document.getElementById('site-contactCours').textContent = c.contactCours;
+      if (c.contactRejoindre) document.getElementById('site-contactRejoindre').textContent = c.contactRejoindre;
+    } catch (err) { /* on garde le texte par défaut */ }
+  })();
 </script>
 <script src="assets/protection.js" defer></script>
 <img src="assets/logo-helene-laruelle.png" alt="Site développé par Hélène Laruelle" title="Site développé par Hélène Laruelle" class="badge-helene">

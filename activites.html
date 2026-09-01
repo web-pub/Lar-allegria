@@ -88,7 +88,7 @@
     <div class="section-title-row">
       <span class="eyebrow">Deux façons de rejoindre le club</span>
       <h2>Membre "cours" ou membre "demi-pension"</h2>
-      <p>Tous les chevaux appartiennent à Lara. Que vous veniez simplement pour un cours d'une heure ou que vous souhaitiez disposer d'un cheval de l'écurie comme s'il était le vôtre, votre fiche membre s'adapte à votre situation dès l'inscription.</p>
+      <p id="site-activitesIntro">Tous les chevaux appartiennent à Lara. Que vous veniez simplement pour un cours d'une heure ou que vous souhaitiez disposer d'un cheval de l'écurie comme s'il était le vôtre, votre fiche membre s'adapte à votre situation dès l'inscription.</p>
     </div>
     <div class="card-grid">
       <div class="link-card">
@@ -150,7 +150,7 @@
       <span>Site développé par Hélène Laruelle</span>
       <span>Contenu sous la responsabilité de Lara Rossoux</span>
       <span>TVA BE 0756.844.280</span>
-      <span>Site V34</span>
+      <span>Site V35</span>
     </div>
     <div class="footer-legal-links"><a href="securisation.html">Sécurisation</a> | <a href="confidentialite.html">Déclaration de confidentialité</a> | <a href="business-ethics-gouvernance.html">Business Ethics &amp; Governance</a> | <a href="confidentialite.html#cookies">Politique en matière de cookies</a> | <a href="limitation-responsabilite.html">Limitation de responsabilité</a> | <a href="mentions-legales.html">Mentions légales</a> / <a href="confidentialite.html#rgpd">RGPD</a> / <a href="cgv.html">CGV</a></div>
   </div>
@@ -163,6 +163,17 @@
     const isOpen = nav.classList.toggle('open');
     toggle.setAttribute('aria-expanded', isOpen);
   });
+</script>
+<script type="module">
+  import { db, doc, getDoc } from "./assets/firebase-config.js";
+  (async () => {
+    try {
+      const snap = await getDoc(doc(db, 'contenu_site', 'global'));
+      if (!snap.exists()) return;
+      const c = snap.data();
+      if (c.activitesIntro) document.getElementById('site-activitesIntro').textContent = c.activitesIntro;
+    } catch (err) { /* on garde le texte par défaut */ }
+  })();
 </script>
 <script src="assets/protection.js" defer></script>
 <img src="assets/logo-helene-laruelle.png" alt="Site développé par Hélène Laruelle" title="Site développé par Hélène Laruelle" class="badge-helene">
