@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V35';
+const VERSION_SITE = 'V36';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -650,24 +650,26 @@ window.ouvrirModalMembre = (membre, demandeId) => {
           <div class="field"><label>Email</label><input id="fm-email" value="${escapeHtml(src.email||'')}"></div>
         </div>
         <div class="field"><label>Adresse</label><input id="fm-adresse" value="${escapeHtml(src.adressePostale || (src.adresse ? `${src.adresse.rue}, ${src.adresse.cp} ${src.adresse.ville}` : ''))}"></div>
-        <div class="form-grid">
-          <div class="field"><label>Cotisation payée</label>
-            <select id="fm-cotisationPayee">
-              <option value="non" ${!src.cotisationPayee?'selected':''}>Non</option>
-              <option value="oui" ${src.cotisationPayee?'selected':''}>Oui</option>
+        <div class="field" id="fm-zoneCotisationRecurrence">
+          <div class="form-grid">
+            <div class="field"><label>Cotisation payée</label>
+              <select id="fm-cotisationPayee">
+                <option value="non" ${!src.cotisationPayee?'selected':''}>Non</option>
+                <option value="oui" ${src.cotisationPayee?'selected':''}>Oui</option>
+              </select>
+            </div>
+            <div class="field"><label>Échéance cotisation</label><input type="date" id="fm-cotisationEcheance" value="${src.cotisationDateEcheance||''}"></div>
+          </div>
+          <div class="field"><label>Cours avec récurrence <span class="hint">— si ce membre a un cours fixe régulier</span></label>
+            <select id="fm-recurrenceCours">
+              <option value="" ${!src.recurrenceCours?'selected':''}>Aucune</option>
+              <option value="hebdomadaire" ${src.recurrenceCours==='hebdomadaire'?'selected':''}>1x par semaine</option>
+              <option value="bimensuelle" ${src.recurrenceCours==='bimensuelle'?'selected':''}>1x toutes les deux semaines</option>
             </select>
           </div>
-          <div class="field"><label>Échéance cotisation</label><input type="date" id="fm-cotisationEcheance" value="${src.cotisationDateEcheance||''}"></div>
-        </div>
-        <div class="field"><label>Cours avec récurrence <span class="hint">— si ce membre a un cours fixe régulier</span></label>
-          <select id="fm-recurrenceCours">
-            <option value="" ${!src.recurrenceCours?'selected':''}>Aucune</option>
-            <option value="hebdomadaire" ${src.recurrenceCours==='hebdomadaire'?'selected':''}>1x par semaine</option>
-            <option value="bimensuelle" ${src.recurrenceCours==='bimensuelle'?'selected':''}>1x toutes les deux semaines</option>
-          </select>
         </div>
         ${!estNouveau ? `
-        <div class="field">
+        <div class="field" id="fm-zoneCoursHistorique">
           <div class="section-heading" style="margin-bottom:8px;">
             <label style="margin-bottom:0;">Cours — historique et à venir</label>
             <button class="collapse-toggle" type="button" data-target="wrapHistoriqueCoursMembre" aria-expanded="false">▸</button>
@@ -675,6 +677,15 @@ window.ouvrirModalMembre = (membre, demandeId) => {
           <div id="wrapHistoriqueCoursMembre" class="hidden">
             <div id="zoneCoursAVenirMembre"><div class="empty-state">Chargement...</div></div>
             <div id="zoneHistoriqueCoursMembre" style="margin-top:10px;"></div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="section-heading" style="margin-bottom:8px;">
+            <label style="margin-bottom:0;">Stock utilisé</label>
+            <button class="collapse-toggle" type="button" data-target="wrapStockMembre" aria-expanded="false">▸</button>
+          </div>
+          <div id="wrapStockMembre" class="hidden">
+            <div id="zoneStockMembre"><div class="empty-state">Chargement...</div></div>
           </div>
         </div>` : ''}
         <div class="modal-actions">
@@ -684,7 +695,16 @@ window.ouvrirModalMembre = (membre, demandeId) => {
       </div>
     </div>`;
   document.getElementById('modalZone').innerHTML = html;
-  if (!estNouveau) chargerCoursMembre(membre.id);
+  if (!estNouveau) { chargerCoursMembre(membre.id); chargerStockMembre(membre.id); }
+
+  const majAffichageSelonType = () => {
+    const estBenevole = document.getElementById('fm-type').value === 'benevole';
+    document.getElementById('fm-zoneCotisationRecurrence').classList.toggle('hidden', estBenevole);
+    const zoneHisto = document.getElementById('fm-zoneCoursHistorique');
+    if (zoneHisto) zoneHisto.classList.toggle('hidden', estBenevole);
+  };
+  document.getElementById('fm-type').addEventListener('change', majAffichageSelonType);
+  majAffichageSelonType();
 
   document.getElementById('fm-save').addEventListener('click', async () => {
     const identifiant = document.getElementById('fm-identifiant').value.trim();
@@ -795,6 +815,19 @@ async function chargerCoursMembre(membreId) {
   document.getElementById('zoneHistoriqueCoursMembre').innerHTML =
     `<h4 style="font-size:0.8rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--terre); margin-bottom:8px;">Historique (${historique.length})</h4>` +
     (historique.length ? historique.map(ligne).join('') : '<div class="empty-state">Aucun cours passé enregistré.</div>');
+}
+
+async function chargerStockMembre(membreId) {
+  const snap = await getDocs(query(collection(db, 'stock_signalements'), where('membreId', '==', membreId)));
+  let prises = [];
+  snap.forEach(d => prises.push({ id: d.id, ...d.data() }));
+  prises.sort((a, b) => (b.dateSignalement || '').localeCompare(a.dateSignalement || ''));
+  const wrap = document.getElementById('zoneStockMembre');
+  if (prises.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucune prise de stock signalée pour ce membre.</div>'; return; }
+  wrap.innerHTML = prises.map(p => {
+    const dateLabel = p.dateSignalement ? new Date(p.dateSignalement).toLocaleString('fr-BE', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : '';
+    return `<div class="data-row"><div class="data-main"><div class="data-title">${p.quantitePrise} ${escapeHtml(p.unite||'')} de ${escapeHtml(p.nom)}</div><div class="data-sub">${dateLabel}</div></div></div>`;
+  }).join('');
 }
 
 // ==========================================================================
