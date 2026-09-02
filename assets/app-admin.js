@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V36';
+const VERSION_SITE = 'V37';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -580,7 +580,7 @@ function renderMembres(filtre = '') {
       <div class="data-row">
         <div class="data-main">
           <div class="data-title">${escapeHtml(m.prenom)} ${escapeHtml(m.nom)}</div>
-          <div class="data-sub">${labelTypeMembre(m.typeMembre)} · ${escapeHtml(m.email||'')} ${m.cotisationPayee ? '<span class="badge badge-ok">Cotisation OK</span>' : '<span class="badge badge-warn">Cotisation à régler</span>'} ${m.recurrenceCours === 'hebdomadaire' ? '<span class="badge badge-neutral">Cours 1x/semaine</span>' : m.recurrenceCours === 'bimensuelle' ? '<span class="badge badge-neutral">Cours 1x/2 semaines</span>' : ''}</div>
+          <div class="data-sub">${labelTypeMembre(m.typeMembre)} · ${escapeHtml(m.email||'')} ${m.typeMembre !== 'benevole' ? (m.cotisationPayee ? '<span class="badge badge-ok">Cotisation OK</span>' : '<span class="badge badge-warn">Cotisation à régler</span>') : ''} ${m.recurrenceCours === 'hebdomadaire' ? '<span class="badge badge-neutral">Cours 1x/semaine</span>' : m.recurrenceCours === 'bimensuelle' ? '<span class="badge badge-neutral">Cours 1x/2 semaines</span>' : ''}</div>
         </div>
         <div class="data-actions">
           <button class="btn-sm" onclick="window.editerMembre('${m.id}')">Modifier</button>

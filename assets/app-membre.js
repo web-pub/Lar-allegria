@@ -5,7 +5,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V36';
+const VERSION_SITE = 'V37';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -79,16 +79,16 @@ function afficherAccueil() {
     : membreData.typeMembre === 'benevole'
     ? `<span class="badge badge-neutral">Membre bénévole</span>`
     : `<span class="badge badge-neutral">Membre cours</span>`;
-  const badgeCotis = membreData.cotisationPayee
+  const badgeCotis = membreData.typeMembre === 'benevole' ? '' : (membreData.cotisationPayee
     ? `<span class="badge badge-ok">Cotisation à jour</span>`
-    : `<span class="badge badge-warn">Cotisation à régler</span>`;
+    : `<span class="badge badge-warn">Cotisation à régler</span>`);
   document.getElementById('badgesAbo').innerHTML = badgeType + ' ' + badgeCotis;
   afficherRappelCotisation();
 }
 
 function afficherRappelCotisation() {
   const zone = document.getElementById('zoneCotisation');
-  if (!membreData.cotisationDateEcheance) { zone.innerHTML = ''; return; }
+  if (membreData.typeMembre === 'benevole' || !membreData.cotisationDateEcheance) { zone.innerHTML = ''; return; }
   const aujourdhui = new Date(); aujourdhui.setHours(0,0,0,0);
   const dansUnMois = new Date(aujourdhui); dansUnMois.setMonth(aujourdhui.getMonth() + 1);
   const echeance = new Date(membreData.cotisationDateEcheance + 'T00:00:00');
