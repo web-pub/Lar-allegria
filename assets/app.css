@@ -560,3 +560,20 @@
   flex: none;
 }
 .collapse-toggle:hover { background: var(--paper-warm); }
+
+/* Sur petit écran, les lignes de liste (membres, demandes, réservations...)
+   passent le texte et les boutons en colonne au lieu de les compresser
+   côte à côte — sinon le texte se retrouve écrasé sur une colonne étroite
+   et les boutons se chevauchent avec lui. */
+@media (max-width: 640px) {
+  .data-row {
+    flex-wrap: wrap;
+  }
+  .data-row .data-main {
+    flex-basis: 100%;
+  }
+  .data-row .data-actions {
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+}

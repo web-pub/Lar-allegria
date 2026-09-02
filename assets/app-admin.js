@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V37';
+const VERSION_SITE = 'V39';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -130,6 +130,13 @@ function nomMembre(uid) {
   if (m) return `${m.prenom || ''} ${m.nom || ''}`.trim() || m.identifiant || uid;
   return uid ? `Compte introuvable (${uid})` : '—';
 }
+// Pour un essai réservé sous un compte partagé (ex: "Nouveau Client"), affiche
+// aussi le nom de la personne qui teste, gardé sur la réservation elle-même
+// sans qu'il faille créer une fiche membre à chaque fois.
+function nomAffichageReservation(r) {
+  const base = nomMembre(r.membreId);
+  return r.nomClientEssai ? `${base} — ${r.nomClientEssai}` : base;
+}
 function labelTypeMembre(type) {
   if (type === 'pension') return 'Membre demi-pension';
   if (type === 'benevole') return 'Membre bénévole';
@@ -159,7 +166,7 @@ async function chargerReservationsAttente() {
     return `
     <div class="data-row">
       <div class="data-main">
-        <div class="data-title">${escapeHtml(nomMembre(r.membreId))} — ${dateLabel} ${r.heureDebut}</div>
+        <div class="data-title">${escapeHtml(nomAffichageReservation(r))} — ${dateLabel} ${r.heureDebut}</div>
         <div class="data-sub">${r.type === 'libre' ? 'Piste libre' : 'Cours de dressage'} ${meteoHtml}</div>
         ${alerte ? `<div class="banner-alert" style="margin-top:6px; padding:6px 10px; background:${alerte.couleur}1a; border-color:${alerte.couleur}; color:${alerte.couleur};">${alerte.texte}</div>` : ''}
       </div>
@@ -222,7 +229,7 @@ async function renderPlanningSemaine() {
     return `
     <div class="data-row">
       <div class="data-main">
-        <div class="data-title">${dateLabel} ${r.heureDebut} — ${escapeHtml(nomMembre(r.membreId))}</div>
+        <div class="data-title">${dateLabel} ${r.heureDebut} — ${escapeHtml(nomAffichageReservation(r))}</div>
         <div class="data-sub">${r.type === 'libre' ? 'Piste libre' : 'Cours de dressage'} ${badge}</div>
       </div>
       <div class="data-actions">
@@ -311,6 +318,7 @@ window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
       <div class="modal-box">
         <h3>Ajouter une réservation</h3>
         <div class="field"><label>Membre *</label><select id="ar-membre"><option value="">— Choisir —</option>${membresTries.map(m => `<option value="${m.id}">${escapeHtml(nomMembre(m.id))}</option>`).join('')}</select></div>
+        <div class="field"><label>Nom du client <span class="hint">— pour un essai réservé sous un compte partagé type "Nouveau Client" : garde une trace de qui a testé, sans créer de fiche membre</span></label><input id="ar-nomClientEssai" placeholder="ex: Marc Dupont"></div>
         <div class="field"><label>Type</label><select id="ar-type"><option value="cours">Cours de dressage avec Lara</option><option value="libre">Utilisation libre de la piste</option></select></div>
         <div class="form-grid">
           <div class="field"><label>Date de départ</label><input type="date" id="ar-date" value="${prefillDate || ''}"></div>
@@ -338,6 +346,7 @@ window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
   });
   document.getElementById('ar-save').addEventListener('click', async () => {
     const membreId = document.getElementById('ar-membre').value;
+    const nomClientEssai = document.getElementById('ar-nomClientEssai').value.trim();
     const type = document.getElementById('ar-type').value;
     const dateVal = document.getElementById('ar-date').value;
     const heure = document.getElementById('ar-heure').value;
@@ -377,7 +386,7 @@ window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
       const ignores = dates.filter(d => occupes.has(`${d}_${heure}`));
       await Promise.all(aCreer.map(d => addDoc(collection(db, 'reservations'), {
         membreId, type, date: d, heureDebut: heure, statut: 'validee',
-        ajouteParAdmin: true, recurrenceId,
+        ajouteParAdmin: true, recurrenceId, nomClientEssai: nomClientEssai || null,
         createdAt: serverTimestamp()
       })));
       window.fermerModal();
@@ -488,7 +497,7 @@ async function chargerCalendrierDeuxSemaines() {
       if (estPasse) return `<button class="creneau-btn passe" disabled>${heure}</button>`;
       if (resa) {
         const cls = resa.statut === 'validee' ? 'valide' : 'attente';
-        return `<button class="creneau-btn ${cls}" onclick="window.annulerReservationAdmin('${resa.id}')" title="${escapeHtml(nomMembre(resa.membreId))} — cliquer pour annuler">${heure} — ${escapeHtml(nomMembre(resa.membreId))}</button>`;
+        return `<button class="creneau-btn ${cls}" onclick="window.annulerReservationAdmin('${resa.id}')" title="${escapeHtml(nomAffichageReservation(resa))} — cliquer pour annuler">${heure} — ${escapeHtml(nomAffichageReservation(resa))}</button>`;
       }
       return `<button class="creneau-btn" onclick="window.ouvrirModalAjouterReservation('${dateISO}','${heure}')">${heure}</button>`;
     }).join('');
@@ -798,7 +807,7 @@ async function chargerCoursMembre(membreId) {
       : r.statut === 'en_attente' ? '<span class="badge badge-warn">En attente</span>'
       : r.statut === 'refusee' ? '<span class="badge badge-danger">Refusée</span>'
       : '<span class="badge badge-neutral">Annulée</span>';
-    return `<div class="data-row"><div class="data-main"><div class="data-title">${dateLabel} — ${r.heureDebut || ''}</div><div class="data-sub">${r.type === 'libre' ? 'Piste libre' : 'Cours'} ${badge}${r.recurrenceId ? ' <span class="badge badge-neutral">Récurrence</span>' : ''}</div></div></div>`;
+    return `<div class="data-row"><div class="data-main"><div class="data-title">${dateLabel} — ${r.heureDebut || ''}</div><div class="data-sub">${r.type === 'libre' ? 'Piste libre' : 'Cours'} ${badge}${r.recurrenceId ? ' <span class="badge badge-neutral">Récurrence</span>' : ''}${r.nomClientEssai ? ` · <strong>${escapeHtml(r.nomClientEssai)}</strong>` : ''}</div></div></div>`;
   };
 
   // À venir : les 3 prochaines occurrences seulement (pour ne pas afficher
