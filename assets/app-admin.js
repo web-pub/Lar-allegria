@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V39';
+const VERSION_SITE = 'V01-001';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -125,6 +125,29 @@ async function chargerMembres() {
     membresParUid[d.id] = m;
   });
 }
+function retirerAccents(s) {
+  return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+// Identifiant suggéré par défaut : prenom.1ereLettreDuNom (sans accent, sans
+// caractère spécial). Ex: "Hélène Laruelle" -> "helene.l"
+function suggererIdentifiant(prenom, nom) {
+  const p = retirerAccents(prenom).toLowerCase().replace(/[^a-z]/g, '');
+  const n = retirerAccents(nom).toLowerCase().replace(/[^a-z]/g, '');
+  if (!p) return '';
+  return n ? `${p}.${n[0]}` : p;
+}
+// Mot de passe suggéré par défaut : 3 premières lettres du prénom + 3
+// premières lettres du nom + date de naissance en JJMM.
+// Ex: "Hélène Laruelle", née le 24/06/1984 -> "hellar2406"
+function suggererMotDePasse(prenom, nom, dateNaissanceISO) {
+  const p = retirerAccents(prenom).toLowerCase().replace(/[^a-z]/g, '').slice(0, 3);
+  const n = retirerAccents(nom).toLowerCase().replace(/[^a-z]/g, '').slice(0, 3);
+  let ddmm = '';
+  const m = (dateNaissanceISO || '').match(/^\d{4}-(\d{2})-(\d{2})$/);
+  if (m) ddmm = m[2] + m[1];
+  return `${p}${n}${ddmm}`;
+}
+
 function nomMembre(uid) {
   const m = membresParUid[uid];
   if (m) return `${m.prenom || ''} ${m.nom || ''}`.trim() || m.identifiant || uid;
@@ -654,6 +677,7 @@ window.ouvrirModalMembre = (membre, demandeId) => {
           <div class="field"><label>Prénom *</label><input id="fm-prenom" value="${escapeHtml(src.prenom||'')}"></div>
           <div class="field"><label>Nom *</label><input id="fm-nom" value="${escapeHtml(src.nom||'')}"></div>
         </div>
+        <div class="field"><label>Date de naissance</label><input type="date" id="fm-naissance" value="${escapeHtml(src.dateNaissance||'')}"></div>
         <div class="form-grid">
           <div class="field"><label>Téléphone</label><input id="fm-telephone" value="${escapeHtml(src.telephone||src.gsm||'')}"></div>
           <div class="field"><label>Email</label><input id="fm-email" value="${escapeHtml(src.email||'')}"></div>
@@ -706,6 +730,29 @@ window.ouvrirModalMembre = (membre, demandeId) => {
   document.getElementById('modalZone').innerHTML = html;
   if (!estNouveau) { chargerCoursMembre(membre.id); chargerStockMembre(membre.id); }
 
+  if (estNouveau) {
+    // Suggestion automatique de l'identifiant et du mot de passe à partir du
+    // prénom/nom/date de naissance — sauf si le membre a déjà choisi les
+    // siens lui-même via le formulaire d'inscription (on respecte son choix).
+    let identifiantAuto = !(d && d.identifiantSouhaite);
+    let motdepasseAuto = !(d && d.motDePasseSouhaite);
+    const champId = document.getElementById('fm-identifiant');
+    const champMdp = document.getElementById('fm-motdepasse');
+    const champPrenom = document.getElementById('fm-prenom');
+    const champNom = document.getElementById('fm-nom');
+    const champNaissance = document.getElementById('fm-naissance');
+    champId.addEventListener('input', () => { identifiantAuto = false; });
+    champMdp.addEventListener('input', () => { motdepasseAuto = false; });
+    const recalculerSuggestions = () => {
+      if (identifiantAuto) champId.value = suggererIdentifiant(champPrenom.value, champNom.value);
+      if (motdepasseAuto) champMdp.value = suggererMotDePasse(champPrenom.value, champNom.value, champNaissance.value);
+    };
+    champPrenom.addEventListener('input', recalculerSuggestions);
+    champNom.addEventListener('input', recalculerSuggestions);
+    champNaissance.addEventListener('input', recalculerSuggestions);
+    if (identifiantAuto || motdepasseAuto) recalculerSuggestions();
+  }
+
   const majAffichageSelonType = () => {
     const estBenevole = document.getElementById('fm-type').value === 'benevole';
     document.getElementById('fm-zoneCotisationRecurrence').classList.toggle('hidden', estBenevole);
@@ -752,6 +799,7 @@ window.ouvrirModalMembre = (membre, demandeId) => {
       typeMembre: document.getElementById('fm-type').value,
       prenom: document.getElementById('fm-prenom').value.trim(),
       nom: document.getElementById('fm-nom').value.trim(),
+      dateNaissance: document.getElementById('fm-naissance').value,
       telephone: document.getElementById('fm-telephone').value.trim(),
       email: document.getElementById('fm-email').value.trim(),
       adressePostale: document.getElementById('fm-adresse').value.trim(),
@@ -764,7 +812,6 @@ window.ouvrirModalMembre = (membre, demandeId) => {
       data.motDePasseActuel = motDePasse;
       data.dateInscription = new Date().toISOString();
       if (d) {
-        data.dateNaissance = d.dateNaissance || '';
         data.niveauEquitation = d.niveauEquitation || 'debutant';
         data.contactUrgence = d.contactUrgence || {};
         data.assuranceRC = d.assuranceRC || {};
