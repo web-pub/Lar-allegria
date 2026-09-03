@@ -258,9 +258,12 @@ nav.main-nav { margin-left: auto; }
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -1px;
-  height: 22px;
-  background: radial-gradient(circle at 12px 0, transparent 13px, var(--paper) 14px) top left / 26px 24px repeat-x;
+  bottom: 3px;
+  height: 14px;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzNiIgaGVpZ2h0PSIxOCIgdmlld0JveD0iMCAwIDM2IDE4Ij48cmVjdCB4PSIxMyIgeT0iMyIgd2lkdGg9IjciIGhlaWdodD0iNyIgZmlsbD0iI0U4QTIzMCIgdHJhbnNmb3JtPSJyb3RhdGUoNDUgMTYuNSA2LjUpIi8+PGNpcmNsZSBjeD0iMTYuNSIgY3k9IjYuNSIgcj0iMS4zIiBmaWxsPSIjMkIxQjE0Ii8+PC9zdmc+"), linear-gradient(90deg, transparent 0%, rgba(232,162,48,0.5) 15%, rgba(232,162,48,0.5) 85%, transparent 100%);
+  background-size: 36px 14px, 100% 1px;
+  background-repeat: repeat-x, no-repeat;
+  background-position: bottom left, bottom left;
   pointer-events: none;
 }
 
@@ -333,9 +336,12 @@ nav.main-nav { margin-left: auto; }
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -1px;
-  height: 22px;
-  background: radial-gradient(circle at 12px 0, transparent 13px, var(--paper) 14px) top left / 26px 24px repeat-x;
+  bottom: 3px;
+  height: 14px;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzNiIgaGVpZ2h0PSIxOCIgdmlld0JveD0iMCAwIDM2IDE4Ij48cmVjdCB4PSIxMyIgeT0iMyIgd2lkdGg9IjciIGhlaWdodD0iNyIgZmlsbD0iI0U4QTIzMCIgdHJhbnNmb3JtPSJyb3RhdGUoNDUgMTYuNSA2LjUpIi8+PGNpcmNsZSBjeD0iMTYuNSIgY3k9IjYuNSIgcj0iMS4zIiBmaWxsPSIjMkIxQjE0Ii8+PC9zdmc+"), linear-gradient(90deg, transparent 0%, rgba(232,162,48,0.5) 15%, rgba(232,162,48,0.5) 85%, transparent 100%);
+  background-size: 36px 14px, 100% 1px;
+  background-repeat: repeat-x, no-repeat;
+  background-position: bottom left, bottom left;
   pointer-events: none;
 }
 
