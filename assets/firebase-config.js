@@ -90,6 +90,19 @@ export function identifiantVersEmail(identifiant) {
   return identifiant.trim().toLowerCase() + "@membres.lar-allegria.local";
 }
 
+// Transforme les liens (http://, https://, www.) présents dans un texte
+// libre (bio, description, article de blog...) en liens cliquables, tout en
+// échappant le reste du texte pour rester sûr vis-à-vis du HTML.
+export function linkify(texte) {
+  const echappe = (texte || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  return echappe.replace(/(https?:\/\/[^\s<]+|www\.[^\s<]+)/g, (match) => {
+    const href = match.startsWith('http') ? match : 'https://' + match;
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer">${match}</a>`;
+  });
+}
+
 // Interdit tout caractère spécial dans les identifiants et mots de passe
 // (lettres avec ou sans accent, chiffres uniquement — pas d'espace, pas de
 // ponctuation, pas de symbole).

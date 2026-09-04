@@ -912,3 +912,11 @@ body:not(.app-body) textarea {
 [id^="site-"] {
   white-space: pre-line;
 }
+
+/* Liens auto-détectés dans un texte libre (blog, description cheval,
+   événement...) — cohérents avec la charte au lieu du bleu par défaut. */
+.media-card p a, .lb-fiche-item p a {
+  color: var(--rouge-dark);
+  text-decoration: underline;
+}
+.media-card p a:hover, .lb-fiche-item p a:hover { color: var(--rouge); }

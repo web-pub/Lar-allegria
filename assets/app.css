@@ -536,6 +536,13 @@
 #calendrierDeuxSemaines .creneau-btn.attente {
   cursor: pointer;
 }
+#calendrierDeuxSemaines .creneau-btn {
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
 
 /* Météo des prochains jours : nombre de colonnes qui s'adapte à la largeur
    d'écran disponible (PC : les 7 jours sur une ligne si la place le permet ;
@@ -546,6 +553,8 @@
   grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
   gap: 8px;
 }
+.meteo-resume-grid .data-row { justify-content: center; text-align: center; }
+.meteo-resume-grid .data-main { flex: none; }
 
 /* Panneaux repliables (flèche pour afficher/masquer une section). */
 .collapse-toggle {
