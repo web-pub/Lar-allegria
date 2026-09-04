@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-005';
+const VERSION_SITE = 'V01-006';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -60,6 +60,7 @@ onAuthStateChanged(auth, async (user) => {
   chargerTarifs();
   chargerIban();
   chargerActivites();
+  chargerProgrammesActivites();
   chargerConversations();
   chargerDisponibilitesAdmin();
   chargerExceptionsAdmin();
@@ -1217,6 +1218,94 @@ document.getElementById('btnSauverDisponibilites').addEventListener('click', asy
     alert('Erreur lors de l\'enregistrement : ' + (err.code || err.message));
   }
 });
+
+// ==========================================================================
+// PROGRAMMES (cartes numérotées de la page publique "Activités")
+// ==========================================================================
+const PROGRAMMES_DE_BASE = [
+  { categorie: 'Initiation', titre: "École d'équitation", description: "Découverte et apprentissage de l'équitation pour les cavaliers débutants, sur des chevaux adaptés, en cours individuels d'une heure.", ordre: 1 },
+  { categorie: 'Perfectionnement', titre: 'Cours de dressage', description: 'Des cours individuels pour progresser en dressage à votre rythme, seul(e) sur la piste avec Lara, quel que soit votre niveau.', ordre: 2 },
+  { categorie: 'Demi-pension', titre: 'Écurie privée', description: "Un cheval de l'écurie mis à votre disposition comme s'il était le vôtre : box, soins et accès à la piste, dans un cadre familial et suivi de près.", ordre: 3 },
+  { categorie: 'Immersion', titre: 'Stages', description: 'Des stages ponctuels pour se perfectionner sur plusieurs jours, seul(e) ou en petit groupe selon les périodes.', ordre: 4 },
+  { categorie: 'Événements', titre: 'Spectacles équestres', description: 'Le club organise régulièrement des spectacles équestres où cavaliers et chevaux du club se retrouvent pour présenter leur travail.', ordre: 5 }
+];
+async function chargerProgrammesActivites() {
+  const snap = await getDocs(collection(db, 'programme_activites'));
+  let programmes = [];
+  snap.forEach(d => programmes.push({ id: d.id, ...d.data() }));
+  programmes.sort((a, b) => (a.ordre ?? 999) - (b.ordre ?? 999));
+  const wrap = document.getElementById('listeProgrammesActivites');
+  if (programmes.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun programme — clique sur "Initialiser" pour repartir des 5 programmes actuels, ou ajoutes-en un.</div>'; return; }
+  let numero = 0;
+  wrap.innerHTML = programmes.map(p => {
+    if (p.visiblePublic !== false) numero++;
+    const badgeNum = p.visiblePublic !== false ? `${String(numero).padStart(2,'0')} — ` : '';
+    return `
+    <div class="data-row">
+      <div class="data-main">
+        <div class="data-title">${badgeNum}${escapeHtml(p.categorie || '')} — ${escapeHtml(p.titre || '')}</div>
+        <div class="data-sub">${escapeHtml((p.description||'').slice(0,80))}${(p.description||'').length>80?'…':''} ${p.visiblePublic === false ? '<span class="badge badge-neutral">Masqué du site public</span>' : ''}</div>
+      </div>
+      <div class="data-actions">
+        <button class="btn-sm" onclick="window.editerProgrammeActivite('${p.id}')">Modifier</button>
+        <button class="btn-sm danger" onclick="window.supprimerProgrammeActivite('${p.id}')">Supprimer</button>
+      </div>
+    </div>`;
+  }).join('');
+  window._programmesActivites = programmes;
+}
+document.getElementById('btnInitProgrammes').addEventListener('click', async () => {
+  if (!confirm("Créer les 5 programmes de base ? (à ne faire qu'une fois — n'écrase pas ceux déjà créés)")) return;
+  try {
+    await Promise.all(PROGRAMMES_DE_BASE.map(p => addDoc(collection(db, 'programme_activites'), { ...p, visiblePublic: true })));
+    chargerProgrammesActivites();
+  } catch (err) {
+    alert('Erreur : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore (voir le README, section 4).');
+  }
+});
+document.getElementById('btnAjouterProgramme').addEventListener('click', () => window.ouvrirModalProgramme());
+window.editerProgrammeActivite = (id) => window.ouvrirModalProgramme((window._programmesActivites || []).find(p => p.id === id));
+window.supprimerProgrammeActivite = async (id) => { if (!confirm('Supprimer ce programme ?')) return; await deleteDoc(doc(db, 'programme_activites', id)); chargerProgrammesActivites(); };
+window.ouvrirModalProgramme = (p) => {
+  const html = `
+    <div class="modal-overlay" id="modalOverlayProgramme">
+      <div class="modal-box">
+        <h3>${p ? 'Modifier le programme' : 'Ajouter un programme'}</h3>
+        <div class="form-grid">
+          <div class="field"><label>Catégorie <span class="hint">— ex: Initiation, Perfectionnement...</span></label><input id="pg-categorie" value="${escapeHtml(p?.categorie||'')}"></div>
+          <div class="field"><label>Ordre d'affichage</label><input type="number" id="pg-ordre" value="${p?.ordre ?? ((window._programmesActivites||[]).length+1)}"></div>
+        </div>
+        <div class="field"><label>Titre</label><input id="pg-titre" value="${escapeHtml(p?.titre||'')}"></div>
+        <div class="field"><label>Description</label><textarea id="pg-description" rows="3" spellcheck="true" lang="fr">${escapeHtml(p?.description||'')}</textarea></div>
+        <div class="field"><label>Visible sur le site public</label>
+          <select id="pg-visible"><option value="oui" ${p?.visiblePublic!==false?'selected':''}>Oui</option><option value="non" ${p?.visiblePublic===false?'selected':''}>Non</option></select>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
+          <button class="btn-sm primary" type="button" id="pg-save">Enregistrer</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modalZone').innerHTML = html;
+  document.getElementById('pg-save').addEventListener('click', async () => {
+    const data = {
+      categorie: document.getElementById('pg-categorie').value.trim(),
+      titre: document.getElementById('pg-titre').value.trim(),
+      description: document.getElementById('pg-description').value.trim(),
+      ordre: parseInt(document.getElementById('pg-ordre').value, 10) || 999,
+      visiblePublic: document.getElementById('pg-visible').value === 'oui'
+    };
+    if (!data.titre) { alert('Le titre est obligatoire.'); return; }
+    try {
+      if (p) await updateDoc(doc(db, 'programme_activites', p.id), data);
+      else await addDoc(collection(db, 'programme_activites'), data);
+      window.fermerModal();
+      chargerProgrammesActivites();
+    } catch (err) {
+      alert('Erreur : ' + (err.code || err.message));
+    }
+  });
+};
 
 // ==========================================================================
 // ACTIVITÉS (stages, spectacles)
