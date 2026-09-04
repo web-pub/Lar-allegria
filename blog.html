@@ -106,7 +106,7 @@
       <span>Site développé par Hélène Laruelle</span>
       <span>Contenu sous la responsabilité de Lara Rossoux</span>
       <span>TVA BE 0756.844.280</span>
-      <span>Site V01-006</span>
+      <span>Site V01-008</span>
     </div>
     <div class="footer-legal-links"><a href="securisation.html">Sécurisation</a> | <a href="confidentialite.html">Déclaration de confidentialité</a> | <a href="business-ethics-gouvernance.html">Business Ethics &amp; Governance</a> | <a href="confidentialite.html#cookies">Politique en matière de cookies</a> | <a href="limitation-responsabilite.html">Limitation de responsabilité</a> | <a href="mentions-legales.html">Mentions légales</a> / <a href="confidentialite.html#rgpd">RGPD</a> / <a href="cgv.html">CGV</a></div>
   </div>
@@ -149,9 +149,10 @@
         return;
       }
 
-      zone.innerHTML = articles.map(a => `
+      window._articlesBlog = articles;
+      zone.innerHTML = articles.map((a, i) => `
         <div class="media-card">
-          ${a.photoUrl ? `<img src="${escapeHtml(a.photoUrl)}" alt="${escapeHtml(a.titre)}">` : ''}
+          ${a.photoUrl ? `<div class="evenement-vignette clickable" onclick="window.agrandirPhotoBlog(${i})"><img src="${escapeHtml(a.photoUrl)}" alt="${escapeHtml(a.titre)}" loading="lazy"></div>` : ''}
           <div class="mc-body">
             <h3>${escapeHtml(a.titre)}</h3>
             <div class="mc-meta">${formatDateFr(a.date)}</div>
@@ -162,6 +163,26 @@
       zone.innerHTML = '<div class="empty-state">Le blog n\'est pas disponible pour le moment.</div>';
     }
   })();
+
+  window.agrandirPhotoBlog = (i) => {
+    const a = window._articlesBlog[i];
+    if (!a || !a.photoUrl) return;
+    const html = `
+      <div class="lightbox-overlay" id="lightboxBlog" onclick="if(event.target===this) window.fermerPhotoBlog()">
+        <div class="lightbox-box" style="max-width:800px;">
+          <button class="lightbox-close" onclick="window.fermerPhotoBlog()" aria-label="Fermer">✕</button>
+          <div class="lb-photo" style="height:auto; max-height:80vh;"><img src="${escapeHtml(a.photoUrl)}" alt="${escapeHtml(a.titre)}" style="height:auto; max-height:80vh; width:auto; max-width:100%; margin:0 auto; display:block;"></div>
+          <div class="lb-body"><h3>${escapeHtml(a.titre)}</h3></div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    document.addEventListener('keydown', window._fermerPhotoBlogEsc);
+  };
+  window._fermerPhotoBlogEsc = (e) => { if (e.key === 'Escape') window.fermerPhotoBlog(); };
+  window.fermerPhotoBlog = () => {
+    document.getElementById('lightboxBlog')?.remove();
+    document.removeEventListener('keydown', window._fermerPhotoBlogEsc);
+  };
 </script>
 <script>
   // Filet de sécurité : si une zone chargée depuis Firebase reste bloquée
