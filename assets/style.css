@@ -432,15 +432,20 @@ section { padding: 60px 0; }
 /* Activity list */
 
 .activity-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 24px;
 }
+.activity-card {
+  flex: 0 1 calc((100% - 48px) / 3);
+  max-width: calc((100% - 48px) / 3);
+}
 @media (max-width: 860px) {
-  .activity-grid { grid-template-columns: repeat(2, 1fr); }
+  .activity-card { flex-basis: calc((100% - 24px) / 2); max-width: calc((100% - 24px) / 2); }
 }
 @media (max-width: 560px) {
-  .activity-grid { grid-template-columns: 1fr; }
+  .activity-card { flex-basis: 100%; max-width: 100%; }
 }
 
 .activity-card {
@@ -788,6 +793,8 @@ blockquote.pull-quote {
 }
 .media-card.clickable { cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; }
 .media-card.clickable:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,0,0,0.12); }
+.evenement-vignette.clickable, .cheval-vignette.clickable { cursor: pointer; }
+.evenement-vignette.clickable:hover, .cheval-vignette.clickable:hover { opacity: 0.88; }
 
 /* Vignette cheval : toute la photo reste visible (pas de recadrage brutal),
    posée sur un fond doux qui reprend les couleurs du site. */
