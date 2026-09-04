@@ -53,32 +53,8 @@
 
 <section>
   <div class="container">
-    <div class="activity-grid">
-      <div class="activity-card">
-        <span class="num">01 — Initiation</span>
-        <h3>École d'équitation</h3>
-        <p>Découverte et apprentissage de l'équitation pour les cavaliers débutants, sur des chevaux adaptés, en cours individuels d'une heure.</p>
-      </div>
-      <div class="activity-card">
-        <span class="num">02 — Perfectionnement</span>
-        <h3>Cours de dressage</h3>
-        <p>Des cours individuels pour progresser en dressage à votre rythme, seul(e) sur la piste avec Lara, quel que soit votre niveau.</p>
-      </div>
-      <div class="activity-card">
-        <span class="num">03 — Demi-pension</span>
-        <h3>Écurie privée</h3>
-        <p>Un cheval de l'écurie mis à votre disposition comme s'il était le vôtre : box, soins et accès à la piste, dans un cadre familial et suivi de près.</p>
-      </div>
-      <div class="activity-card">
-        <span class="num">04 — Immersion</span>
-        <h3>Stages</h3>
-        <p>Des stages ponctuels pour se perfectionner sur plusieurs jours, seul(e) ou en petit groupe selon les périodes.</p>
-      </div>
-      <div class="activity-card">
-        <span class="num">05 — Événements</span>
-        <h3>Spectacles équestres</h3>
-        <p>Le club organise régulièrement des spectacles équestres où cavaliers et chevaux du club se retrouvent pour présenter leur travail.</p>
-      </div>
+    <div class="activity-grid" id="zoneProgrammesPublic">
+      <div class="empty-state">Chargement des programmes...</div>
     </div>
   </div>
 </section>
@@ -150,7 +126,7 @@
       <span>Site développé par Hélène Laruelle</span>
       <span>Contenu sous la responsabilité de Lara Rossoux</span>
       <span>TVA BE 0756.844.280</span>
-      <span>Site V01-005</span>
+      <span>Site V01-006</span>
     </div>
     <div class="footer-legal-links"><a href="securisation.html">Sécurisation</a> | <a href="confidentialite.html">Déclaration de confidentialité</a> | <a href="business-ethics-gouvernance.html">Business Ethics &amp; Governance</a> | <a href="confidentialite.html#cookies">Politique en matière de cookies</a> | <a href="limitation-responsabilite.html">Limitation de responsabilité</a> | <a href="mentions-legales.html">Mentions légales</a> / <a href="confidentialite.html#rgpd">RGPD</a> / <a href="cgv.html">CGV</a></div>
   </div>
@@ -165,7 +141,11 @@
   });
 </script>
 <script type="module">
-  import { db, doc, getDoc } from "./assets/firebase-config.js";
+  import { db, doc, getDoc, collection, getDocs, linkify } from "./assets/firebase-config.js";
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
   (async () => {
     try {
       const snap = await getDoc(doc(db, 'contenu_site', 'global'));
@@ -174,6 +154,39 @@
       if (c.activitesIntro) document.getElementById('site-activitesIntro').textContent = c.activitesIntro;
     } catch (err) { /* on garde le texte par défaut */ }
   })();
+  (async () => {
+    const zone = document.getElementById('zoneProgrammesPublic');
+    try {
+      const snap = await getDocs(collection(db, 'programme_activites'));
+      let programmes = [];
+      snap.forEach(d => { const p = d.data(); if (p.visiblePublic !== false) programmes.push(p); });
+      programmes.sort((a, b) => (a.ordre ?? 999) - (b.ordre ?? 999));
+      if (programmes.length === 0) {
+        zone.innerHTML = '<div class="empty-state">Le programme des activités arrive bientôt.</div>';
+        return;
+      }
+      zone.innerHTML = programmes.map((p, i) => `
+        <div class="activity-card">
+          <span class="num">${String(i+1).padStart(2,'0')} — ${escapeHtml(p.categorie || '')}</span>
+          <h3>${escapeHtml(p.titre || '')}</h3>
+          <p>${linkify(p.description || '')}</p>
+        </div>`).join('');
+    } catch (err) {
+      zone.innerHTML = '<div class="empty-state">Le programme des activités n\'est pas disponible pour le moment.</div>';
+    }
+  })();
+</script>
+<script>
+  // Filet de sécurité : si une zone chargée depuis Firebase reste bloquée
+  // sur son message de chargement (ex: souci réseau), on affiche un message
+  // honnête après quelques secondes plutôt que de laisser tourner dans le vide.
+  setTimeout(() => {
+    document.querySelectorAll('[id^="zone"]').forEach(zone => {
+      if (zone.textContent.includes('Chargement')) {
+        zone.innerHTML = '<div class="empty-state">Le chargement prend plus de temps que prévu. Essayez de rafraîchir la page (Ctrl+F5) ; si ça persiste, contactez-nous.</div>';
+      }
+    });
+  }, 8000);
 </script>
 <script src="assets/protection.js" defer></script>
 <img src="assets/logo-helene-laruelle.png" alt="Site développé par Hélène Laruelle" title="Site développé par Hélène Laruelle" class="badge-helene">

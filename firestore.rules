@@ -1,5 +1,5 @@
 // Projet : Lar-allegria
-// Site : Lar'Allegria by Lara Rossoux — V01-005
+// Site : Lar'Allegria by Lara Rossoux — V01-006
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -122,6 +122,13 @@ service cloud.firestore {
 
     // Chevaux de l'écurie (propriété de Lara) — page publique "Nos chevaux".
     match /chevaux_ecurie/{id} {
+      allow read: if true;
+      allow write: if estAdmin();
+    }
+
+    // Cartes numérotées de la page publique "Activités" — numérotation
+    // recalculée à l'affichage à partir du champ ordre + visiblePublic.
+    match /programme_activites/{id} {
       allow read: if true;
       allow write: if estAdmin();
     }

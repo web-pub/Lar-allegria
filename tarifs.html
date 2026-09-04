@@ -107,7 +107,7 @@
       <span>Site développé par Hélène Laruelle</span>
       <span>Contenu sous la responsabilité de Lara Rossoux</span>
       <span>TVA BE 0756.844.280</span>
-      <span>Site V01-005</span>
+      <span>Site V01-006</span>
     </div>
     <div class="footer-legal-links"><a href="securisation.html">Sécurisation</a> | <a href="confidentialite.html">Déclaration de confidentialité</a> | <a href="business-ethics-gouvernance.html">Business Ethics &amp; Governance</a> | <a href="confidentialite.html#cookies">Politique en matière de cookies</a> | <a href="limitation-responsabilite.html">Limitation de responsabilité</a> | <a href="mentions-legales.html">Mentions légales</a> / <a href="confidentialite.html#rgpd">RGPD</a> / <a href="cgv.html">CGV</a></div>
   </div>
@@ -160,6 +160,15 @@
       zone.innerHTML = '<div class="empty-state">La grille tarifaire n\'est pas disponible pour le moment. Contactez Lara directement.</div>';
     }
   })();
+</script>
+<script>
+  setTimeout(() => {
+    document.querySelectorAll('[id^="zone"]').forEach(zone => {
+      if (zone.textContent.includes('Chargement')) {
+        zone.innerHTML = '<div class="empty-state">Le chargement prend plus de temps que prévu. Essayez de rafraîchir la page (Ctrl+F5) ; si ça persiste, contactez-nous.</div>';
+      }
+    });
+  }, 8000);
 </script>
 <script src="assets/protection.js" defer></script>
 <img src="assets/logo-helene-laruelle.png" alt="Site développé par Hélène Laruelle" title="Site développé par Hélène Laruelle" class="badge-helene">
