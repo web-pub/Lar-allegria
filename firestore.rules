@@ -1,5 +1,5 @@
 // Projet : Lar-allegria
-// Site : Lar'Allegria by Lara Rossoux — V01-008
+// Site : Lar'Allegria by Lara Rossoux — V01-013
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -14,6 +14,15 @@ service cloud.firestore {
     function estSuperAdmin() {
       return estConnecte() &&
         get(/databases/$(database)/documents/membres/$(request.auth.uid)).data.role == 'superadmin';
+    }
+    function monMembre() {
+      return get(/databases/$(database)/documents/membres/$(request.auth.uid)).data;
+    }
+    function estChefBenevoles() {
+      return estConnecte() && monMembre().chefBenevoles == true;
+    }
+    function estBenevoleSimple() {
+      return estConnecte() && monMembre().typeMembre == 'benevole' && monMembre().chefBenevoles != true;
     }
 
     function champsAutorisesMembre() {
@@ -60,7 +69,7 @@ service cloud.firestore {
     }
 
     match /nettoyages/{id} {
-      allow read: if estConnecte();
+      allow read: if estAdmin() || (estConnecte() && resource.data.assigneA == request.auth.uid);
       allow create, delete: if estAdmin();
       allow update: if estAdmin() || (
         estConnecte() && resource.data.assigneA == request.auth.uid &&
@@ -80,7 +89,7 @@ service cloud.firestore {
     }
 
     match /activites_reponses/{id} {
-      allow read: if estConnecte();
+      allow read: if estConnecte() && (resource.data.uid == request.auth.uid || estAdmin());
       allow create: if estConnecte() && request.resource.data.uid == request.auth.uid;
       allow update: if estAdmin() || (estConnecte() && resource.data.uid == request.auth.uid);
       allow delete: if estAdmin();
@@ -146,21 +155,31 @@ service cloud.firestore {
       allow write: if estAdmin();
     }
 
-    // Stock (foin, nourriture...) : l'admin gère tout ; un membre connecté
-    // peut uniquement mettre à jour la quantité (pour signaler une prise).
+    // Stock (foin, nourriture...) : l'admin et le super-admin gèrent tout,
+    // en plus comme en moins. Le "chef des bénévoles" (statut particulier
+    // porté par un membre bénévole) a les mêmes droits +/- sur le stock
+    // uniquement, sans accès au reste de l'admin. Un bénévole "simple" ne
+    // peut que diminuer une quantité (signaler une prise), jamais l'augmenter.
+    // Les membres cours et demi-pension n'ont aucun droit sur le stock.
     match /stock/{id} {
       allow read: if estConnecte();
       allow create, delete: if estAdmin();
       allow update: if estAdmin() || (
-        estConnecte() &&
+        estChefBenevoles() &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantite'])
+      ) || (
+        estBenevoleSimple() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantite']) &&
+        request.resource.data.quantite <= resource.data.quantite
       );
     }
 
-    // Journal des prises de stock signalées par les membres.
+    // Journal des prises/ajouts de stock signalés par les bénévoles (simples
+    // ou chef) — les membres cours/demi-pension n'y ont pas accès.
     match /stock_signalements/{id} {
       allow read: if estAdmin();
-      allow create: if estConnecte() && request.resource.data.membreId == request.auth.uid;
+      allow create: if estConnecte() && request.resource.data.membreId == request.auth.uid &&
+        (estChefBenevoles() || estBenevoleSimple());
       allow delete: if estAdmin();
     }
 
@@ -192,6 +211,18 @@ service cloud.firestore {
     // chaque connexion réussie du super-admin. Réservé au super-admin.
     match /sauvegardes_mdp/{id} {
       allow read, create: if estSuperAdmin();
+    }
+
+    // Comptabilité (livre de caisse + plan comptable) — données financières
+    // sensibles, strictement réservées à l'admin et au super-admin.
+    match /comptabilite_ecritures/{id} {
+      allow read, write: if estAdmin();
+    }
+    match /comptabilite_comptes/{id} {
+      allow read, write: if estAdmin();
+    }
+    match /livre_recettes/{id} {
+      allow read, write: if estAdmin();
     }
   }
 }

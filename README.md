@@ -1,4 +1,4 @@
-# Lar'Allegria by Lara Rossoux — site du club (V01-008)
+# Lar'Allegria by Lara Rossoux — site du club (V01-013)
 
 Dépôt GitHub : **web-pub/Lar-allegria**. Projet Firebase : **Lar-allegria**.
 
@@ -63,17 +63,18 @@ seulement à activer les deux services suivants dans la
 ## 3. Créer le compte de Lara (administratrice)
 
 Comme le site n'a pas de serveur (pas de Cloud Functions), la création d'un
-compte se fait en deux étapes toutes simples. **Identifiants prévus pour
-Lara : identifiant `ADMIN`, mot de passe `Lara4460`** (Lara pourra changer ce
-mot de passe elle-même depuis l'espace admin, onglet "Paramètres" → "Mon mot
-de passe").
+compte se fait en deux étapes toutes simples. **Identifiant prévu pour
+Lara : `ADMIN`** — choisis toi-même un mot de passe fort au moment de créer
+le compte (ne le note pas ici ni dans aucun fichier du dépôt : garde-le dans
+un gestionnaire de mots de passe). Lara pourra le changer elle-même ensuite
+depuis l'espace admin, onglet "Paramètres" → "Mon mot de passe".
 
 1. Dans la console Firebase → **Authentication** → **Users** → **Add user**.
    - Email : `admin@membres.lar-allegria.local` (le mot-clé, ici "admin",
      est l'identifiant que Lara tapera pour se connecter sur
      `connexion.html`, qui transforme automatiquement l'identifiant saisi en
      cette adresse — donc taper "ADMIN" ou "admin" fonctionne pareil).
-   - Mot de passe : `Lara4460` (à changer ensuite depuis le site si tu veux).
+   - Mot de passe : au choix (fort, non stocké ici).
    - Une fois créé, **copie l'UID** généré (une longue chaîne du type
      `8f3kd92J...`).
 2. Dans la console Firebase → **Firestore Database** → **Start collection** →
@@ -85,8 +86,8 @@ de passe").
    - `nom` (string) = `Rossoux`
 
 Lara peut alors se connecter sur `connexion.html` avec l'identifiant `ADMIN`
-et le mot de passe `Lara4460`, et elle arrive sur `admin.html`. Elle peut
-changer ce mot de passe à tout moment depuis l'onglet **Paramètres** de
+et le mot de passe choisi à l'étape 1, et elle arrive sur `admin.html`. Elle
+peut changer ce mot de passe à tout moment depuis l'onglet **Paramètres** de
 l'espace admin.
 
 ## 3bis. Créer le compte super-admin (HeleneL)
@@ -101,28 +102,32 @@ les requêtes excluent les rôles `admin` et `superadmin`).
 
 1. Firebase Console → **Authentication** → **Users** → **Add user**.
    - Email : `helenel@membres.lar-allegria.local`
-   - Mot de passe : `Helene123`
+   - Mot de passe : au choix (fort, non stocké ici).
    - Copie l'UID généré.
 2. Firebase Console → **Firestore Database** → collection `membres` → crée un
    document dont l'**ID est exactement cet UID**, avec les champs :
    - `role` (string) = `superadmin`
    - `identifiant` (string) = `HeleneL`
    - `prenom` (string) = `Hélène`
-   - `motDePasseActuel` (string) = `Helene123` — **important** : c'est ce
-     champ que l'onglet "Mots de passe" affiche et utilise pour pouvoir
-     réinitialiser les mots de passe des autres comptes (le SDK Firebase
-     client ne permet de changer le mot de passe d'un compte tiers qu'en se
-     connectant brièvement avec son mot de passe actuel connu — pas d'accès
-     Admin SDK sur le plan Spark).
+   - `motDePasseActuel` (string) = le même mot de passe choisi à l'étape 1 —
+     **important** : c'est ce champ que l'onglet "Mots de passe" affiche et
+     utilise pour pouvoir réinitialiser les mots de passe des autres comptes
+     (le SDK Firebase client ne permet de changer le mot de passe d'un
+     compte tiers qu'en se connectant brièvement avec son mot de passe actuel
+     connu — pas d'accès Admin SDK sur le plan Spark).
 3. Pour que le mot de passe de Lara soit lui aussi visible/réinitialisable
    dès le départ (son compte a été créé avant cette fonctionnalité), ajoute
-   aussi le champ `motDePasseActuel` = `Lara4460` sur le document `membres`
-   de Lara. Les comptes créés ensuite (nouveaux membres, ou tout compte dont
-   le mot de passe est changé depuis le site) ont ce champ renseigné
-   automatiquement.
+   aussi le champ `motDePasseActuel` sur le document `membres` de Lara, avec
+   la valeur exacte de son mot de passe actuel. Les comptes créés ensuite
+   (nouveaux membres, ou tout compte dont le mot de passe est changé depuis
+   le site) ont ce champ renseigné automatiquement.
 
 HeleneL se connecte alors sur `connexion.html` avec l'identifiant `HeleneL`
-et le mot de passe `Helene123`.
+et le mot de passe choisi à l'étape 1.
+
+**⚠️ Aucun mot de passe réel ne doit jamais être écrit dans ce fichier ni
+dans aucun fichier du dépôt** — ce dépôt GitHub est public, tout son contenu
+(y compris ce README) est donc lisible par n'importe qui à l'adresse du site.
 
 **Pour chaque membre ensuite**, tout se fait directement depuis l'espace
 admin du site (onglet "Membres") → **"+ Ajouter un membre"** : Lara choisit

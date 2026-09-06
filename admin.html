@@ -39,6 +39,8 @@
     <button class="tab-btn" data-tab="messages" id="tabMessagesBtn">Messages</button>
     <button class="tab-btn" data-tab="contenu">Contenu du site</button>
     <button class="tab-btn" data-tab="parametres">Paramètres</button>
+    <button class="tab-btn" data-tab="comptabilite">📒 Comptabilité</button>
+    <button class="tab-btn" data-tab="livrerecettes">📗 Livre des recettes</button>
     <button class="tab-btn hidden" data-tab="motsdepasse" id="tabMotsDePasseBtn">🔑 Mots de passe</button>
   </div>
 
@@ -337,6 +339,75 @@
     </div>
   </div>
 
+  <!-- ==================== COMPTABILITÉ ==================== -->
+  <div id="panel-comptabilite" class="tab-panel hidden">
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>📒 Livre de caisse</h2>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <select id="cpt-annee"></select>
+          <button class="btn-sm primary" id="btnAjouterEcriture">+ Ajouter une écriture</button>
+          <button class="btn-sm" id="btnExporterCompta">Exporter en Excel</button>
+        </div>
+      </div>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Encodage des dépenses et des recettes depuis 2025, classées automatiquement par date (une écriture oubliée reprend sa place chronologique). Le solde se recalcule ligne par ligne.</p>
+      <div style="overflow-x:auto;">
+        <table class="compta-table" id="tableauCompta">
+          <thead>
+            <tr><th>Date</th><th>Libellé</th><th>Compte</th><th>Recette</th><th>Dépense</th><th>Déductible</th><th>Solde</th><th></th></tr>
+          </thead>
+          <tbody id="corpsTableauCompta"><tr><td colspan="8" class="empty-state">Chargement...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="data-sub" id="totauxCompta" style="margin-top:10px; font-weight:600;"></div>
+    </div>
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>Plan comptable</h2>
+        <button class="collapse-toggle" data-target="wrapPlanComptable" aria-expanded="false">▸</button>
+      </div>
+      <div id="wrapPlanComptable" class="hidden">
+        <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Les comptes disponibles au moment d'encoder une écriture (numéro + intitulé). Ajoutes-en un nouveau ici, il apparaîtra ensuite dans la liste déroulante d'encodage.</p>
+        <div class="form-grid">
+          <div class="field"><label>Numéro de compte</label><input id="pc-numero" placeholder="ex: 604000"></div>
+          <div class="field"><label>Intitulé</label><input id="pc-nom" placeholder="ex: Achats fournitures"></div>
+        </div>
+        <button class="btn-sm primary" id="btnAjouterCompte">+ Ajouter ce compte</button>
+        <div class="data-list" id="listePlanComptable" style="margin-top:14px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== LIVRE DES RECETTES ==================== -->
+  <div id="panel-livrerecettes" class="tab-panel hidden">
+    <div class="app-panel">
+      <h2>📗 Livre des recettes</h2>
+      <div class="banner-alert info" style="margin-top:10px;">
+        Format basé sur le schéma minimum normalisé des <strong>petites ASBL en comptabilité simplifiée</strong> (AR du 29 avril 2019, Code des sociétés et des associations, Livre 3, Titre 4) : les recettes sont enregistrées <strong>chronologiquement</strong>, sans "trou", réparties en 4 catégories (Cotisations / Dons et legs / Subsides / Autres recettes), avec référence à la pièce justificative. Ce total sert de base à l'état annuel des recettes et dépenses.<br><br>
+        <em>Je ne suis ni comptable ni juriste — vérifie avec ton comptable que ce format correspond bien au régime de ton ASBL avant de t'y fier pour tes obligations légales.</em>
+      </div>
+      <div class="section-heading" style="margin-top:16px;">
+        <div style="display:flex; gap:8px; align-items:center;">
+          <select id="lr-annee"></select>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button class="btn-sm primary" id="btnAjouterRecette">+ Ajouter une recette</button>
+          <button class="btn-sm" id="btnExporterRecettes">Exporter en Excel</button>
+        </div>
+      </div>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Une recette ajoutée après coup reprend automatiquement sa place chronologique et le numéro d'ordre se réajuste — l'enregistrement reste continu.</p>
+      <div style="overflow-x:auto;">
+        <table class="compta-table" id="tableauRecettes">
+          <thead>
+            <tr><th>N°</th><th>Date</th><th>Description</th><th>Pièce justif.</th><th>Cotisations</th><th>Dons &amp; legs</th><th>Subsides</th><th>Autres recettes</th><th>Total cumulé</th><th></th></tr>
+          </thead>
+          <tbody id="corpsTableauRecettes"><tr><td colspan="10" class="empty-state">Chargement...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="data-sub" id="totauxRecettes" style="margin-top:10px; font-weight:600;"></div>
+    </div>
+  </div>
+
   <!-- ==================== MOTS DE PASSE (super-admin uniquement) ==================== -->
   <div id="panel-motsdepasse" class="tab-panel hidden">
     <div class="app-panel">
@@ -357,6 +428,7 @@
 
 <div id="modalZone"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="module" src="assets/app-admin.js"></script>
 <script src="assets/protection.js" defer></script>
 </body>
