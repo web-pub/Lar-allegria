@@ -3,14 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Blog — Lar'Allegria by Lara Rossoux | École équestre</title>
-<meta name="description" content="Le blog de l'école équestre Lar'Allegria by Lara Rossoux à Grâce-Hollogne : actualités, conseils et coulisses de l'écurie.">
-<link rel="canonical" href="https://web-pub.github.io/Lar-allegria/blog.html">
+<title>Livre d'or — Lar'Allegria by Lara Rossoux | École équestre</title>
+<meta name="description" content="Les témoignages des cavaliers et membres de l'école équestre Lar'Allegria by Lara Rossoux à Grâce-Hollogne. Laissez le vôtre !">
+<link rel="canonical" href="https://web-pub.github.io/Lar-allegria/livre-or.html">
 <link rel="icon" href="assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Yeseva+One&family=Playball&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/app.css">
 </head>
 <body>
 
@@ -32,8 +33,8 @@
         <li><a href="chevaux.html">Nos chevaux</a></li>
         <li><a href="lara.html">Lara</a></li>
         <li><a href="evenements.html">Événements</a></li>
-        <li><a href="blog.html" class="active">Blog</a></li>
-        <li><a href="livre-or.html">Livre d'or</a></li>
+        <li><a href="blog.html">Blog</a></li>
+        <li><a href="livre-or.html" class="active">Livre d'or</a></li>
         <li><a href="tarifs.html">Tarifs</a></li>
         <li><a href="inscription.html">Inscription</a></li>
         <li><a href="contact.html">Nous contacter</a></li>
@@ -45,26 +46,31 @@
 
 <section class="page-hero">
   <div class="container">
-    <span class="eyebrow">Notre newsletter</span>
-    <h1>Blog</h1>
-    <p class="lead">Actualités, conseils et coulisses de l'écurie, par Lara.</p>
+    <span class="eyebrow">Vos mots comptent</span>
+    <h1>Livre d'or</h1>
+    <p class="lead">Un mot, un souvenir, un merci — les témoignages des cavaliers et des membres du club, à découvrir et à compléter.</p>
     <div class="flourish"><span></span><i>&#10022;</i><span></span></div>
   </div>
 </section>
 
 <section>
-  <div class="container">
-    <div class="media-feed" id="zoneBlogPublic">
-      <div class="empty-state">Chargement des articles...</div>
+  <div class="container" style="max-width: 780px;">
+    <div id="zoneLivreOrPublic">
+      <div class="empty-state">Chargement du livre d'or...</div>
     </div>
-  </div>
-</section>
 
-<section class="cta-band">
-  <div class="container">
-    <h2>Envie de nous rejoindre ?</h2>
-    <p>Rejoignez l'école équestre en cours ou en demi-pension.</p>
-    <a class="btn btn-primary" href="inscription.html">Faire ma demande d'inscription</a>
+    <div class="info-block" style="margin-top: 30px;">
+      <h2>Laisser un mot</h2>
+      <p style="margin-bottom: 16px;">Votre message sera relu par Lara avant publication — il apparaîtra ici sous peu.</p>
+      <form id="livreOrForm">
+        <div class="field"><label>Votre nom *</label><input id="lo-nom" required maxlength="60"></div>
+        <div class="field"><label>Votre message *</label><textarea id="lo-message" rows="4" required maxlength="600" spellcheck="true" lang="fr"></textarea></div>
+        <input type="text" id="lo-siteweb" name="siteweb" autocomplete="off" tabindex="-1" style="position:absolute; left:-9999px;" aria-hidden="true">
+        <div id="loSuccess" class="banner-alert" style="display:none; margin-top:10px;">Merci ! Votre message a bien été envoyé et sera publié après relecture.</div>
+        <div id="loError" class="banner-alert danger" style="display:none; margin-top:10px;"></div>
+        <button type="submit" class="btn btn-primary" id="lo-submit" style="margin-top:10px;">Envoyer mon message</button>
+      </form>
+    </div>
   </div>
 </section>
 
@@ -73,7 +79,7 @@
     <div class="footer-grid">
       <div>
         <h4>Lar'Allegria by Lara Rossoux</h4>
-        <p>École équestre ASBL proposant école d'équitation, cours de dressage, écurie privée, stages et spectacles équestres à Grâce-Hollogne.</p>
+        <p>École équestre familiale à Grâce-Hollogne — dressage, demi-pension, stages et spectacles.</p>
       </div>
       <div>
         <h4>Navigation</h4>
@@ -85,7 +91,7 @@
           <li><a href="lara.html">Lara</a></li>
           <li><a href="evenements.html">Événements</a></li>
           <li><a href="blog.html">Blog</a></li>
-        <li><a href="livre-or.html">Livre d'or</a></li>
+          <li><a href="livre-or.html">Livre d'or</a></li>
           <li><a href="tarifs.html">Tarifs</a></li>
           <li><a href="inscription.html">Inscription</a></li>
           <li><a href="contact.html">Nous contacter</a></li>
@@ -123,13 +129,12 @@
   });
 </script>
 <script type="module">
-  import { db, collection, getDocs, linkify } from "./assets/firebase-config.js";
+  import { db, collection, getDocs, addDoc, serverTimestamp, linkify } from "./assets/firebase-config.js";
 
   function escapeHtml(str) {
     if (!str) return '';
     return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
-
   function formatDateFr(iso) {
     if (!iso) return '';
     const [y, m, d] = iso.split('-');
@@ -139,57 +144,67 @@
   }
 
   (async () => {
-    const zone = document.getElementById('zoneBlogPublic');
+    const zone = document.getElementById('zoneLivreOrPublic');
     try {
-      const snap = await getDocs(collection(db, 'articles_blog'));
-      const articles = [];
-      snap.forEach(d => { const a = d.data(); if (a.publie !== false) articles.push(a); });
-      articles.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      const snap = await getDocs(collection(db, 'livre_or'));
+      const messages = [];
+      snap.forEach(d => { const m = d.data(); if (m.statut === 'publie') messages.push(m); });
+      messages.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
-      if (articles.length === 0) {
-        zone.innerHTML = '<div class="empty-state">Aucun article publié pour l\'instant. Revenez bientôt !</div>';
+      if (messages.length === 0) {
+        zone.innerHTML = '<div class="empty-state">Le livre d\'or n\'a pas encore de message publié. Soyez le premier !</div>';
         return;
       }
 
-      window._articlesBlog = articles;
-      zone.innerHTML = articles.map((a, i) => `
-        <div class="media-card">
-          ${a.photoUrl ? `<div class="evenement-vignette clickable" onclick="window.agrandirPhotoBlog(${i})"><img src="${escapeHtml(a.photoUrl)}" alt="${escapeHtml(a.titre)}" loading="lazy"></div>` : ''}
-          <div class="mc-body">
-            <h3>${escapeHtml(a.titre)}</h3>
-            <div class="mc-meta">${formatDateFr(a.date)}</div>
-            <p>${linkify(a.contenu || '')}</p>
-          </div>
+      zone.innerHTML = messages.map(m => `
+        <div class="info-block" style="margin-bottom:16px;">
+          <p style="white-space:pre-line;">${linkify(m.message || '')}</p>
+          <p class="mc-meta" style="margin-top:8px;">— <strong>${escapeHtml(m.nom || '')}</strong>, le ${formatDateFr(m.date)}</p>
         </div>`).join('');
     } catch (err) {
-      zone.innerHTML = '<div class="empty-state">Le blog n\'est pas disponible pour le moment.</div>';
+      zone.innerHTML = '<div class="empty-state">Le livre d\'or n\'est pas disponible pour le moment.</div>';
     }
   })();
 
-  window.agrandirPhotoBlog = (i) => {
-    const a = window._articlesBlog[i];
-    if (!a || !a.photoUrl) return;
-    const html = `
-      <div class="lightbox-overlay" id="lightboxBlog" onclick="if(event.target===this) window.fermerPhotoBlog()">
-        <div class="lightbox-box" style="max-width:800px;">
-          <button class="lightbox-close" onclick="window.fermerPhotoBlog()" aria-label="Fermer">✕</button>
-          <div class="lb-photo" style="height:auto; max-height:80vh;"><img src="${escapeHtml(a.photoUrl)}" alt="${escapeHtml(a.titre)}" style="height:auto; max-height:80vh; width:auto; max-width:100%; margin:0 auto; display:block;"></div>
-          <div class="lb-body"><h3>${escapeHtml(a.titre)}</h3></div>
-        </div>
-      </div>`;
-    document.body.insertAdjacentHTML('beforeend', html);
-    document.addEventListener('keydown', window._fermerPhotoBlogEsc);
-  };
-  window._fermerPhotoBlogEsc = (e) => { if (e.key === 'Escape') window.fermerPhotoBlog(); };
-  window.fermerPhotoBlog = () => {
-    document.getElementById('lightboxBlog')?.remove();
-    document.removeEventListener('keydown', window._fermerPhotoBlogEsc);
-  };
+  const form = document.getElementById('livreOrForm');
+  const successBox = document.getElementById('loSuccess');
+  const errorBox = document.getElementById('loError');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    successBox.style.display = 'none';
+    errorBox.style.display = 'none';
+
+    // Piège à robots : ce champ doit rester vide (masqué pour les humains).
+    if (document.getElementById('lo-siteweb').value) return;
+
+    const nom = document.getElementById('lo-nom').value.trim();
+    const message = document.getElementById('lo-message').value.trim();
+    if (!nom || !message) {
+      errorBox.textContent = 'Merci de remplir votre nom et votre message.';
+      errorBox.style.display = 'block';
+      return;
+    }
+    const submitBtn = document.getElementById('lo-submit');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Envoi...';
+    try {
+      await addDoc(collection(db, 'livre_or'), {
+        nom, message, statut: 'en_attente',
+        date: new Date().toISOString().slice(0, 10),
+        createdAt: serverTimestamp()
+      });
+      form.reset();
+      successBox.style.display = 'block';
+    } catch (err) {
+      errorBox.textContent = "Erreur lors de l'envoi : " + (err.code || err.message);
+      errorBox.style.display = 'block';
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Envoyer mon message';
+    }
+  });
 </script>
 <script>
-  // Filet de sécurité : si une zone chargée depuis Firebase reste bloquée
-  // sur son message de chargement (ex: souci réseau), on affiche un message
-  // honnête après quelques secondes plutôt que de laisser tourner dans le vide.
   setTimeout(() => {
     document.querySelectorAll('[id^="zone"]').forEach(zone => {
       if (zone.textContent.includes('Chargement')) {

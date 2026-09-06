@@ -1,5 +1,5 @@
 // Projet : Lar-allegria
-// Site : Lar'Allegria by Lara Rossoux — V01-013
+// Site : Lar'Allegria by Lara Rossoux — V01-014
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -223,6 +223,19 @@ service cloud.firestore {
     }
     match /livre_recettes/{id} {
       allow read, write: if estAdmin();
+    }
+
+    // Livre d'or public : n'importe qui peut proposer un message (statut
+    // toujours "en_attente" à la création, pas de champ superflu) ; seul un
+    // message au statut "publie" est visible publiquement ; la modération
+    // (publier/supprimer) est réservée à l'admin.
+    match /livre_or/{id} {
+      allow read: if resource.data.statut == 'publie' || estAdmin();
+      allow create: if request.resource.data.statut == 'en_attente' &&
+        request.resource.data.nom is string && request.resource.data.nom.size() > 0 && request.resource.data.nom.size() <= 60 &&
+        request.resource.data.message is string && request.resource.data.message.size() > 0 && request.resource.data.message.size() <= 600 &&
+        request.resource.data.keys().hasOnly(['nom','message','statut','date','createdAt']);
+      allow update, delete: if estAdmin();
     }
   }
 }

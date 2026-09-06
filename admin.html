@@ -33,6 +33,7 @@
     <button class="tab-btn" data-tab="activites">Activités</button>
     <button class="tab-btn" data-tab="evenements">Événements</button>
     <button class="tab-btn" data-tab="blog">Blog</button>
+    <button class="tab-btn" data-tab="livreor">📖 Livre d'or</button>
     <button class="tab-btn" data-tab="boutique" id="tabBoutiqueBtn">Boutique</button>
     <button class="tab-btn" data-tab="stock">Stock</button>
     <button class="tab-btn" data-tab="planning-benevoles">Planning bénévoles</button>
@@ -216,6 +217,19 @@
       </div>
       <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Publiés sur la page publique "Blog", visible de tous les visiteurs.</p>
       <div class="data-list" id="listeArticlesBlog"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+
+  <!-- ==================== LIVRE D'OR ==================== -->
+  <div id="panel-livreor" class="tab-panel hidden">
+    <div class="app-panel">
+      <h2>Messages en attente de relecture</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Un message envoyé depuis la page publique "Livre d'or" n'apparaît sur le site qu'une fois publié ici.</p>
+      <div class="data-list" id="listeLivreOrAttente"><div class="empty-state">...</div></div>
+    </div>
+    <div class="app-panel">
+      <h2>Messages publiés</h2>
+      <div class="data-list" id="listeLivreOrPublies"><div class="empty-state">...</div></div>
     </div>
   </div>
 
