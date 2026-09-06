@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-016';
+const VERSION_SITE = 'V01-017';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -61,11 +61,13 @@ onAuthStateChanged(auth, async (user) => {
   chargerIban();
   chargerActivites();
   chargerProgrammesActivites();
+  initSelecteurAnneeCaisse();
+  chargerSoldeDepartCaisse();
+  chargerLivreCaisse();
   initSelecteurAnneeCompta();
   chargerPlanComptable();
   chargerCompta();
   initSelecteurAnneeRecettes();
-  chargerCategoriesRecettes();
   chargerLivreRecettes();
   chargerLivreOrAdmin();
   chargerConversations();
@@ -2290,7 +2292,155 @@ async function chargerSauvegardesMdp() {
 }
 
 // ==========================================================================
-// COMPTABILITÉ — livre de caisse (recettes/dépenses), plan comptable, export
+// LIVRE DE CAISSE — mouvements en espèces uniquement (hors banque)
+// ==========================================================================
+let anneeActuelleCaisse = new Date().getFullYear();
+
+function initSelecteurAnneeCaisse() {
+  const sel = document.getElementById('lc-annee');
+  const anneeCourante = new Date().getFullYear();
+  const annees = [];
+  for (let a = 2025; a <= anneeCourante + 1; a++) annees.push(a);
+  sel.innerHTML = annees.map(a => `<option value="${a}" ${a === anneeCourante ? 'selected' : ''}>${a}</option>`).join('');
+  anneeActuelleCaisse = anneeCourante;
+  sel.addEventListener('change', () => {
+    anneeActuelleCaisse = parseInt(sel.value, 10);
+    chargerSoldeDepartCaisse();
+    chargerLivreCaisse();
+  });
+}
+async function chargerSoldeDepartCaisse() {
+  const d = await getDoc(doc(db, 'livre_caisse_parametres', String(anneeActuelleCaisse)));
+  document.getElementById('lc-soldeDepart').value = d.exists() ? (d.data().soldeDepart ?? 0) : 0;
+}
+document.getElementById('btnSauverSoldeDepart').addEventListener('click', async () => {
+  const soldeDepart = parseFloat(document.getElementById('lc-soldeDepart').value) || 0;
+  try {
+    await setDoc(doc(db, 'livre_caisse_parametres', String(anneeActuelleCaisse)), { soldeDepart }, { merge: true });
+    chargerLivreCaisse();
+  } catch (err) {
+    alert('Erreur : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore (voir le README, section 4).');
+  }
+});
+
+async function chargerLivreCaisse() {
+  const corps = document.getElementById('corpsTableauCaisse');
+  const dParam = await getDoc(doc(db, 'livre_caisse_parametres', String(anneeActuelleCaisse)));
+  const soldeDepart = dParam.exists() ? (Number(dParam.data().soldeDepart) || 0) : 0;
+  const dateDebut = `${anneeActuelleCaisse}-01-01`;
+  const dateFin = `${anneeActuelleCaisse}-12-31`;
+  const snap = await getDocs(query(collection(db, 'livre_caisse'), where('date', '>=', dateDebut), where('date', '<=', dateFin)));
+  let mouvements = [];
+  snap.forEach(d => mouvements.push({ id: d.id, ...d.data() }));
+  mouvements.sort((a, b) => a.date.localeCompare(b.date) || (a.createdAtMs||0) - (b.createdAtMs||0));
+
+  let solde = soldeDepart, totalEncaisse = 0, totalDecaisse = 0;
+  const ligneDepart = `<tr><td colspan="4" style="font-style:italic;">Solde de départ au 1er janvier</td><td class="solde">${soldeDepart.toFixed(2)} €</td><td></td></tr>`;
+  const lignes = mouvements.map(m => {
+    const montant = Number(m.montant) || 0;
+    if (m.type === 'encaissement') { solde += montant; totalEncaisse += montant; }
+    else { solde -= montant; totalDecaisse += montant; }
+    const dateLabel = new Date(m.date + 'T00:00:00').toLocaleDateString('fr-BE', { day:'2-digit', month:'2-digit', year:'numeric' });
+    return `<tr>
+      <td>${dateLabel}</td>
+      <td>${escapeHtml(m.libelle||'')}</td>
+      <td class="montant-recette">${m.type==='encaissement' ? montant.toFixed(2)+' €' : ''}</td>
+      <td class="montant-depense">${m.type==='decaissement' ? montant.toFixed(2)+' €' : ''}</td>
+      <td class="solde">${solde.toFixed(2)} €</td>
+      <td>
+        <button class="btn-sm" onclick="window.editerMouvementCaisse('${m.id}')">Modifier</button>
+        <button class="btn-sm danger" onclick="window.supprimerMouvementCaisse('${m.id}')">Suppr.</button>
+      </td>
+    </tr>`;
+  }).join('');
+  corps.innerHTML = ligneDepart + (lignes || `<tr><td colspan="6" class="empty-state">Aucun mouvement de caisse pour ${anneeActuelleCaisse}.</td></tr>`);
+  document.getElementById('totauxCaisse').textContent =
+    `Encaissé : ${totalEncaisse.toFixed(2)} € · Décaissé : ${totalDecaisse.toFixed(2)} € · Solde au 31/12 : ${solde.toFixed(2)} €`;
+  window._livreCaisse = mouvements;
+}
+
+document.getElementById('btnAjouterMouvementCaisse').addEventListener('click', () => window.ouvrirModalMouvementCaisse());
+window.editerMouvementCaisse = (id) => window.ouvrirModalMouvementCaisse((window._livreCaisse || []).find(m => m.id === id));
+window.supprimerMouvementCaisse = async (id) => {
+  if (!confirm('Supprimer ce mouvement de caisse ?')) return;
+  await deleteDoc(doc(db, 'livre_caisse', id));
+  chargerLivreCaisse();
+};
+window.ouvrirModalMouvementCaisse = (m) => {
+  const html = `
+    <div class="modal-overlay" id="modalOverlayCaisse">
+      <div class="modal-box">
+        <h3>${m ? 'Modifier le mouvement' : 'Ajouter un mouvement de caisse'}</h3>
+        <div class="form-grid">
+          <div class="field"><label>Date</label><input type="date" id="lc-date" value="${m?.date || dateISOLocale(new Date())}"></div>
+          <div class="field"><label>Type</label>
+            <select id="lc-type">
+              <option value="decaissement" ${m?.type!=='encaissement'?'selected':''}>Décaissé (sorti de caisse)</option>
+              <option value="encaissement" ${m?.type==='encaissement'?'selected':''}>Encaissé (entré en caisse)</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Libellé</label><input id="lc-libelle" value="${escapeHtml(m?.libelle||'')}" placeholder="ex: Paiement cours en espèces, achat foin en liquide..." spellcheck="true" lang="fr"></div>
+        <div class="field"><label>Montant (€)</label><input type="number" step="0.01" id="lc-montant" value="${m?.montant ?? ''}"></div>
+        <div class="modal-actions">
+          <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
+          <button class="btn-sm primary" type="button" id="lc-save">Enregistrer</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modalZone').innerHTML = html;
+  document.getElementById('lc-save').addEventListener('click', async () => {
+    const montant = parseFloat(document.getElementById('lc-montant').value);
+    if (!montant || montant <= 0) { alert('Merci d\'indiquer un montant valide.'); return; }
+    const data = {
+      date: document.getElementById('lc-date').value,
+      type: document.getElementById('lc-type').value,
+      libelle: document.getElementById('lc-libelle').value.trim(),
+      montant
+    };
+    if (!data.date) { alert('Merci d\'indiquer une date.'); return; }
+    try {
+      if (m) await updateDoc(doc(db, 'livre_caisse', m.id), data);
+      else await addDoc(collection(db, 'livre_caisse'), { ...data, createdAtMs: Date.now() });
+      window.fermerModal();
+      const anneeSaisie = parseInt(data.date.slice(0,4), 10);
+      if (anneeSaisie !== anneeActuelleCaisse) {
+        anneeActuelleCaisse = anneeSaisie;
+        document.getElementById('lc-annee').value = anneeSaisie;
+        await chargerSoldeDepartCaisse();
+      }
+      chargerLivreCaisse();
+    } catch (err) {
+      alert('Erreur : ' + (err.code || err.message));
+    }
+  });
+};
+document.getElementById('btnExporterCaisse').addEventListener('click', async () => {
+  const mouvements = window._livreCaisse || [];
+  const dParam = await getDoc(doc(db, 'livre_caisse_parametres', String(anneeActuelleCaisse)));
+  const soldeDepart = dParam.exists() ? (Number(dParam.data().soldeDepart) || 0) : 0;
+  let solde = soldeDepart;
+  const lignes = [{ 'Date': '', 'Libellé': 'Solde de départ', 'Encaissé (€)': '', 'Décaissé (€)': '', 'Solde (€)': soldeDepart }];
+  mouvements.forEach(m => {
+    const montant = Number(m.montant) || 0;
+    if (m.type === 'encaissement') solde += montant; else solde -= montant;
+    lignes.push({
+      'Date': m.date, 'Libellé': m.libelle || '',
+      'Encaissé (€)': m.type === 'encaissement' ? montant : '',
+      'Décaissé (€)': m.type === 'decaissement' ? montant : '',
+      'Solde (€)': Number(solde.toFixed(2))
+    });
+  });
+  if (mouvements.length === 0) { alert('Aucun mouvement à exporter pour ' + anneeActuelleCaisse + '.'); return; }
+  const feuille = XLSX.utils.json_to_sheet(lignes);
+  feuille['!cols'] = [{wch:12},{wch:32},{wch:12},{wch:12},{wch:12}];
+  const classeur = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(classeur, feuille, `Caisse ${anneeActuelleCaisse}`);
+  XLSX.writeFile(classeur, `Livre-de-caisse-Lar-Allegria-${anneeActuelleCaisse}.xlsx`);
+});
+
+// ==========================================================================
+// COMPTABILITÉ — achats & ventes → compte de résultat simplifié
 // ==========================================================================
 let planComptableCache = [];
 let compteActuelAnnee = new Date().getFullYear();
@@ -2347,21 +2497,18 @@ async function chargerCompta() {
   const snap = await getDocs(query(collection(db, 'comptabilite_ecritures'), where('date', '>=', dateDebut), where('date', '<=', dateFin)));
   let ecritures = [];
   snap.forEach(d => ecritures.push({ id: d.id, ...d.data() }));
-  // Classement par date : une écriture ajoutée après coup reprend sa place
-  // chronologique plutôt que de s'ajouter en bas.
   ecritures.sort((a, b) => a.date.localeCompare(b.date) || (a.createdAtMs||0) - (b.createdAtMs||0));
 
   if (ecritures.length === 0) {
-    corps.innerHTML = '<tr><td colspan="8" class="empty-state">Aucune écriture pour ' + compteActuelAnnee + '.</td></tr>';
+    corps.innerHTML = '<tr><td colspan="7" class="empty-state">Aucune écriture pour ' + compteActuelAnnee + '.</td></tr>';
     document.getElementById('totauxCompta').textContent = '';
     return;
   }
 
-  let solde = 0, totalRecettes = 0, totalDepenses = 0, totalDeductible = 0;
+  let totalAchats = 0, totalVentes = 0, totalDeductible = 0;
   corps.innerHTML = ecritures.map(e => {
     const montant = Number(e.montant) || 0;
-    if (e.type === 'recette') { solde += montant; totalRecettes += montant; }
-    else { solde -= montant; totalDepenses += montant; }
+    if (e.type === 'vente') totalVentes += montant; else totalAchats += montant;
     totalDeductible += Number(e.montantDeductible) || 0;
     const dateLabel = new Date(e.date + 'T00:00:00').toLocaleDateString('fr-BE', { day:'2-digit', month:'2-digit', year:'numeric' });
     const compteLabel = e.compteNumero ? `${escapeHtml(e.compteNumero)} — ${escapeHtml(e.compteNom||'')}` : '—';
@@ -2369,18 +2516,18 @@ async function chargerCompta() {
       <td>${dateLabel}</td>
       <td>${escapeHtml(e.libelle||'')}</td>
       <td>${compteLabel}</td>
-      <td class="montant-recette">${e.type==='recette' ? montant.toFixed(2)+' €' : ''}</td>
-      <td class="montant-depense">${e.type==='depense' ? montant.toFixed(2)+' €' : ''}</td>
+      <td class="montant-depense">${e.type!=='vente' ? montant.toFixed(2)+' €' : ''}</td>
+      <td class="montant-recette">${e.type==='vente' ? montant.toFixed(2)+' €' : ''}</td>
       <td>${e.montantDeductible ? e.montantDeductible.toFixed(2) + ' € (' + (e.tauxDeductible ?? 100) + '%)' : '—'}</td>
-      <td class="solde">${solde.toFixed(2)} €</td>
       <td>
         <button class="btn-sm" onclick="window.editerEcritureCompta('${e.id}')">Modifier</button>
         <button class="btn-sm danger" onclick="window.supprimerEcritureCompta('${e.id}')">Suppr.</button>
       </td>
     </tr>`;
   }).join('');
-  document.getElementById('totauxCompta').textContent =
-    `Total ${compteActuelAnnee} — Recettes : ${totalRecettes.toFixed(2)} € · Dépenses : ${totalDepenses.toFixed(2)} € · Solde final : ${solde.toFixed(2)} € · Total déductible : ${totalDeductible.toFixed(2)} €`;
+  const resultat = totalVentes - totalAchats;
+  document.getElementById('totauxCompta').innerHTML =
+    `Compte de résultat simplifié ${compteActuelAnnee} — Total achats : ${totalAchats.toFixed(2)} € · Total ventes : ${totalVentes.toFixed(2)} € · <strong>Résultat : ${resultat.toFixed(2)} €</strong> · Total déductible : ${totalDeductible.toFixed(2)} €`;
   window._ecrituresCompta = ecritures;
 }
 
@@ -2401,12 +2548,19 @@ window.ouvrirModalEcriture = (e) => {
           <div class="field"><label>Date</label><input type="date" id="ec-date" value="${e?.date || dateISOLocale(new Date())}"></div>
           <div class="field"><label>Type</label>
             <select id="ec-type">
-              <option value="depense" ${e?.type!=='recette'?'selected':''}>Dépense</option>
-              <option value="recette" ${e?.type==='recette'?'selected':''}>Recette</option>
+              <option value="achat" ${e?.type!=='vente'?'selected':''}>Achat</option>
+              <option value="vente" ${e?.type==='vente'?'selected':''}>Vente</option>
             </select>
           </div>
         </div>
-        <div class="field"><label>Libellé</label><input id="ec-libelle" value="${escapeHtml(e?.libelle||'')}" placeholder="ex: Achat de foin, Cotisation membre..." spellcheck="true" lang="fr"></div>
+        <div class="field ${e?.type==='vente'?'':'hidden'}" id="ec-zoneVente">
+          <label>Reprendre le total d'un mois depuis le Livre des recettes</label>
+          <div style="display:flex; gap:8px;">
+            <input type="month" id="ec-moisRecettes">
+            <button class="btn-sm" type="button" id="ec-reprendreMois">Calculer</button>
+          </div>
+        </div>
+        <div class="field"><label>Libellé</label><input id="ec-libelle" value="${escapeHtml(e?.libelle||'')}" placeholder="ex: Achat de foin, Ventes de janvier 2025..." spellcheck="true" lang="fr"></div>
         <div class="form-grid">
           <div class="field"><label>Montant (€)</label><input type="number" step="0.01" id="ec-montant" value="${e?.montant ?? ''}"></div>
           <div class="field"><label>Compte comptable <span class="hint">— détermine automatiquement le % déductible</span></label>
@@ -2421,6 +2575,26 @@ window.ouvrirModalEcriture = (e) => {
       </div>
     </div>`;
   document.getElementById('modalZone').innerHTML = html;
+  document.getElementById('ec-type').addEventListener('change', () => {
+    document.getElementById('ec-zoneVente').classList.toggle('hidden', document.getElementById('ec-type').value !== 'vente');
+  });
+  document.getElementById('ec-reprendreMois').addEventListener('click', async () => {
+    const moisVal = document.getElementById('ec-moisRecettes').value;
+    if (!moisVal) { alert('Choisis un mois.'); return; }
+    const [an, mois] = moisVal.split('-');
+    const debut = `${an}-${mois}-01`;
+    const dernierJour = new Date(parseInt(an, 10), parseInt(mois, 10), 0).getDate();
+    const fin = `${an}-${mois}-${String(dernierJour).padStart(2,'0')}`;
+    const snapMois = await getDocs(query(collection(db, 'livre_recettes'), where('date', '>=', debut), where('date', '<=', fin)));
+    let total = 0;
+    snapMois.forEach(d => total += Number(d.data().montant) || 0);
+    document.getElementById('ec-montant').value = total.toFixed(2);
+    if (!document.getElementById('ec-libelle').value) {
+      const nomsMois = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+      document.getElementById('ec-libelle').value = `Ventes de ${nomsMois[parseInt(mois,10)-1]} ${an} — Livre des recettes`;
+    }
+    majInfoDeductible();
+  });
   const majInfoDeductible = () => {
     const compte = planComptableCache.find(c => c.id === document.getElementById('ec-compte').value);
     const taux = compte ? (compte.tauxDeductible ?? 100) : null;
@@ -2454,7 +2628,6 @@ window.ouvrirModalEcriture = (e) => {
       if (e) await updateDoc(doc(db, 'comptabilite_ecritures', e.id), data);
       else await addDoc(collection(db, 'comptabilite_ecritures'), { ...data, createdAtMs: Date.now() });
       window.fermerModal();
-      // Si l'écriture concerne une autre année que celle affichée, on bascule dessus.
       const anneeEcriture = parseInt(data.date.slice(0,4), 10);
       if (anneeEcriture !== compteActuelAnnee) {
         compteActuelAnnee = anneeEcriture;
@@ -2470,32 +2643,28 @@ window.ouvrirModalEcriture = (e) => {
 document.getElementById('btnExporterCompta').addEventListener('click', () => {
   const ecritures = window._ecrituresCompta || [];
   if (ecritures.length === 0) { alert('Aucune écriture à exporter pour ' + compteActuelAnnee + '.'); return; }
-  let solde = 0;
   const lignes = ecritures.map(e => {
     const montant = Number(e.montant) || 0;
-    solde += e.type === 'recette' ? montant : -montant;
     return {
       'Date': e.date,
       'Libellé': e.libelle || '',
       'Compte n°': e.compteNumero || '',
       'Intitulé compte': e.compteNom || '',
-      'Recette (€)': e.type === 'recette' ? montant : '',
-      'Dépense (€)': e.type === 'depense' ? montant : '',
+      'Achat (€)': e.type !== 'vente' ? montant : '',
+      'Vente (€)': e.type === 'vente' ? montant : '',
       '% déductible': e.tauxDeductible ?? '',
-      'Montant déductible (€)': e.montantDeductible ?? '',
-      'Solde (€)': Number(solde.toFixed(2))
+      'Montant déductible (€)': e.montantDeductible ?? ''
     };
   });
   const feuille = XLSX.utils.json_to_sheet(lignes);
-  feuille['!cols'] = [{wch:12},{wch:32},{wch:12},{wch:24},{wch:12},{wch:12},{wch:12},{wch:16},{wch:12}];
+  feuille['!cols'] = [{wch:12},{wch:32},{wch:12},{wch:24},{wch:12},{wch:12},{wch:12},{wch:16}];
   const classeur = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(classeur, feuille, String(compteActuelAnnee));
-  XLSX.writeFile(classeur, `Livre-de-caisse-Lar-Allegria-${compteActuelAnnee}.xlsx`);
+  XLSX.utils.book_append_sheet(classeur, feuille, `Compta ${compteActuelAnnee}`);
+  XLSX.writeFile(classeur, `Comptabilite-Lar-Allegria-${compteActuelAnnee}.xlsx`);
 });
 
 // ==========================================================================
-// LIVRE DES RECETTES — schéma minimum normalisé petites ASBL (comptabilité
-// simplifiée, AR 29/04/2019 - CSA Livre 3, Titre 4)
+// LIVRE DES RECETTES — une ligne par jour de l'année (journal des recettes)
 // ==========================================================================
 let anneeActuelleRecettes = new Date().getFullYear();
 
@@ -2509,123 +2678,57 @@ function initSelecteurAnneeRecettes() {
   sel.addEventListener('change', () => { anneeActuelleRecettes = parseInt(sel.value, 10); chargerLivreRecettes(); });
 }
 
-const CATEGORIES_LEGALES = {
-  cotisations: 'Cotisations',
-  dons_legs: 'Dons & legs',
-  subsides: 'Subsides',
-  autres: 'Autres recettes'
-};
-let categoriesRecettesCache = [];
-
-async function chargerCategoriesRecettes() {
-  const snap = await getDocs(collection(db, 'livre_recettes_categories'));
-  categoriesRecettesCache = [];
-  snap.forEach(d => categoriesRecettesCache.push({ id: d.id, ...d.data() }));
-  categoriesRecettesCache.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
-  const wrap = document.getElementById('listeCategoriesRecettes');
-  wrap.innerHTML = categoriesRecettesCache.length === 0
-    ? '<div class="empty-state">Aucune catégorie — clique sur "Initialiser" ou ajoutes-en une.</div>'
-    : categoriesRecettesCache.map(c => `
-      <div class="data-row">
-        <div class="data-main"><div class="data-title">${escapeHtml(c.nom)}</div><div class="data-sub">Compte légalement dans : ${CATEGORIES_LEGALES[c.categorieLegale] || '—'}</div></div>
-        <div class="data-actions"><button class="btn-sm danger" onclick="window.supprimerCategorieRecette('${c.id}')">Supprimer</button></div>
-      </div>`).join('');
-}
-document.getElementById('btnInitCategoriesRecettes').addEventListener('click', async () => {
-  if (!confirm("Créer les 4 catégories légales de base (Cotisations, Dons & legs, Subsides, Autres recettes) ? (à ne faire qu'une fois)")) return;
-  try {
-    await Promise.all(Object.entries(CATEGORIES_LEGALES).map(([val, nom]) =>
-      addDoc(collection(db, 'livre_recettes_categories'), { nom, categorieLegale: val })));
-    chargerCategoriesRecettes();
-  } catch (err) {
-    alert('Erreur : ' + (err.code || err.message));
-  }
-});
-document.getElementById('btnAjouterCategorieRecette').addEventListener('click', async () => {
-  const nom = document.getElementById('cr-nom').value.trim();
-  const categorieLegale = document.getElementById('cr-legale').value;
-  if (!nom) { alert('Merci de donner un nom à cette catégorie.'); return; }
-  try {
-    await addDoc(collection(db, 'livre_recettes_categories'), { nom, categorieLegale });
-    document.getElementById('cr-nom').value = '';
-    chargerCategoriesRecettes();
-  } catch (err) {
-    alert('Erreur : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore (voir le README, section 4).');
-  }
-});
-window.supprimerCategorieRecette = async (id) => {
-  if (!confirm('Supprimer cette catégorie ? (les recettes déjà encodées avec ne sont pas modifiées)')) return;
-  await deleteDoc(doc(db, 'livre_recettes_categories', id));
-  chargerCategoriesRecettes();
-};
-
 async function chargerLivreRecettes() {
   const corps = document.getElementById('corpsTableauRecettes');
-  const dateDebut = `${anneeActuelleRecettes}-01-01`;
-  const dateFin = `${anneeActuelleRecettes}-12-31`;
+  const an = anneeActuelleRecettes;
+  const dateDebut = `${an}-01-01`;
+  const dateFin = `${an}-12-31`;
   const snap = await getDocs(query(collection(db, 'livre_recettes'), where('date', '>=', dateDebut), where('date', '<=', dateFin)));
-  let recettes = [];
-  snap.forEach(d => recettes.push({ id: d.id, ...d.data() }));
-  // Ordre chronologique continu : une recette oubliée, ajoutée plus tard,
-  // reprend sa vraie place et tous les numéros d'ordre se réajustent.
-  recettes.sort((a, b) => a.date.localeCompare(b.date) || (a.createdAtMs||0) - (b.createdAtMs||0));
+  const parDate = {};
+  snap.forEach(d => { parDate[d.id] = d.data(); });
 
-  if (recettes.length === 0) {
-    corps.innerHTML = '<tr><td colspan="8" class="empty-state">Aucune recette encodée pour ' + anneeActuelleRecettes + '.</td></tr>';
-    document.getElementById('totauxRecettes').textContent = '';
-    return;
-  }
-
+  const bissextile = (an % 4 === 0 && (an % 100 !== 0 || an % 400 === 0));
+  const joursParMois = [31, bissextile ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   let total = 0;
-  const totauxParCategorieLegale = { cotisations: 0, dons_legs: 0, subsides: 0, autres: 0 };
-  corps.innerHTML = recettes.map((r, i) => {
-    const montant = Number(r.montant) || 0;
-    total += montant;
-    const legale = r.categorieLegale || 'autres';
-    totauxParCategorieLegale[legale] = (totauxParCategorieLegale[legale] || 0) + montant;
-    const dateLabel = new Date(r.date + 'T00:00:00').toLocaleDateString('fr-BE', { day:'2-digit', month:'2-digit', year:'numeric' });
-    return `<tr>
-      <td>${i + 1}</td>
-      <td>${dateLabel}</td>
-      <td>${escapeHtml(r.description||'')}</td>
-      <td>${escapeHtml(r.pieceJustificative||'')}</td>
-      <td>${escapeHtml(r.categorieNom || CATEGORIES_LEGALES[legale] || '')}</td>
-      <td class="montant-recette">${montant.toFixed(2)} €</td>
-      <td class="solde">${total.toFixed(2)} €</td>
-      <td>
-        <button class="btn-sm" onclick="window.editerRecette('${r.id}')">Modifier</button>
-        <button class="btn-sm danger" onclick="window.supprimerRecette('${r.id}')">Suppr.</button>
-      </td>
-    </tr>`;
-  }).join('');
-  document.getElementById('totauxRecettes').innerHTML =
-    `Total ${anneeActuelleRecettes} (schéma légal) — Cotisations : ${totauxParCategorieLegale.cotisations.toFixed(2)} € · Dons & legs : ${totauxParCategorieLegale.dons_legs.toFixed(2)} € · Subsides : ${totauxParCategorieLegale.subsides.toFixed(2)} € · Autres : ${totauxParCategorieLegale.autres.toFixed(2)} € · <strong>TOTAL GÉNÉRAL : ${total.toFixed(2)} €</strong>`;
-  window._livreRecettes = recettes;
+  let lignes = '';
+  for (let mois = 0; mois < 12; mois++) {
+    for (let jour = 1; jour <= joursParMois[mois]; jour++) {
+      const dateISO = `${an}-${String(mois+1).padStart(2,'0')}-${String(jour).padStart(2,'0')}`;
+      const r = parDate[dateISO];
+      const montant = r ? (Number(r.montant) || 0) : 0;
+      total += montant;
+      const dateLabel = capitalize(new Date(dateISO + 'T00:00:00').toLocaleDateString('fr-BE', { weekday:'short', day:'2-digit', month:'2-digit' }));
+      lignes += `<tr onclick="window.ouvrirModalRecette('${dateISO}')" style="cursor:pointer;">
+        <td>${dateLabel}</td>
+        <td class="${montant>0?'montant-recette':''}">${montant.toFixed(2)} €</td>
+        <td>${r?.factureJournalVente ? '✓' : ''}</td>
+        <td>${escapeHtml(r?.referenceJournalVente||'')}</td>
+        <td class="solde">${total.toFixed(2)} €</td>
+        <td><button class="btn-sm" onclick="event.stopPropagation(); window.ouvrirModalRecette('${dateISO}')">Éditer</button></td>
+      </tr>`;
+    }
+  }
+  corps.innerHTML = lignes;
+  document.getElementById('totauxRecettes').innerHTML = `<strong>Chiffre d'affaires ${an} : ${total.toFixed(2)} €</strong>`;
+  window._livreRecettesParDate = parDate;
+  window._livreRecettesAnnee = an;
 }
 
-document.getElementById('btnAjouterRecette').addEventListener('click', () => window.ouvrirModalRecette());
-window.editerRecette = (id) => window.ouvrirModalRecette((window._livreRecettes || []).find(r => r.id === id));
-window.supprimerRecette = async (id) => {
-  if (!confirm("Supprimer cette recette ? Pour rester dans l'esprit d'un livre chronologique inaltérable, mieux vaut normalement corriger une erreur plutôt que supprimer — à réserver aux vraies erreurs de saisie.")) return;
-  await deleteDoc(doc(db, 'livre_recettes', id));
-  chargerLivreRecettes();
-};
-window.ouvrirModalRecette = (r) => {
-  const optionsCategories = categoriesRecettesCache.map(c =>
-    `<option value="${c.id}" ${r?.categorieId === c.id ? 'selected' : ''}>${escapeHtml(c.nom)}</option>`).join('');
+window.ouvrirModalRecette = (dateISO) => {
+  const r = window._livreRecettesParDate[dateISO];
+  const dateLabel = capitalize(new Date(dateISO + 'T00:00:00').toLocaleDateString('fr-BE', { weekday:'long', day:'numeric', month:'long', year:'numeric' }));
   const html = `
     <div class="modal-overlay" id="modalOverlayRecette">
       <div class="modal-box">
-        <h3>${r ? 'Modifier la recette' : 'Ajouter une recette'}</h3>
-        <div class="form-grid">
-          <div class="field"><label>Date</label><input type="date" id="lr-date" value="${r?.date || dateISOLocale(new Date())}"></div>
-          <div class="field"><label>Catégorie <span class="hint">— gérer la liste ci-dessous</span></label><select id="lr-categorie">${optionsCategories || '<option value="">Aucune catégorie créée</option>'}</select></div>
+        <h3>Recette du ${dateLabel}</h3>
+        <div class="field"><label>Montant (€)</label><input type="number" step="0.01" id="lr-montant" value="${r?.montant ?? 0}"></div>
+        <div class="field"><label>Facturé (via journal de vente) ?</label>
+          <select id="lr-facture">
+            <option value="non" ${!r?.factureJournalVente?'selected':''}>Non</option>
+            <option value="oui" ${r?.factureJournalVente?'selected':''}>Oui</option>
+          </select>
         </div>
-        <div class="field"><label>Description</label><input id="lr-description" value="${escapeHtml(r?.description||'')}" placeholder="ex: Cotisation membre Untel, don anonyme..." spellcheck="true" lang="fr"></div>
-        <div class="form-grid">
-          <div class="field"><label>Montant (€)</label><input type="number" step="0.01" id="lr-montant" value="${r?.montant ?? ''}"></div>
-          <div class="field"><label>Pièce justificative <span class="hint">— n° de facture, reçu...</span></label><input id="lr-piece" value="${escapeHtml(r?.pieceJustificative||'')}"></div>
-        </div>
+        <div class="field"><label>Référence dans le journal de vente</label><input id="lr-reference" value="${escapeHtml(r?.referenceJournalVente||'')}" placeholder="ex: facture n°2025-014"></div>
         <div class="modal-actions">
           <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
           <button class="btn-sm primary" type="button" id="lr-save">Enregistrer</button>
@@ -2634,60 +2737,46 @@ window.ouvrirModalRecette = (r) => {
     </div>`;
   document.getElementById('modalZone').innerHTML = html;
   document.getElementById('lr-save').addEventListener('click', async () => {
-    const montant = parseFloat(document.getElementById('lr-montant').value);
-    if (!montant || montant <= 0) { alert('Merci d\'indiquer un montant valide.'); return; }
-    const categorieId = document.getElementById('lr-categorie').value;
-    const categorie = categoriesRecettesCache.find(c => c.id === categorieId);
-    if (!categorie) { alert('Merci de choisir une catégorie (crée-en une dans "Catégories de recettes" si la liste est vide).'); return; }
-    const data = {
-      date: document.getElementById('lr-date').value,
-      categorieId,
-      categorieNom: categorie.nom,
-      categorieLegale: categorie.categorieLegale,
-      description: document.getElementById('lr-description').value.trim(),
-      montant,
-      pieceJustificative: document.getElementById('lr-piece').value.trim()
-    };
-    if (!data.date) { alert('Merci d\'indiquer une date.'); return; }
+    const montant = parseFloat(document.getElementById('lr-montant').value) || 0;
+    const factureJournalVente = document.getElementById('lr-facture').value === 'oui';
+    const referenceJournalVente = document.getElementById('lr-reference').value.trim();
     try {
-      if (r) await updateDoc(doc(db, 'livre_recettes', r.id), data);
-      else await addDoc(collection(db, 'livre_recettes'), { ...data, createdAtMs: Date.now() });
+      await setDoc(doc(db, 'livre_recettes', dateISO), { date: dateISO, montant, factureJournalVente, referenceJournalVente }, { merge: true });
       window.fermerModal();
-      const anneeSaisie = parseInt(data.date.slice(0,4), 10);
-      if (anneeSaisie !== anneeActuelleRecettes) {
-        anneeActuelleRecettes = anneeSaisie;
-        document.getElementById('lr-annee').value = anneeSaisie;
-      }
       chargerLivreRecettes();
     } catch (err) {
-      alert('Erreur : ' + (err.code || err.message));
+      alert('Erreur : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore (voir le README, section 4).');
     }
   });
 };
 
 document.getElementById('btnExporterRecettes').addEventListener('click', () => {
-  const recettes = window._livreRecettes || [];
-  if (recettes.length === 0) { alert('Aucune recette à exporter pour ' + anneeActuelleRecettes + '.'); return; }
+  const parDate = window._livreRecettesParDate || {};
+  const an = window._livreRecettesAnnee || anneeActuelleRecettes;
+  const bissextile = (an % 4 === 0 && (an % 100 !== 0 || an % 400 === 0));
+  const joursParMois = [31, bissextile ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   let total = 0;
-  const lignes = recettes.map((r, i) => {
-    const montant = Number(r.montant) || 0;
-    total += montant;
-    return {
-      'N°': i + 1,
-      'Date': r.date,
-      'Description': r.description || '',
-      'Pièce justificative': r.pieceJustificative || '',
-      'Catégorie': r.categorieNom || '',
-      'Catégorie légale': CATEGORIES_LEGALES[r.categorieLegale] || '',
-      'Montant (€)': montant,
-      'Total cumulé (€)': Number(total.toFixed(2))
-    };
-  });
+  const lignes = [];
+  for (let mois = 0; mois < 12; mois++) {
+    for (let jour = 1; jour <= joursParMois[mois]; jour++) {
+      const dateISO = `${an}-${String(mois+1).padStart(2,'0')}-${String(jour).padStart(2,'0')}`;
+      const r = parDate[dateISO];
+      const montant = r ? (Number(r.montant) || 0) : 0;
+      total += montant;
+      lignes.push({
+        'Date': dateISO,
+        'Recette du jour (€)': montant,
+        'Facturé ?': r?.factureJournalVente ? 'Oui' : 'Non',
+        'Référence journal de vente': r?.referenceJournalVente || '',
+        'Cumul (€)': Number(total.toFixed(2))
+      });
+    }
+  }
   const feuille = XLSX.utils.json_to_sheet(lignes);
-  feuille['!cols'] = [{wch:5},{wch:12},{wch:32},{wch:16},{wch:18},{wch:16},{wch:12},{wch:14}];
+  feuille['!cols'] = [{wch:12},{wch:16},{wch:9},{wch:22},{wch:12}];
   const classeur = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(classeur, feuille, `Recettes ${anneeActuelleRecettes}`);
-  XLSX.writeFile(classeur, `Livre-des-recettes-Lar-Allegria-${anneeActuelleRecettes}.xlsx`);
+  XLSX.utils.book_append_sheet(classeur, feuille, `Recettes ${an}`);
+  XLSX.writeFile(classeur, `Livre-des-recettes-Lar-Allegria-${an}.xlsx`);
 });
 
 // ==========================================================================
