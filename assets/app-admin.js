@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-015';
+const VERSION_SITE = 'V01-016';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -65,6 +65,7 @@ onAuthStateChanged(auth, async (user) => {
   chargerPlanComptable();
   chargerCompta();
   initSelecteurAnneeRecettes();
+  chargerCategoriesRecettes();
   chargerLivreRecettes();
   chargerLivreOrAdmin();
   chargerConversations();
@@ -2314,18 +2315,20 @@ async function chargerPlanComptable() {
     ? '<div class="empty-state">Aucun compte encodé pour l\'instant.</div>'
     : planComptableCache.map(c => `
       <div class="data-row">
-        <div class="data-main"><div class="data-title">${escapeHtml(c.numero)} — ${escapeHtml(c.nom)}</div></div>
+        <div class="data-main"><div class="data-title">${escapeHtml(c.numero)} — ${escapeHtml(c.nom)} <span class="badge badge-neutral">${c.tauxDeductible ?? 100}% déductible</span></div></div>
         <div class="data-actions"><button class="btn-sm danger" onclick="window.supprimerCompteComptable('${c.id}')">Supprimer</button></div>
       </div>`).join('');
 }
 document.getElementById('btnAjouterCompte').addEventListener('click', async () => {
   const numero = document.getElementById('pc-numero').value.trim();
   const nom = document.getElementById('pc-nom').value.trim();
+  const tauxDeductible = Math.max(0, Math.min(100, parseFloat(document.getElementById('pc-deductible').value) || 0));
   if (!numero || !nom) { alert('Merci de renseigner le numéro et l\'intitulé du compte.'); return; }
   try {
-    await addDoc(collection(db, 'comptabilite_comptes'), { numero, nom });
+    await addDoc(collection(db, 'comptabilite_comptes'), { numero, nom, tauxDeductible });
     document.getElementById('pc-numero').value = '';
     document.getElementById('pc-nom').value = '';
+    document.getElementById('pc-deductible').value = '100';
     chargerPlanComptable();
   } catch (err) {
     alert('Erreur : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore (voir le README, section 4).');
@@ -2354,11 +2357,12 @@ async function chargerCompta() {
     return;
   }
 
-  let solde = 0, totalRecettes = 0, totalDepenses = 0;
+  let solde = 0, totalRecettes = 0, totalDepenses = 0, totalDeductible = 0;
   corps.innerHTML = ecritures.map(e => {
     const montant = Number(e.montant) || 0;
     if (e.type === 'recette') { solde += montant; totalRecettes += montant; }
     else { solde -= montant; totalDepenses += montant; }
+    totalDeductible += Number(e.montantDeductible) || 0;
     const dateLabel = new Date(e.date + 'T00:00:00').toLocaleDateString('fr-BE', { day:'2-digit', month:'2-digit', year:'numeric' });
     const compteLabel = e.compteNumero ? `${escapeHtml(e.compteNumero)} — ${escapeHtml(e.compteNom||'')}` : '—';
     return `<tr>
@@ -2367,7 +2371,7 @@ async function chargerCompta() {
       <td>${compteLabel}</td>
       <td class="montant-recette">${e.type==='recette' ? montant.toFixed(2)+' €' : ''}</td>
       <td class="montant-depense">${e.type==='depense' ? montant.toFixed(2)+' €' : ''}</td>
-      <td>${e.deductible ? '✓' : ''}</td>
+      <td>${e.montantDeductible ? e.montantDeductible.toFixed(2) + ' € (' + (e.tauxDeductible ?? 100) + '%)' : '—'}</td>
       <td class="solde">${solde.toFixed(2)} €</td>
       <td>
         <button class="btn-sm" onclick="window.editerEcritureCompta('${e.id}')">Modifier</button>
@@ -2376,7 +2380,7 @@ async function chargerCompta() {
     </tr>`;
   }).join('');
   document.getElementById('totauxCompta').textContent =
-    `Total ${compteActuelAnnee} — Recettes : ${totalRecettes.toFixed(2)} € · Dépenses : ${totalDepenses.toFixed(2)} € · Solde final : ${solde.toFixed(2)} €`;
+    `Total ${compteActuelAnnee} — Recettes : ${totalRecettes.toFixed(2)} € · Dépenses : ${totalDepenses.toFixed(2)} € · Solde final : ${solde.toFixed(2)} € · Total déductible : ${totalDeductible.toFixed(2)} €`;
   window._ecrituresCompta = ecritures;
 }
 
@@ -2405,16 +2409,11 @@ window.ouvrirModalEcriture = (e) => {
         <div class="field"><label>Libellé</label><input id="ec-libelle" value="${escapeHtml(e?.libelle||'')}" placeholder="ex: Achat de foin, Cotisation membre..." spellcheck="true" lang="fr"></div>
         <div class="form-grid">
           <div class="field"><label>Montant (€)</label><input type="number" step="0.01" id="ec-montant" value="${e?.montant ?? ''}"></div>
-          <div class="field"><label>Dépense déductible</label>
-            <select id="ec-deductible">
-              <option value="non" ${!e?.deductible?'selected':''}>Non</option>
-              <option value="oui" ${e?.deductible?'selected':''}>Oui</option>
-            </select>
+          <div class="field"><label>Compte comptable <span class="hint">— détermine automatiquement le % déductible</span></label>
+            <select id="ec-compte"><option value="">— Aucun —</option>${optionsComptes}</select>
           </div>
         </div>
-        <div class="field"><label>Compte comptable <span class="hint">— gérer les comptes disponibles dans "Plan comptable" ci-dessous</span></label>
-          <select id="ec-compte"><option value="">— Aucun —</option>${optionsComptes}</select>
-        </div>
+        <div class="data-sub" id="ec-infoDeductible" style="margin-bottom:10px;"></div>
         <div class="modal-actions">
           <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
           <button class="btn-sm primary" type="button" id="ec-save">Enregistrer</button>
@@ -2422,17 +2421,30 @@ window.ouvrirModalEcriture = (e) => {
       </div>
     </div>`;
   document.getElementById('modalZone').innerHTML = html;
+  const majInfoDeductible = () => {
+    const compte = planComptableCache.find(c => c.id === document.getElementById('ec-compte').value);
+    const taux = compte ? (compte.tauxDeductible ?? 100) : null;
+    const montant = parseFloat(document.getElementById('ec-montant').value) || 0;
+    document.getElementById('ec-infoDeductible').textContent = compte
+      ? `Déductible à ${taux}% pour ce compte → ${(montant * taux / 100).toFixed(2)} € déductible sur ce montant.`
+      : 'Choisis un compte comptable pour voir le % déductible applicable.';
+  };
+  document.getElementById('ec-compte').addEventListener('change', majInfoDeductible);
+  document.getElementById('ec-montant').addEventListener('input', majInfoDeductible);
+  majInfoDeductible();
   document.getElementById('ec-save').addEventListener('click', async () => {
     const compteId = document.getElementById('ec-compte').value;
     const compte = planComptableCache.find(c => c.id === compteId);
     const montant = parseFloat(document.getElementById('ec-montant').value);
     if (!montant || montant <= 0) { alert('Merci d\'indiquer un montant valide.'); return; }
+    const tauxDeductible = compte ? (compte.tauxDeductible ?? 100) : 0;
     const data = {
       date: document.getElementById('ec-date').value,
       type: document.getElementById('ec-type').value,
       libelle: document.getElementById('ec-libelle').value.trim(),
       montant,
-      deductible: document.getElementById('ec-deductible').value === 'oui',
+      tauxDeductible,
+      montantDeductible: Number((montant * tauxDeductible / 100).toFixed(2)),
       compteId: compteId || null,
       compteNumero: compte?.numero || '',
       compteNom: compte?.nom || ''
@@ -2469,12 +2481,13 @@ document.getElementById('btnExporterCompta').addEventListener('click', () => {
       'Intitulé compte': e.compteNom || '',
       'Recette (€)': e.type === 'recette' ? montant : '',
       'Dépense (€)': e.type === 'depense' ? montant : '',
-      'Déductible': e.deductible ? 'Oui' : 'Non',
+      '% déductible': e.tauxDeductible ?? '',
+      'Montant déductible (€)': e.montantDeductible ?? '',
       'Solde (€)': Number(solde.toFixed(2))
     };
   });
   const feuille = XLSX.utils.json_to_sheet(lignes);
-  feuille['!cols'] = [{wch:12},{wch:32},{wch:12},{wch:24},{wch:12},{wch:12},{wch:11},{wch:12}];
+  feuille['!cols'] = [{wch:12},{wch:32},{wch:12},{wch:24},{wch:12},{wch:12},{wch:12},{wch:16},{wch:12}];
   const classeur = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(classeur, feuille, String(compteActuelAnnee));
   XLSX.writeFile(classeur, `Livre-de-caisse-Lar-Allegria-${compteActuelAnnee}.xlsx`);
@@ -2496,11 +2509,54 @@ function initSelecteurAnneeRecettes() {
   sel.addEventListener('change', () => { anneeActuelleRecettes = parseInt(sel.value, 10); chargerLivreRecettes(); });
 }
 
-const CATEGORIES_RECETTES = {
+const CATEGORIES_LEGALES = {
   cotisations: 'Cotisations',
   dons_legs: 'Dons & legs',
   subsides: 'Subsides',
   autres: 'Autres recettes'
+};
+let categoriesRecettesCache = [];
+
+async function chargerCategoriesRecettes() {
+  const snap = await getDocs(collection(db, 'livre_recettes_categories'));
+  categoriesRecettesCache = [];
+  snap.forEach(d => categoriesRecettesCache.push({ id: d.id, ...d.data() }));
+  categoriesRecettesCache.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+  const wrap = document.getElementById('listeCategoriesRecettes');
+  wrap.innerHTML = categoriesRecettesCache.length === 0
+    ? '<div class="empty-state">Aucune catégorie — clique sur "Initialiser" ou ajoutes-en une.</div>'
+    : categoriesRecettesCache.map(c => `
+      <div class="data-row">
+        <div class="data-main"><div class="data-title">${escapeHtml(c.nom)}</div><div class="data-sub">Compte légalement dans : ${CATEGORIES_LEGALES[c.categorieLegale] || '—'}</div></div>
+        <div class="data-actions"><button class="btn-sm danger" onclick="window.supprimerCategorieRecette('${c.id}')">Supprimer</button></div>
+      </div>`).join('');
+}
+document.getElementById('btnInitCategoriesRecettes').addEventListener('click', async () => {
+  if (!confirm("Créer les 4 catégories légales de base (Cotisations, Dons & legs, Subsides, Autres recettes) ? (à ne faire qu'une fois)")) return;
+  try {
+    await Promise.all(Object.entries(CATEGORIES_LEGALES).map(([val, nom]) =>
+      addDoc(collection(db, 'livre_recettes_categories'), { nom, categorieLegale: val })));
+    chargerCategoriesRecettes();
+  } catch (err) {
+    alert('Erreur : ' + (err.code || err.message));
+  }
+});
+document.getElementById('btnAjouterCategorieRecette').addEventListener('click', async () => {
+  const nom = document.getElementById('cr-nom').value.trim();
+  const categorieLegale = document.getElementById('cr-legale').value;
+  if (!nom) { alert('Merci de donner un nom à cette catégorie.'); return; }
+  try {
+    await addDoc(collection(db, 'livre_recettes_categories'), { nom, categorieLegale });
+    document.getElementById('cr-nom').value = '';
+    chargerCategoriesRecettes();
+  } catch (err) {
+    alert('Erreur : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore (voir le README, section 4).');
+  }
+});
+window.supprimerCategorieRecette = async (id) => {
+  if (!confirm('Supprimer cette catégorie ? (les recettes déjà encodées avec ne sont pas modifiées)')) return;
+  await deleteDoc(doc(db, 'livre_recettes_categories', id));
+  chargerCategoriesRecettes();
 };
 
 async function chargerLivreRecettes() {
@@ -2515,28 +2571,26 @@ async function chargerLivreRecettes() {
   recettes.sort((a, b) => a.date.localeCompare(b.date) || (a.createdAtMs||0) - (b.createdAtMs||0));
 
   if (recettes.length === 0) {
-    corps.innerHTML = '<tr><td colspan="10" class="empty-state">Aucune recette encodée pour ' + anneeActuelleRecettes + '.</td></tr>';
+    corps.innerHTML = '<tr><td colspan="8" class="empty-state">Aucune recette encodée pour ' + anneeActuelleRecettes + '.</td></tr>';
     document.getElementById('totauxRecettes').textContent = '';
     return;
   }
 
   let total = 0;
-  const totauxParCategorie = { cotisations: 0, dons_legs: 0, subsides: 0, autres: 0 };
+  const totauxParCategorieLegale = { cotisations: 0, dons_legs: 0, subsides: 0, autres: 0 };
   corps.innerHTML = recettes.map((r, i) => {
     const montant = Number(r.montant) || 0;
     total += montant;
-    totauxParCategorie[r.categorie] = (totauxParCategorie[r.categorie] || 0) + montant;
+    const legale = r.categorieLegale || 'autres';
+    totauxParCategorieLegale[legale] = (totauxParCategorieLegale[legale] || 0) + montant;
     const dateLabel = new Date(r.date + 'T00:00:00').toLocaleDateString('fr-BE', { day:'2-digit', month:'2-digit', year:'numeric' });
-    const cellule = (cat) => r.categorie === cat ? `${montant.toFixed(2)} €` : '';
     return `<tr>
       <td>${i + 1}</td>
       <td>${dateLabel}</td>
       <td>${escapeHtml(r.description||'')}</td>
       <td>${escapeHtml(r.pieceJustificative||'')}</td>
-      <td class="montant-recette">${cellule('cotisations')}</td>
-      <td class="montant-recette">${cellule('dons_legs')}</td>
-      <td class="montant-recette">${cellule('subsides')}</td>
-      <td class="montant-recette">${cellule('autres')}</td>
+      <td>${escapeHtml(r.categorieNom || CATEGORIES_LEGALES[legale] || '')}</td>
+      <td class="montant-recette">${montant.toFixed(2)} €</td>
       <td class="solde">${total.toFixed(2)} €</td>
       <td>
         <button class="btn-sm" onclick="window.editerRecette('${r.id}')">Modifier</button>
@@ -2544,8 +2598,8 @@ async function chargerLivreRecettes() {
       </td>
     </tr>`;
   }).join('');
-  document.getElementById('totauxRecettes').textContent =
-    `Total ${anneeActuelleRecettes} — Cotisations : ${totauxParCategorie.cotisations.toFixed(2)} € · Dons & legs : ${totauxParCategorie.dons_legs.toFixed(2)} € · Subsides : ${totauxParCategorie.subsides.toFixed(2)} € · Autres : ${totauxParCategorie.autres.toFixed(2)} € · TOTAL GÉNÉRAL : ${total.toFixed(2)} €`;
+  document.getElementById('totauxRecettes').innerHTML =
+    `Total ${anneeActuelleRecettes} (schéma légal) — Cotisations : ${totauxParCategorieLegale.cotisations.toFixed(2)} € · Dons & legs : ${totauxParCategorieLegale.dons_legs.toFixed(2)} € · Subsides : ${totauxParCategorieLegale.subsides.toFixed(2)} € · Autres : ${totauxParCategorieLegale.autres.toFixed(2)} € · <strong>TOTAL GÉNÉRAL : ${total.toFixed(2)} €</strong>`;
   window._livreRecettes = recettes;
 }
 
@@ -2557,15 +2611,15 @@ window.supprimerRecette = async (id) => {
   chargerLivreRecettes();
 };
 window.ouvrirModalRecette = (r) => {
-  const optionsCategories = Object.entries(CATEGORIES_RECETTES).map(([val, label]) =>
-    `<option value="${val}" ${r?.categorie === val ? 'selected' : ''}>${label}</option>`).join('');
+  const optionsCategories = categoriesRecettesCache.map(c =>
+    `<option value="${c.id}" ${r?.categorieId === c.id ? 'selected' : ''}>${escapeHtml(c.nom)}</option>`).join('');
   const html = `
     <div class="modal-overlay" id="modalOverlayRecette">
       <div class="modal-box">
         <h3>${r ? 'Modifier la recette' : 'Ajouter une recette'}</h3>
         <div class="form-grid">
           <div class="field"><label>Date</label><input type="date" id="lr-date" value="${r?.date || dateISOLocale(new Date())}"></div>
-          <div class="field"><label>Catégorie <span class="hint">— schéma légal minimum</span></label><select id="lr-categorie">${optionsCategories}</select></div>
+          <div class="field"><label>Catégorie <span class="hint">— gérer la liste ci-dessous</span></label><select id="lr-categorie">${optionsCategories || '<option value="">Aucune catégorie créée</option>'}</select></div>
         </div>
         <div class="field"><label>Description</label><input id="lr-description" value="${escapeHtml(r?.description||'')}" placeholder="ex: Cotisation membre Untel, don anonyme..." spellcheck="true" lang="fr"></div>
         <div class="form-grid">
@@ -2582,9 +2636,14 @@ window.ouvrirModalRecette = (r) => {
   document.getElementById('lr-save').addEventListener('click', async () => {
     const montant = parseFloat(document.getElementById('lr-montant').value);
     if (!montant || montant <= 0) { alert('Merci d\'indiquer un montant valide.'); return; }
+    const categorieId = document.getElementById('lr-categorie').value;
+    const categorie = categoriesRecettesCache.find(c => c.id === categorieId);
+    if (!categorie) { alert('Merci de choisir une catégorie (crée-en une dans "Catégories de recettes" si la liste est vide).'); return; }
     const data = {
       date: document.getElementById('lr-date').value,
-      categorie: document.getElementById('lr-categorie').value,
+      categorieId,
+      categorieNom: categorie.nom,
+      categorieLegale: categorie.categorieLegale,
       description: document.getElementById('lr-description').value.trim(),
       montant,
       pieceJustificative: document.getElementById('lr-piece').value.trim()
@@ -2618,15 +2677,14 @@ document.getElementById('btnExporterRecettes').addEventListener('click', () => {
       'Date': r.date,
       'Description': r.description || '',
       'Pièce justificative': r.pieceJustificative || '',
-      'Cotisations (€)': r.categorie === 'cotisations' ? montant : '',
-      'Dons & legs (€)': r.categorie === 'dons_legs' ? montant : '',
-      'Subsides (€)': r.categorie === 'subsides' ? montant : '',
-      'Autres recettes (€)': r.categorie === 'autres' ? montant : '',
+      'Catégorie': r.categorieNom || '',
+      'Catégorie légale': CATEGORIES_LEGALES[r.categorieLegale] || '',
+      'Montant (€)': montant,
       'Total cumulé (€)': Number(total.toFixed(2))
     };
   });
   const feuille = XLSX.utils.json_to_sheet(lignes);
-  feuille['!cols'] = [{wch:5},{wch:12},{wch:32},{wch:16},{wch:13},{wch:13},{wch:11},{wch:15},{wch:14}];
+  feuille['!cols'] = [{wch:5},{wch:12},{wch:32},{wch:16},{wch:18},{wch:16},{wch:12},{wch:14}];
   const classeur = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(classeur, feuille, `Recettes ${anneeActuelleRecettes}`);
   XLSX.writeFile(classeur, `Livre-des-recettes-Lar-Allegria-${anneeActuelleRecettes}.xlsx`);
