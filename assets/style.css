@@ -216,6 +216,23 @@ nav.main-nav { margin-left: auto; }
   nav.main-nav a { font-size: 0.8rem; padding: 6px 8px; }
 }
 
+/* Si le menu ne tient plus sur une seule ligne à cette largeur, on bascule
+   en grille à colonnes fixes pour obtenir des lignes bien réparties (ex:
+   6+6) plutôt qu'un retour à la ligne du dernier lien tout seul. */
+@media (max-width: 1180px) and (min-width: 861px) {
+  nav.main-nav ul {
+    display: grid;
+    grid-template-columns: repeat(6, auto);
+    justify-content: center;
+    gap: 4px 6px;
+  }
+}
+@media (max-width: 980px) and (min-width: 861px) {
+  nav.main-nav ul {
+    grid-template-columns: repeat(4, auto);
+  }
+}
+
 @media (max-width: 860px) {
   .header-inner { flex-wrap: wrap; }
   nav.main-nav { margin-left: 0; }
