@@ -40,6 +40,7 @@
     <button class="tab-btn" data-tab="messages" id="tabMessagesBtn">Messages</button>
     <button class="tab-btn" data-tab="contenu">Contenu du site</button>
     <button class="tab-btn" data-tab="parametres">Paramètres</button>
+    <button class="tab-btn" data-tab="livrecaisse">💰 Livre de caisse</button>
     <button class="tab-btn" data-tab="comptabilite">📒 Comptabilité</button>
     <button class="tab-btn" data-tab="livrerecettes">📗 Livre des recettes</button>
     <button class="tab-btn hidden" data-tab="motsdepasse" id="tabMotsDePasseBtn">🔑 Mots de passe</button>
@@ -353,24 +354,57 @@
     </div>
   </div>
 
-  <!-- ==================== COMPTABILITÉ ==================== -->
+  <!-- ==================== LIVRE DE CAISSE ==================== -->
+  <div id="panel-livrecaisse" class="tab-panel hidden">
+    <div class="app-panel">
+      <div class="banner-alert info">
+        Mouvements en <strong>espèces uniquement</strong> (hors banque) : ce qui est payé ou encaissé en liquide. Renseigne un solde de départ, puis chaque mouvement fait évoluer le solde ligne par ligne.
+      </div>
+      <div class="section-heading" style="margin-top:14px;">
+        <h2>💰 Livre de caisse</h2>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <select id="lc-annee"></select>
+          <button class="btn-sm primary" id="btnAjouterMouvementCaisse">+ Ajouter un mouvement</button>
+          <button class="btn-sm" id="btnExporterCaisse">Exporter en Excel</button>
+        </div>
+      </div>
+      <div class="field" style="max-width:260px; margin-top:10px;">
+        <label>Solde de départ au 1er janvier (€)</label>
+        <input type="number" step="0.01" id="lc-soldeDepart">
+        <button class="btn-sm" id="btnSauverSoldeDepart" style="margin-top:6px;">Enregistrer le solde de départ</button>
+      </div>
+      <div style="overflow-x:auto; margin-top:14px;">
+        <table class="compta-table" id="tableauCaisse">
+          <thead>
+            <tr><th>Date</th><th>Libellé</th><th>Encaissé</th><th>Décaissé</th><th>Solde</th><th></th></tr>
+          </thead>
+          <tbody id="corpsTableauCaisse"><tr><td colspan="6" class="empty-state">Chargement...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="data-sub" id="totauxCaisse" style="margin-top:10px; font-weight:600;"></div>
+    </div>
+  </div>
+
+  <!-- ==================== COMPTABILITÉ (achats / ventes) ==================== -->
   <div id="panel-comptabilite" class="tab-panel hidden">
     <div class="app-panel">
-      <div class="section-heading">
-        <h2>📒 Livre de caisse</h2>
+      <div class="banner-alert info">
+        Encodage des <strong>achats</strong> et des <strong>ventes</strong> — les ventes reprennent normalement, une fois par mois, le total du Livre des recettes de ce mois-là (bouton dédié pour aller plus vite, valeur modifiable ensuite). Ça donne un compte de résultat simplifié achats / ventes.
+      </div>
+      <div class="section-heading" style="margin-top:14px;">
+        <h2>📒 Comptabilité — achats &amp; ventes</h2>
         <div style="display:flex; gap:8px; align-items:center;">
           <select id="cpt-annee"></select>
           <button class="btn-sm primary" id="btnAjouterEcriture">+ Ajouter une écriture</button>
           <button class="btn-sm" id="btnExporterCompta">Exporter en Excel</button>
         </div>
       </div>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Encodage des dépenses et des recettes depuis 2025, classées automatiquement par date (une écriture oubliée reprend sa place chronologique). Le solde se recalcule ligne par ligne.</p>
-      <div style="overflow-x:auto;">
+      <div style="overflow-x:auto; margin-top:10px;">
         <table class="compta-table" id="tableauCompta">
           <thead>
-            <tr><th>Date</th><th>Libellé</th><th>Compte</th><th>Recette</th><th>Dépense</th><th>Déductible</th><th>Solde</th><th></th></tr>
+            <tr><th>Date</th><th>Libellé</th><th>Compte</th><th>Achat</th><th>Vente</th><th>Déductible</th><th></th></tr>
           </thead>
-          <tbody id="corpsTableauCompta"><tr><td colspan="8" class="empty-state">Chargement...</td></tr></tbody>
+          <tbody id="corpsTableauCompta"><tr><td colspan="7" class="empty-state">Chargement...</td></tr></tbody>
         </table>
       </div>
       <div class="data-sub" id="totauxCompta" style="margin-top:10px; font-weight:600;"></div>
@@ -393,58 +427,31 @@
     </div>
   </div>
 
-  <!-- ==================== LIVRE DES RECETTES ==================== -->
+  <!-- ==================== LIVRE DES RECETTES (journal quotidien) ==================== -->
   <div id="panel-livrerecettes" class="tab-panel hidden">
     <div class="app-panel">
       <h2>📗 Livre des recettes</h2>
       <div class="banner-alert info" style="margin-top:10px;">
-        Format basé sur le schéma minimum normalisé des <strong>petites ASBL en comptabilité simplifiée</strong> (AR du 29 avril 2019, Code des sociétés et des associations, Livre 3, Titre 4) : les recettes sont enregistrées <strong>chronologiquement</strong>, sans "trou", réparties en 4 catégories (Cotisations / Dons et legs / Subsides / Autres recettes), avec référence à la pièce justificative. Ce total sert de base à l'état annuel des recettes et dépenses.<br><br>
-        <em>Je ne suis ni comptable ni juriste — vérifie avec ton comptable que ce format correspond bien au régime de ton ASBL avant de t'y fier pour tes obligations légales.</em>
+        Une ligne <strong>par jour de l'année</strong>, même à 0 € — pour qu'il n'y ait aucun "trou" dans l'enregistrement chronologique. Le total de l'année constitue le <strong>chiffre d'affaires</strong>. Si une partie de la recette d'un jour a été facturée, coche-le et indique la référence dans le journal de vente.<br><br>
+        <em>Je ne suis ni comptable ni juriste — vérifie ce format avec ton comptable avant de t'y fier pour tes obligations légales.</em>
       </div>
       <div class="section-heading" style="margin-top:16px;">
-        <div style="display:flex; gap:8px; align-items:center;">
-          <select id="lr-annee"></select>
-        </div>
-        <div style="display:flex; gap:8px; align-items:center;">
-          <button class="btn-sm primary" id="btnAjouterRecette">+ Ajouter une recette</button>
-          <button class="btn-sm" id="btnExporterRecettes">Exporter en Excel</button>
-        </div>
+        <select id="lr-annee"></select>
+        <button class="btn-sm" id="btnExporterRecettes">Exporter en Excel</button>
       </div>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Une recette ajoutée après coup reprend automatiquement sa place chronologique et le numéro d'ordre se réajuste — l'enregistrement reste continu.</p>
-      <div style="overflow-x:auto;">
+      <p style="color:var(--terre); font-size:0.85rem; margin: 8px 0;">Clique sur une ligne pour encoder ou modifier la recette de ce jour.</p>
+      <div style="overflow-x:auto; max-height:600px; overflow-y:auto; border:1px solid #E9DEC8; border-radius:var(--radius);">
         <table class="compta-table" id="tableauRecettes">
           <thead>
-            <tr><th>N°</th><th>Date</th><th>Description</th><th>Pièce justif.</th><th>Catégorie</th><th>Montant</th><th>Total cumulé</th><th></th></tr>
+            <tr><th>Date</th><th>Recette du jour</th><th>Facturé ?</th><th>Réf. journal de vente</th><th>Cumul</th><th></th></tr>
           </thead>
-          <tbody id="corpsTableauRecettes"><tr><td colspan="8" class="empty-state">Chargement...</td></tr></tbody>
+          <tbody id="corpsTableauRecettes"><tr><td colspan="6" class="empty-state">Chargement...</td></tr></tbody>
         </table>
       </div>
       <div class="data-sub" id="totauxRecettes" style="margin-top:10px; font-weight:600;"></div>
     </div>
-    <div class="app-panel">
-      <div class="section-heading">
-        <h2>Catégories de recettes</h2>
-        <button class="collapse-toggle" data-target="wrapCategoriesRecettes" aria-expanded="false">▸</button>
-      </div>
-      <div id="wrapCategoriesRecettes" class="hidden">
-        <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Crée autant de catégories que tu veux pour ton suivi (Abonnements, Autres cours...). Chacune est rattachée à l'une des 4 catégories légales, pour que le total annuel reste conforme au schéma minimum normalisé.</p>
-        <div class="form-grid">
-          <div class="field"><label>Nom de la catégorie</label><input id="cr-nom" placeholder="ex: Abonnements"></div>
-          <div class="field"><label>Catégorie légale correspondante</label>
-            <select id="cr-legale">
-              <option value="cotisations">Cotisations</option>
-              <option value="dons_legs">Dons &amp; legs</option>
-              <option value="subsides">Subsides</option>
-              <option value="autres" selected>Autres recettes</option>
-            </select>
-          </div>
-        </div>
-        <button class="btn-sm primary" id="btnAjouterCategorieRecette">+ Ajouter cette catégorie</button>
-        <button class="btn-sm" id="btnInitCategoriesRecettes" style="margin-left:8px;">Initialiser les 4 catégories légales de base</button>
-        <div class="data-list" id="listeCategoriesRecettes" style="margin-top:14px;"></div>
-      </div>
-    </div>
   </div>
+
 
   <!-- ==================== MOTS DE PASSE (super-admin uniquement) ==================== -->
   <div id="panel-motsdepasse" class="tab-panel hidden">

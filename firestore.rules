@@ -1,5 +1,5 @@
 // Projet : Lar-allegria
-// Site : Lar'Allegria by Lara Rossoux — V01-016
+// Site : Lar'Allegria by Lara Rossoux — V01-017
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -224,7 +224,10 @@ service cloud.firestore {
     match /livre_recettes/{id} {
       allow read, write: if estAdmin();
     }
-    match /livre_recettes_categories/{id} {
+    match /livre_caisse/{id} {
+      allow read, write: if estAdmin();
+    }
+    match /livre_caisse_parametres/{id} {
       allow read, write: if estAdmin();
     }
 
