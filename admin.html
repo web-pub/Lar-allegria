@@ -385,6 +385,7 @@
         <div class="form-grid">
           <div class="field"><label>Numéro de compte</label><input id="pc-numero" placeholder="ex: 604000"></div>
           <div class="field"><label>Intitulé</label><input id="pc-nom" placeholder="ex: Achats fournitures"></div>
+          <div class="field"><label>% déductible <span class="hint">— ex: 50 pour "Cadeaux (50%)"</span></label><input type="number" id="pc-deductible" min="0" max="100" value="100"></div>
         </div>
         <button class="btn-sm primary" id="btnAjouterCompte">+ Ajouter ce compte</button>
         <div class="data-list" id="listePlanComptable" style="margin-top:14px;"></div>
@@ -413,12 +414,35 @@
       <div style="overflow-x:auto;">
         <table class="compta-table" id="tableauRecettes">
           <thead>
-            <tr><th>N°</th><th>Date</th><th>Description</th><th>Pièce justif.</th><th>Cotisations</th><th>Dons &amp; legs</th><th>Subsides</th><th>Autres recettes</th><th>Total cumulé</th><th></th></tr>
+            <tr><th>N°</th><th>Date</th><th>Description</th><th>Pièce justif.</th><th>Catégorie</th><th>Montant</th><th>Total cumulé</th><th></th></tr>
           </thead>
-          <tbody id="corpsTableauRecettes"><tr><td colspan="10" class="empty-state">Chargement...</td></tr></tbody>
+          <tbody id="corpsTableauRecettes"><tr><td colspan="8" class="empty-state">Chargement...</td></tr></tbody>
         </table>
       </div>
       <div class="data-sub" id="totauxRecettes" style="margin-top:10px; font-weight:600;"></div>
+    </div>
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>Catégories de recettes</h2>
+        <button class="collapse-toggle" data-target="wrapCategoriesRecettes" aria-expanded="false">▸</button>
+      </div>
+      <div id="wrapCategoriesRecettes" class="hidden">
+        <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Crée autant de catégories que tu veux pour ton suivi (Abonnements, Autres cours...). Chacune est rattachée à l'une des 4 catégories légales, pour que le total annuel reste conforme au schéma minimum normalisé.</p>
+        <div class="form-grid">
+          <div class="field"><label>Nom de la catégorie</label><input id="cr-nom" placeholder="ex: Abonnements"></div>
+          <div class="field"><label>Catégorie légale correspondante</label>
+            <select id="cr-legale">
+              <option value="cotisations">Cotisations</option>
+              <option value="dons_legs">Dons &amp; legs</option>
+              <option value="subsides">Subsides</option>
+              <option value="autres" selected>Autres recettes</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn-sm primary" id="btnAjouterCategorieRecette">+ Ajouter cette catégorie</button>
+        <button class="btn-sm" id="btnInitCategoriesRecettes" style="margin-left:8px;">Initialiser les 4 catégories légales de base</button>
+        <div class="data-list" id="listeCategoriesRecettes" style="margin-top:14px;"></div>
+      </div>
     </div>
   </div>
 
