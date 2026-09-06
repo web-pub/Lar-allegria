@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-008';
+const VERSION_SITE = 'V01-013';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -61,6 +61,11 @@ onAuthStateChanged(auth, async (user) => {
   chargerIban();
   chargerActivites();
   chargerProgrammesActivites();
+  initSelecteurAnneeCompta();
+  chargerPlanComptable();
+  chargerCompta();
+  initSelecteurAnneeRecettes();
+  chargerLivreRecettes();
   chargerConversations();
   chargerDisponibilitesAdmin();
   chargerExceptionsAdmin();
@@ -139,7 +144,7 @@ function suggererIdentifiant(prenom, nom) {
 }
 // Mot de passe suggéré par défaut : 3 premières lettres du prénom + 3
 // premières lettres du nom + date de naissance en JJMM.
-// Ex: "Hélène Laruelle", née le 24/06/1984 -> "hellar2406"
+// Ex: "Jean Dupont", né le 03/07/1990 -> "jeandup0307"
 function suggererMotDePasse(prenom, nom, dateNaissanceISO) {
   const p = retirerAccents(prenom).toLowerCase().replace(/[^a-z]/g, '').slice(0, 3);
   const n = retirerAccents(nom).toLowerCase().replace(/[^a-z]/g, '').slice(0, 3);
@@ -170,6 +175,21 @@ function labelTypeMembre(type) {
 // ==========================================================================
 // RÉSERVATIONS — validation (une seule personne à la fois sur la piste)
 // ==========================================================================
+// Prévient automatiquement le membre par message interne quand Lara valide,
+// refuse ou annule une de ses réservations.
+async function notifierMembreReservation(membreId, texte) {
+  if (!membreId) return;
+  const maintenant = new Date().toISOString();
+  try {
+    await addDoc(collection(db, 'conversations', membreId, 'messages'), { texte, expediteur: 'admin', dateEnvoi: maintenant, lu: false });
+    await setDoc(doc(db, 'conversations', membreId), { dernierMessage: texte, dateDernierMessage: maintenant, nonLuMembre: true }, { merge: true });
+  } catch (err) { /* ne bloque jamais l'action principale de réservation */ }
+}
+function libelleDateHeure(dateISO, heure) {
+  const dateLabel = capitalize(new Date(dateISO + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
+  return `${dateLabel} à ${heure}`;
+}
+
 async function chargerReservationsAttente() {
   const snap = await getDocs(query(collection(db, 'reservations'), where('statut', '==', 'en_attente')));
   let resa = [];
@@ -195,26 +215,28 @@ async function chargerReservationsAttente() {
         ${alerte ? `<div class="banner-alert" style="margin-top:6px; padding:6px 10px; background:${alerte.couleur}1a; border-color:${alerte.couleur}; color:${alerte.couleur};">${alerte.texte}</div>` : ''}
       </div>
       <div class="data-actions">
-        <button class="btn-sm primary" onclick="window.validerReservation('${r.id}','${r.date}','${r.heureDebut}')">Valider</button>
-        <button class="btn-sm danger" onclick="window.refuserReservation('${r.id}')">Refuser</button>
+        <button class="btn-sm primary" onclick="window.validerReservation('${r.id}','${r.date}','${r.heureDebut}','${r.membreId}')">Valider</button>
+        <button class="btn-sm danger" onclick="window.refuserReservation('${r.id}','${r.date}','${r.heureDebut}','${r.membreId}')">Refuser</button>
       </div>
     </div>`;
   }));
   wrap.innerHTML = lignes.join('');
 }
 
-window.validerReservation = async (id, dateISO, heure) => {
+window.validerReservation = async (id, dateISO, heure, membreId) => {
   const snap = await getDocs(query(collection(db, 'reservations'), where('date', '==', dateISO), where('heureDebut', '==', heure), where('statut', '==', 'validee')));
   if (!snap.empty) {
     alert("Attention : une autre réservation est déjà validée sur ce créneau (une seule personne à la fois sur la piste). Refuse-la d'abord si tu veux valider celle-ci à la place.");
     return;
   }
   await updateDoc(doc(db, 'reservations', id), { statut: 'validee' });
+  notifierMembreReservation(membreId, `✅ Votre réservation du ${libelleDateHeure(dateISO, heure)} a été validée par Lara.`);
   chargerReservationsAttente();
   renderPlanningSemaine();
 };
-window.refuserReservation = async (id) => {
+window.refuserReservation = async (id, dateISO, heure, membreId) => {
   await updateDoc(doc(db, 'reservations', id), { statut: 'refusee' });
+  notifierMembreReservation(membreId, `❌ Votre demande de réservation du ${libelleDateHeure(dateISO, heure)} a été refusée par Lara.`);
   chargerReservationsAttente();
   renderPlanningSemaine();
 };
@@ -264,7 +286,12 @@ async function renderPlanningSemaine() {
 }
 window.annulerReservationAdmin = async (id) => {
   if (!confirm('Annuler cette réservation ?')) return;
+  const avant = await getDoc(doc(db, 'reservations', id));
   await updateDoc(doc(db, 'reservations', id), { statut: 'annulee' });
+  if (avant.exists()) {
+    const r = avant.data();
+    notifierMembreReservation(r.membreId, `⚠️ Votre réservation du ${libelleDateHeure(r.date, r.heureDebut)} a été annulée par Lara.`);
+  }
   chargerReservationsAttente();
   renderPlanningSemaine();
   chargerRecurrencesAdmin();
@@ -613,7 +640,7 @@ function renderMembres(filtre = '') {
       <div class="data-row">
         <div class="data-main">
           <div class="data-title">${escapeHtml(m.prenom)} ${escapeHtml(m.nom)}</div>
-          <div class="data-sub">${labelTypeMembre(m.typeMembre)} · ${escapeHtml(m.email||'')} ${m.typeMembre !== 'benevole' ? (m.cotisationPayee ? '<span class="badge badge-ok">Cotisation OK</span>' : '<span class="badge badge-warn">Cotisation à régler</span>') : ''} ${m.recurrenceCours === 'hebdomadaire' ? '<span class="badge badge-neutral">Cours 1x/semaine</span>' : m.recurrenceCours === 'bimensuelle' ? '<span class="badge badge-neutral">Cours 1x/2 semaines</span>' : ''}</div>
+          <div class="data-sub">${labelTypeMembre(m.typeMembre)} · ${escapeHtml(m.email||'')} ${m.typeMembre !== 'benevole' ? (m.cotisationPayee ? '<span class="badge badge-ok">Cotisation OK</span>' : '<span class="badge badge-warn">Cotisation à régler</span>') : ''} ${m.recurrenceCours === 'hebdomadaire' ? '<span class="badge badge-neutral">Cours 1x/semaine</span>' : m.recurrenceCours === 'bimensuelle' ? '<span class="badge badge-neutral">Cours 1x/2 semaines</span>' : ''} ${m.chefBenevoles ? '<span class="badge badge-danger">Chef des bénévoles</span>' : ''}</div>
         </div>
         <div class="data-actions">
           <button class="btn-sm" onclick="window.editerMembre('${m.id}')">Modifier</button>
@@ -669,6 +696,13 @@ window.ouvrirModalMembre = (membre, demandeId) => {
               <option value="benevole" ${src.typeMembre==='benevole'?'selected':''}>Membre bénévole</option>
             </select>
           </div>
+        </div>
+        <div class="field" id="fm-zoneChefBenevoles" style="${src.typeMembre==='benevole'?'':'display:none;'}">
+          <label>Chef des bénévoles <span class="hint">— peut ajouter ET retirer du stock (comme l'admin), mais n'a accès à rien d'autre côté admin</span></label>
+          <select id="fm-chefBenevoles">
+            <option value="non" ${!src.chefBenevoles?'selected':''}>Non</option>
+            <option value="oui" ${src.chefBenevoles?'selected':''}>Oui</option>
+          </select>
         </div>
         ${estNouveau ? `<div class="form-grid">
           <div class="field"><label>${d?.motDePasseSouhaite ? 'Mot de passe choisi par le membre *' : 'Mot de passe temporaire *'}</label><input id="fm-motdepasse" type="text" placeholder="ex: club4460" value="${escapeHtml(d?.motDePasseSouhaite || ('club' + Math.floor(1000+Math.random()*9000)))}"></div>
@@ -757,6 +791,7 @@ window.ouvrirModalMembre = (membre, demandeId) => {
   const majAffichageSelonType = () => {
     const estBenevole = document.getElementById('fm-type').value === 'benevole';
     document.getElementById('fm-zoneCotisationRecurrence').classList.toggle('hidden', estBenevole);
+    document.getElementById('fm-zoneChefBenevoles').style.display = estBenevole ? '' : 'none';
     const zoneHisto = document.getElementById('fm-zoneCoursHistorique');
     if (zoneHisto) zoneHisto.classList.toggle('hidden', estBenevole);
   };
@@ -807,6 +842,7 @@ window.ouvrirModalMembre = (membre, demandeId) => {
       cotisationPayee: document.getElementById('fm-cotisationPayee').value === 'oui',
       cotisationDateEcheance: document.getElementById('fm-cotisationEcheance').value,
       recurrenceCours: document.getElementById('fm-recurrenceCours').value,
+      chefBenevoles: document.getElementById('fm-chefBenevoles').value === 'oui',
       archive: false
     };
     if (estNouveau) {
@@ -2250,3 +2286,347 @@ async function chargerSauvegardesMdp() {
     </div>`;
   }).join('');
 }
+
+// ==========================================================================
+// COMPTABILITÉ — livre de caisse (recettes/dépenses), plan comptable, export
+// ==========================================================================
+let planComptableCache = [];
+let compteActuelAnnee = new Date().getFullYear();
+
+function initSelecteurAnneeCompta() {
+  const sel = document.getElementById('cpt-annee');
+  const anneeCourante = new Date().getFullYear();
+  const annees = [];
+  for (let a = 2025; a <= anneeCourante + 1; a++) annees.push(a);
+  sel.innerHTML = annees.map(a => `<option value="${a}" ${a === anneeCourante ? 'selected' : ''}>${a}</option>`).join('');
+  compteActuelAnnee = anneeCourante;
+  sel.addEventListener('change', () => { compteActuelAnnee = parseInt(sel.value, 10); chargerCompta(); });
+}
+
+async function chargerPlanComptable() {
+  const snap = await getDocs(collection(db, 'comptabilite_comptes'));
+  planComptableCache = [];
+  snap.forEach(d => planComptableCache.push({ id: d.id, ...d.data() }));
+  planComptableCache.sort((a, b) => (a.numero || '').localeCompare(b.numero || ''));
+  const wrap = document.getElementById('listePlanComptable');
+  wrap.innerHTML = planComptableCache.length === 0
+    ? '<div class="empty-state">Aucun compte encodé pour l\'instant.</div>'
+    : planComptableCache.map(c => `
+      <div class="data-row">
+        <div class="data-main"><div class="data-title">${escapeHtml(c.numero)} — ${escapeHtml(c.nom)}</div></div>
+        <div class="data-actions"><button class="btn-sm danger" onclick="window.supprimerCompteComptable('${c.id}')">Supprimer</button></div>
+      </div>`).join('');
+}
+document.getElementById('btnAjouterCompte').addEventListener('click', async () => {
+  const numero = document.getElementById('pc-numero').value.trim();
+  const nom = document.getElementById('pc-nom').value.trim();
+  if (!numero || !nom) { alert('Merci de renseigner le numéro et l\'intitulé du compte.'); return; }
+  try {
+    await addDoc(collection(db, 'comptabilite_comptes'), { numero, nom });
+    document.getElementById('pc-numero').value = '';
+    document.getElementById('pc-nom').value = '';
+    chargerPlanComptable();
+  } catch (err) {
+    alert('Erreur : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore (voir le README, section 4).');
+  }
+});
+window.supprimerCompteComptable = async (id) => {
+  if (!confirm('Supprimer ce compte du plan comptable ? (les écritures déjà encodées avec ce compte ne sont pas modifiées)')) return;
+  await deleteDoc(doc(db, 'comptabilite_comptes', id));
+  chargerPlanComptable();
+};
+
+async function chargerCompta() {
+  const corps = document.getElementById('corpsTableauCompta');
+  const dateDebut = `${compteActuelAnnee}-01-01`;
+  const dateFin = `${compteActuelAnnee}-12-31`;
+  const snap = await getDocs(query(collection(db, 'comptabilite_ecritures'), where('date', '>=', dateDebut), where('date', '<=', dateFin)));
+  let ecritures = [];
+  snap.forEach(d => ecritures.push({ id: d.id, ...d.data() }));
+  // Classement par date : une écriture ajoutée après coup reprend sa place
+  // chronologique plutôt que de s'ajouter en bas.
+  ecritures.sort((a, b) => a.date.localeCompare(b.date) || (a.createdAtMs||0) - (b.createdAtMs||0));
+
+  if (ecritures.length === 0) {
+    corps.innerHTML = '<tr><td colspan="8" class="empty-state">Aucune écriture pour ' + compteActuelAnnee + '.</td></tr>';
+    document.getElementById('totauxCompta').textContent = '';
+    return;
+  }
+
+  let solde = 0, totalRecettes = 0, totalDepenses = 0;
+  corps.innerHTML = ecritures.map(e => {
+    const montant = Number(e.montant) || 0;
+    if (e.type === 'recette') { solde += montant; totalRecettes += montant; }
+    else { solde -= montant; totalDepenses += montant; }
+    const dateLabel = new Date(e.date + 'T00:00:00').toLocaleDateString('fr-BE', { day:'2-digit', month:'2-digit', year:'numeric' });
+    const compteLabel = e.compteNumero ? `${escapeHtml(e.compteNumero)} — ${escapeHtml(e.compteNom||'')}` : '—';
+    return `<tr>
+      <td>${dateLabel}</td>
+      <td>${escapeHtml(e.libelle||'')}</td>
+      <td>${compteLabel}</td>
+      <td class="montant-recette">${e.type==='recette' ? montant.toFixed(2)+' €' : ''}</td>
+      <td class="montant-depense">${e.type==='depense' ? montant.toFixed(2)+' €' : ''}</td>
+      <td>${e.deductible ? '✓' : ''}</td>
+      <td class="solde">${solde.toFixed(2)} €</td>
+      <td>
+        <button class="btn-sm" onclick="window.editerEcritureCompta('${e.id}')">Modifier</button>
+        <button class="btn-sm danger" onclick="window.supprimerEcritureCompta('${e.id}')">Suppr.</button>
+      </td>
+    </tr>`;
+  }).join('');
+  document.getElementById('totauxCompta').textContent =
+    `Total ${compteActuelAnnee} — Recettes : ${totalRecettes.toFixed(2)} € · Dépenses : ${totalDepenses.toFixed(2)} € · Solde final : ${solde.toFixed(2)} €`;
+  window._ecrituresCompta = ecritures;
+}
+
+document.getElementById('btnAjouterEcriture').addEventListener('click', () => window.ouvrirModalEcriture());
+window.editerEcritureCompta = (id) => window.ouvrirModalEcriture((window._ecrituresCompta || []).find(e => e.id === id));
+window.supprimerEcritureCompta = async (id) => {
+  if (!confirm('Supprimer cette écriture ?')) return;
+  await deleteDoc(doc(db, 'comptabilite_ecritures', id));
+  chargerCompta();
+};
+window.ouvrirModalEcriture = (e) => {
+  const optionsComptes = planComptableCache.map(c => `<option value="${c.id}" ${e?.compteId===c.id?'selected':''}>${escapeHtml(c.numero)} — ${escapeHtml(c.nom)}</option>`).join('');
+  const html = `
+    <div class="modal-overlay" id="modalOverlayEcriture">
+      <div class="modal-box">
+        <h3>${e ? 'Modifier l\'écriture' : 'Ajouter une écriture'}</h3>
+        <div class="form-grid">
+          <div class="field"><label>Date</label><input type="date" id="ec-date" value="${e?.date || dateISOLocale(new Date())}"></div>
+          <div class="field"><label>Type</label>
+            <select id="ec-type">
+              <option value="depense" ${e?.type!=='recette'?'selected':''}>Dépense</option>
+              <option value="recette" ${e?.type==='recette'?'selected':''}>Recette</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Libellé</label><input id="ec-libelle" value="${escapeHtml(e?.libelle||'')}" placeholder="ex: Achat de foin, Cotisation membre..." spellcheck="true" lang="fr"></div>
+        <div class="form-grid">
+          <div class="field"><label>Montant (€)</label><input type="number" step="0.01" id="ec-montant" value="${e?.montant ?? ''}"></div>
+          <div class="field"><label>Dépense déductible</label>
+            <select id="ec-deductible">
+              <option value="non" ${!e?.deductible?'selected':''}>Non</option>
+              <option value="oui" ${e?.deductible?'selected':''}>Oui</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Compte comptable <span class="hint">— gérer les comptes disponibles dans "Plan comptable" ci-dessous</span></label>
+          <select id="ec-compte"><option value="">— Aucun —</option>${optionsComptes}</select>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
+          <button class="btn-sm primary" type="button" id="ec-save">Enregistrer</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modalZone').innerHTML = html;
+  document.getElementById('ec-save').addEventListener('click', async () => {
+    const compteId = document.getElementById('ec-compte').value;
+    const compte = planComptableCache.find(c => c.id === compteId);
+    const montant = parseFloat(document.getElementById('ec-montant').value);
+    if (!montant || montant <= 0) { alert('Merci d\'indiquer un montant valide.'); return; }
+    const data = {
+      date: document.getElementById('ec-date').value,
+      type: document.getElementById('ec-type').value,
+      libelle: document.getElementById('ec-libelle').value.trim(),
+      montant,
+      deductible: document.getElementById('ec-deductible').value === 'oui',
+      compteId: compteId || null,
+      compteNumero: compte?.numero || '',
+      compteNom: compte?.nom || ''
+    };
+    if (!data.date) { alert('Merci d\'indiquer une date.'); return; }
+    try {
+      if (e) await updateDoc(doc(db, 'comptabilite_ecritures', e.id), data);
+      else await addDoc(collection(db, 'comptabilite_ecritures'), { ...data, createdAtMs: Date.now() });
+      window.fermerModal();
+      // Si l'écriture concerne une autre année que celle affichée, on bascule dessus.
+      const anneeEcriture = parseInt(data.date.slice(0,4), 10);
+      if (anneeEcriture !== compteActuelAnnee) {
+        compteActuelAnnee = anneeEcriture;
+        document.getElementById('cpt-annee').value = anneeEcriture;
+      }
+      chargerCompta();
+    } catch (err) {
+      alert('Erreur : ' + (err.code || err.message));
+    }
+  });
+};
+
+document.getElementById('btnExporterCompta').addEventListener('click', () => {
+  const ecritures = window._ecrituresCompta || [];
+  if (ecritures.length === 0) { alert('Aucune écriture à exporter pour ' + compteActuelAnnee + '.'); return; }
+  let solde = 0;
+  const lignes = ecritures.map(e => {
+    const montant = Number(e.montant) || 0;
+    solde += e.type === 'recette' ? montant : -montant;
+    return {
+      'Date': e.date,
+      'Libellé': e.libelle || '',
+      'Compte n°': e.compteNumero || '',
+      'Intitulé compte': e.compteNom || '',
+      'Recette (€)': e.type === 'recette' ? montant : '',
+      'Dépense (€)': e.type === 'depense' ? montant : '',
+      'Déductible': e.deductible ? 'Oui' : 'Non',
+      'Solde (€)': Number(solde.toFixed(2))
+    };
+  });
+  const feuille = XLSX.utils.json_to_sheet(lignes);
+  feuille['!cols'] = [{wch:12},{wch:32},{wch:12},{wch:24},{wch:12},{wch:12},{wch:11},{wch:12}];
+  const classeur = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(classeur, feuille, String(compteActuelAnnee));
+  XLSX.writeFile(classeur, `Livre-de-caisse-Lar-Allegria-${compteActuelAnnee}.xlsx`);
+});
+
+// ==========================================================================
+// LIVRE DES RECETTES — schéma minimum normalisé petites ASBL (comptabilité
+// simplifiée, AR 29/04/2019 - CSA Livre 3, Titre 4)
+// ==========================================================================
+let anneeActuelleRecettes = new Date().getFullYear();
+
+function initSelecteurAnneeRecettes() {
+  const sel = document.getElementById('lr-annee');
+  const anneeCourante = new Date().getFullYear();
+  const annees = [];
+  for (let a = 2025; a <= anneeCourante + 1; a++) annees.push(a);
+  sel.innerHTML = annees.map(a => `<option value="${a}" ${a === anneeCourante ? 'selected' : ''}>${a}</option>`).join('');
+  anneeActuelleRecettes = anneeCourante;
+  sel.addEventListener('change', () => { anneeActuelleRecettes = parseInt(sel.value, 10); chargerLivreRecettes(); });
+}
+
+const CATEGORIES_RECETTES = {
+  cotisations: 'Cotisations',
+  dons_legs: 'Dons & legs',
+  subsides: 'Subsides',
+  autres: 'Autres recettes'
+};
+
+async function chargerLivreRecettes() {
+  const corps = document.getElementById('corpsTableauRecettes');
+  const dateDebut = `${anneeActuelleRecettes}-01-01`;
+  const dateFin = `${anneeActuelleRecettes}-12-31`;
+  const snap = await getDocs(query(collection(db, 'livre_recettes'), where('date', '>=', dateDebut), where('date', '<=', dateFin)));
+  let recettes = [];
+  snap.forEach(d => recettes.push({ id: d.id, ...d.data() }));
+  // Ordre chronologique continu : une recette oubliée, ajoutée plus tard,
+  // reprend sa vraie place et tous les numéros d'ordre se réajustent.
+  recettes.sort((a, b) => a.date.localeCompare(b.date) || (a.createdAtMs||0) - (b.createdAtMs||0));
+
+  if (recettes.length === 0) {
+    corps.innerHTML = '<tr><td colspan="10" class="empty-state">Aucune recette encodée pour ' + anneeActuelleRecettes + '.</td></tr>';
+    document.getElementById('totauxRecettes').textContent = '';
+    return;
+  }
+
+  let total = 0;
+  const totauxParCategorie = { cotisations: 0, dons_legs: 0, subsides: 0, autres: 0 };
+  corps.innerHTML = recettes.map((r, i) => {
+    const montant = Number(r.montant) || 0;
+    total += montant;
+    totauxParCategorie[r.categorie] = (totauxParCategorie[r.categorie] || 0) + montant;
+    const dateLabel = new Date(r.date + 'T00:00:00').toLocaleDateString('fr-BE', { day:'2-digit', month:'2-digit', year:'numeric' });
+    const cellule = (cat) => r.categorie === cat ? `${montant.toFixed(2)} €` : '';
+    return `<tr>
+      <td>${i + 1}</td>
+      <td>${dateLabel}</td>
+      <td>${escapeHtml(r.description||'')}</td>
+      <td>${escapeHtml(r.pieceJustificative||'')}</td>
+      <td class="montant-recette">${cellule('cotisations')}</td>
+      <td class="montant-recette">${cellule('dons_legs')}</td>
+      <td class="montant-recette">${cellule('subsides')}</td>
+      <td class="montant-recette">${cellule('autres')}</td>
+      <td class="solde">${total.toFixed(2)} €</td>
+      <td>
+        <button class="btn-sm" onclick="window.editerRecette('${r.id}')">Modifier</button>
+        <button class="btn-sm danger" onclick="window.supprimerRecette('${r.id}')">Suppr.</button>
+      </td>
+    </tr>`;
+  }).join('');
+  document.getElementById('totauxRecettes').textContent =
+    `Total ${anneeActuelleRecettes} — Cotisations : ${totauxParCategorie.cotisations.toFixed(2)} € · Dons & legs : ${totauxParCategorie.dons_legs.toFixed(2)} € · Subsides : ${totauxParCategorie.subsides.toFixed(2)} € · Autres : ${totauxParCategorie.autres.toFixed(2)} € · TOTAL GÉNÉRAL : ${total.toFixed(2)} €`;
+  window._livreRecettes = recettes;
+}
+
+document.getElementById('btnAjouterRecette').addEventListener('click', () => window.ouvrirModalRecette());
+window.editerRecette = (id) => window.ouvrirModalRecette((window._livreRecettes || []).find(r => r.id === id));
+window.supprimerRecette = async (id) => {
+  if (!confirm("Supprimer cette recette ? Pour rester dans l'esprit d'un livre chronologique inaltérable, mieux vaut normalement corriger une erreur plutôt que supprimer — à réserver aux vraies erreurs de saisie.")) return;
+  await deleteDoc(doc(db, 'livre_recettes', id));
+  chargerLivreRecettes();
+};
+window.ouvrirModalRecette = (r) => {
+  const optionsCategories = Object.entries(CATEGORIES_RECETTES).map(([val, label]) =>
+    `<option value="${val}" ${r?.categorie === val ? 'selected' : ''}>${label}</option>`).join('');
+  const html = `
+    <div class="modal-overlay" id="modalOverlayRecette">
+      <div class="modal-box">
+        <h3>${r ? 'Modifier la recette' : 'Ajouter une recette'}</h3>
+        <div class="form-grid">
+          <div class="field"><label>Date</label><input type="date" id="lr-date" value="${r?.date || dateISOLocale(new Date())}"></div>
+          <div class="field"><label>Catégorie <span class="hint">— schéma légal minimum</span></label><select id="lr-categorie">${optionsCategories}</select></div>
+        </div>
+        <div class="field"><label>Description</label><input id="lr-description" value="${escapeHtml(r?.description||'')}" placeholder="ex: Cotisation membre Untel, don anonyme..." spellcheck="true" lang="fr"></div>
+        <div class="form-grid">
+          <div class="field"><label>Montant (€)</label><input type="number" step="0.01" id="lr-montant" value="${r?.montant ?? ''}"></div>
+          <div class="field"><label>Pièce justificative <span class="hint">— n° de facture, reçu...</span></label><input id="lr-piece" value="${escapeHtml(r?.pieceJustificative||'')}"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
+          <button class="btn-sm primary" type="button" id="lr-save">Enregistrer</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modalZone').innerHTML = html;
+  document.getElementById('lr-save').addEventListener('click', async () => {
+    const montant = parseFloat(document.getElementById('lr-montant').value);
+    if (!montant || montant <= 0) { alert('Merci d\'indiquer un montant valide.'); return; }
+    const data = {
+      date: document.getElementById('lr-date').value,
+      categorie: document.getElementById('lr-categorie').value,
+      description: document.getElementById('lr-description').value.trim(),
+      montant,
+      pieceJustificative: document.getElementById('lr-piece').value.trim()
+    };
+    if (!data.date) { alert('Merci d\'indiquer une date.'); return; }
+    try {
+      if (r) await updateDoc(doc(db, 'livre_recettes', r.id), data);
+      else await addDoc(collection(db, 'livre_recettes'), { ...data, createdAtMs: Date.now() });
+      window.fermerModal();
+      const anneeSaisie = parseInt(data.date.slice(0,4), 10);
+      if (anneeSaisie !== anneeActuelleRecettes) {
+        anneeActuelleRecettes = anneeSaisie;
+        document.getElementById('lr-annee').value = anneeSaisie;
+      }
+      chargerLivreRecettes();
+    } catch (err) {
+      alert('Erreur : ' + (err.code || err.message));
+    }
+  });
+};
+
+document.getElementById('btnExporterRecettes').addEventListener('click', () => {
+  const recettes = window._livreRecettes || [];
+  if (recettes.length === 0) { alert('Aucune recette à exporter pour ' + anneeActuelleRecettes + '.'); return; }
+  let total = 0;
+  const lignes = recettes.map((r, i) => {
+    const montant = Number(r.montant) || 0;
+    total += montant;
+    return {
+      'N°': i + 1,
+      'Date': r.date,
+      'Description': r.description || '',
+      'Pièce justificative': r.pieceJustificative || '',
+      'Cotisations (€)': r.categorie === 'cotisations' ? montant : '',
+      'Dons & legs (€)': r.categorie === 'dons_legs' ? montant : '',
+      'Subsides (€)': r.categorie === 'subsides' ? montant : '',
+      'Autres recettes (€)': r.categorie === 'autres' ? montant : '',
+      'Total cumulé (€)': Number(total.toFixed(2))
+    };
+  });
+  const feuille = XLSX.utils.json_to_sheet(lignes);
+  feuille['!cols'] = [{wch:5},{wch:12},{wch:32},{wch:16},{wch:13},{wch:13},{wch:11},{wch:15},{wch:14}];
+  const classeur = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(classeur, feuille, `Recettes ${anneeActuelleRecettes}`);
+  XLSX.writeFile(classeur, `Livre-des-recettes-Lar-Allegria-${anneeActuelleRecettes}.xlsx`);
+});

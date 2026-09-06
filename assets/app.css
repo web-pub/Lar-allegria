@@ -586,3 +586,16 @@
     justify-content: flex-start;
   }
 }
+
+/* Livre de caisse (onglet Comptabilité) */
+.compta-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; min-width: 720px; }
+.compta-table th {
+  text-align: left; padding: 8px 10px; background: var(--paper-warm);
+  border-bottom: 2px solid #DCCBA8; font-size: 0.76rem; text-transform: uppercase;
+  letter-spacing: 0.03em; color: var(--terre);
+}
+.compta-table td { padding: 8px 10px; border-bottom: 1px solid #EDE3D0; vertical-align: top; }
+.compta-table tr:hover td { background: rgba(232,162,48,0.06); }
+.compta-table td.montant-recette { color: #2C6E3F; font-weight: 600; white-space: nowrap; }
+.compta-table td.montant-depense { color: #8A2E2E; font-weight: 600; white-space: nowrap; }
+.compta-table td.solde { font-weight: 700; white-space: nowrap; }

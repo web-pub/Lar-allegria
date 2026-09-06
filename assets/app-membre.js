@@ -5,7 +5,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-008';
+const VERSION_SITE = 'V01-013';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -43,6 +43,7 @@ onAuthStateChanged(auth, async (user) => {
   document.getElementById('tabChevalBtn').classList.toggle('hidden', membreData.typeMembre !== 'pension');
   document.getElementById('tabNettoyageBtn').classList.toggle('hidden', membreData.typeMembre !== 'pension');
   document.getElementById('tabBenevolatBtn').classList.toggle('hidden', membreData.typeMembre !== 'benevole');
+  document.getElementById('tabStockBtn').classList.toggle('hidden', membreData.typeMembre !== 'benevole');
   document.getElementById('resaTypeChoix').classList.toggle('hidden', membreData.typeMembre !== 'pension');
 
   afficherAccueil();
@@ -633,11 +634,11 @@ async function chargerActivites() {
   const paramDoc = await getDoc(doc(db, 'parametres', 'bancaire'));
   const iban = paramDoc.exists() ? (paramDoc.data().iban || '') : '';
 
-  const reponseSnap = await getDocs(collection(db, 'activites_reponses'));
+  const reponseSnap = await getDocs(query(collection(db, 'activites_reponses'), where('uid', '==', membreUid)));
   const mesReponses = {};
   reponseSnap.forEach(d => {
     const r = d.data();
-    if (r.uid === membreUid) mesReponses[r.activiteId] = { id: d.id, ...r };
+    mesReponses[r.activiteId] = { id: d.id, ...r };
   });
 
   wrap.innerHTML = activites.map(a => {
@@ -1029,7 +1030,8 @@ async function chargerStockMembre() {
           <div class="data-sub">${s.quantite <= 0 ? '<span class="badge badge-danger">Épuisé</span>' : `${s.quantite} ${escapeHtml(s.unite || '')} en stock`}</div>
         </div>
         <div class="data-actions">
-          <button class="btn-sm" ${s.quantite <= 0 ? 'disabled' : ''} onclick="window.signalerPriseStock('${s.id}')">J'ai pris quelque chose</button>
+          ${membreData.chefBenevoles ? `<button class="btn-sm primary" onclick="window.ajouterStock('${s.id}')">+ Ajouter</button>` : ''}
+          <button class="btn-sm" ${s.quantite <= 0 ? 'disabled' : ''} onclick="window.signalerPriseStock('${s.id}')">${membreData.chefBenevoles ? '− Retirer' : "J'ai pris quelque chose"}</button>
         </div>
       </div>`).join('');
   } catch (err) {
@@ -1052,6 +1054,31 @@ window.signalerPriseStock = async (id) => {
       nom: item.nom,
       quantitePrise: quantite,
       unite: item.unite || '',
+      typeMouvement: 'retrait',
+      dateSignalement: new Date().toISOString()
+    });
+    await chargerStockMembre();
+  } catch (err) {
+    alert('Erreur : ' + (err.code || err.message));
+  }
+};
+window.ajouterStock = async (id) => {
+  const item = stockCache.find(s => s.id === id);
+  if (!item) return;
+  const quantiteStr = prompt(`Quelle quantité de "${item.nom}" ajoutes-tu au stock ? (unité : ${item.unite || '—'})`, '1');
+  if (quantiteStr === null) return;
+  const quantite = parseFloat(quantiteStr.replace(',', '.'));
+  if (!quantite || quantite <= 0) { alert('Merci d\'indiquer une quantité valide.'); return; }
+  const nouvelleQuantite = (item.quantite || 0) + quantite;
+  try {
+    await updateDoc(doc(db, 'stock', id), { quantite: nouvelleQuantite });
+    await addDoc(collection(db, 'stock_signalements'), {
+      membreId: membreUid,
+      stockId: id,
+      nom: item.nom,
+      quantitePrise: quantite,
+      unite: item.unite || '',
+      typeMouvement: 'ajout',
       dateSignalement: new Date().toISOString()
     });
     await chargerStockMembre();
