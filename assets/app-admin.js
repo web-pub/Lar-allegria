@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-013';
+const VERSION_SITE = 'V01-014';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -66,6 +66,7 @@ onAuthStateChanged(auth, async (user) => {
   chargerCompta();
   initSelecteurAnneeRecettes();
   chargerLivreRecettes();
+  chargerLivreOrAdmin();
   chargerConversations();
   chargerDisponibilitesAdmin();
   chargerExceptionsAdmin();
@@ -2630,3 +2631,54 @@ document.getElementById('btnExporterRecettes').addEventListener('click', () => {
   XLSX.utils.book_append_sheet(classeur, feuille, `Recettes ${anneeActuelleRecettes}`);
   XLSX.writeFile(classeur, `Livre-des-recettes-Lar-Allegria-${anneeActuelleRecettes}.xlsx`);
 });
+
+// ==========================================================================
+// LIVRE D'OR — modération des messages publics
+// ==========================================================================
+async function chargerLivreOrAdmin() {
+  const snap = await getDocs(collection(db, 'livre_or'));
+  let messages = [];
+  snap.forEach(d => messages.push({ id: d.id, ...d.data() }));
+  messages.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  const enAttente = messages.filter(m => m.statut === 'en_attente');
+  const publies = messages.filter(m => m.statut === 'publie');
+
+  const ligneAttente = (m) => `
+    <div class="data-row">
+      <div class="data-main">
+        <div class="data-title">${escapeHtml(m.nom)}</div>
+        <div class="data-sub">${escapeHtml(m.message)}</div>
+      </div>
+      <div class="data-actions">
+        <button class="btn-sm primary" onclick="window.publierLivreOr('${m.id}')">Publier</button>
+        <button class="btn-sm danger" onclick="window.supprimerLivreOr('${m.id}')">Refuser</button>
+      </div>
+    </div>`;
+  const lignePubliee = (m) => `
+    <div class="data-row">
+      <div class="data-main">
+        <div class="data-title">${escapeHtml(m.nom)}</div>
+        <div class="data-sub">${escapeHtml(m.message)}</div>
+      </div>
+      <div class="data-actions">
+        <button class="btn-sm danger" onclick="window.supprimerLivreOr('${m.id}')">Supprimer</button>
+      </div>
+    </div>`;
+
+  document.getElementById('listeLivreOrAttente').innerHTML =
+    enAttente.length ? enAttente.map(ligneAttente).join('') : '<div class="empty-state">Aucun message en attente.</div>';
+  document.getElementById('listeLivreOrPublies').innerHTML =
+    publies.length ? publies.map(lignePubliee).join('') : '<div class="empty-state">Aucun message publié pour l\'instant.</div>';
+
+  window._livreOr = messages;
+}
+window.publierLivreOr = async (id) => {
+  await updateDoc(doc(db, 'livre_or', id), { statut: 'publie' });
+  chargerLivreOrAdmin();
+};
+window.supprimerLivreOr = async (id) => {
+  if (!confirm('Supprimer ce message ?')) return;
+  await deleteDoc(doc(db, 'livre_or', id));
+  chargerLivreOrAdmin();
+};
