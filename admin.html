@@ -97,6 +97,23 @@
       </div>
     </div>
     <div class="app-panel">
+      <div class="section-heading"><h2>🔍 Historique des réservations (contrôle)</h2>
+        <button class="collapse-toggle" data-target="wrapHistoriqueResa" aria-expanded="false">▸</button>
+      </div>
+      <div id="wrapHistoriqueResa" class="hidden">
+        <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Retrouve qui est venu (ou doit venir) sur n'importe quelle période, passée ou future — utile en cas de contrôle. Exporte le résultat en Excel.</p>
+        <div class="form-grid">
+          <div class="field"><label>Du</label><input type="date" id="hr-dateDebut"></div>
+          <div class="field"><label>Au</label><input type="date" id="hr-dateFin"></div>
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:14px;">
+          <button class="btn-sm primary" id="btnRechercherHistorique">Rechercher</button>
+          <button class="btn-sm" id="btnExporterHistorique">Exporter en Excel</button>
+        </div>
+        <div class="data-list" id="listeHistoriqueResa"><div class="empty-state">Choisis une période puis clique sur "Rechercher".</div></div>
+      </div>
+    </div>
+    <div class="app-panel">
       <div class="section-heading"><h2>Réservations orphelines</h2>
         <div style="display:flex; gap:8px; align-items:center;">
           <button class="btn-sm" id="btnVerifierOrphelines">Vérifier</button>
@@ -335,15 +352,16 @@
     </div>
     <div class="app-panel">
       <h2>Jours fermés / horaires exceptionnels</h2>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Pour un jour précis qui déroge aux horaires habituels ci-dessus (fermeture exceptionnelle, ou horaire spécial).</p>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Pour un jour précis, ou une période complète (ex : vacances, maladie), qui déroge aux horaires habituels ci-dessus — sans toucher à la grille hebdomadaire normale. Utile pour bloquer une période sans que les créneaux ne redeviennent "libres".</p>
       <div class="form-grid">
-        <div class="field"><label>Date</label><input type="date" id="exc-date"></div>
-        <div class="field"><label>Statut</label>
-          <select id="exc-statut">
-            <option value="ferme">Fermé ce jour-là</option>
-            <option value="horaire">Horaire spécial</option>
-          </select>
-        </div>
+        <div class="field"><label>Du</label><input type="date" id="exc-date"></div>
+        <div class="field"><label>Au <span class="hint">— optionnel, pour bloquer toute une période</span></label><input type="date" id="exc-dateFin"></div>
+      </div>
+      <div class="field"><label>Statut</label>
+        <select id="exc-statut">
+          <option value="ferme">Fermé sur cette période</option>
+          <option value="horaire">Horaire spécial</option>
+        </select>
       </div>
       <div class="form-grid" id="exc-horaireZone" style="display:none;">
         <div class="field"><label>Ouverture</label><input type="time" id="exc-heureDebut"></div>
@@ -449,6 +467,21 @@
         </table>
       </div>
       <div class="data-sub" id="totauxRecettes" style="margin-top:10px; font-weight:600;"></div>
+    </div>
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>Catégories de recettes</h2>
+        <button class="collapse-toggle" data-target="wrapCategoriesRecettes" aria-expanded="false">▸</button>
+      </div>
+      <div id="wrapCategoriesRecettes" class="hidden">
+        <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Les catégories disponibles pour ventiler la recette d'un jour (abonnement, cours sans abonnement, cotisation, sponsor...). Ajoutes-en autant que tu veux.</p>
+        <div class="form-grid">
+          <div class="field"><label>Nom de la catégorie</label><input id="cr-nom" placeholder="ex: Sponsor"></div>
+        </div>
+        <button class="btn-sm primary" id="btnAjouterCategorieRecette">+ Ajouter cette catégorie</button>
+        <button class="btn-sm" id="btnInitCategoriesRecettes" style="margin-left:8px;">Initialiser les catégories de base</button>
+        <div class="data-list" id="listeCategoriesRecettes" style="margin-top:14px;"></div>
+      </div>
     </div>
   </div>
 
