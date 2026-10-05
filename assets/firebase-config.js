@@ -13,7 +13,8 @@ import {
   updatePassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
-  createUserWithEmailAndPassword
+  createUserWithEmailAndPassword,
+  deleteUser
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
   getFirestore,
@@ -77,6 +78,21 @@ export async function reinitialiserMotDePasseCompte(identifiant, ancienMotDePass
     const cred = await signInWithEmailAndPassword(authTemp, identifiantVersEmail(identifiant), ancienMotDePasse);
     await updatePassword(cred.user, nouveauMotDePasse);
     await signOut(authTemp);
+  } finally {
+    await deleteApp(appTemp);
+  }
+}
+
+// Supprime le compte Firebase Authentication d'un membre (même mécanisme
+// que la réinitialisation de mot de passe : connexion brève avec le mot de
+// passe actuel connu, via une app temporaire isolée). Ne touche pas à la
+// fiche Firestore — à supprimer séparément une fois cet appel réussi.
+export async function supprimerCompteAuthMembre(identifiant, motDePasseActuel) {
+  const appTemp = initializeApp(firebaseConfig, 'temp-' + Date.now());
+  const authTemp = getAuth(appTemp);
+  try {
+    const cred = await signInWithEmailAndPassword(authTemp, identifiantVersEmail(identifiant), motDePasseActuel);
+    await deleteUser(cred.user);
   } finally {
     await deleteApp(appTemp);
   }

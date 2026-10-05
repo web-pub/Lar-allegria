@@ -99,7 +99,7 @@ button:focus-visible {
   align-items: center;
   justify-content: space-between;
   padding: 12px 24px;
-  max-width: var(--max-width);
+  max-width: 1500px;
   margin: 0 auto;
   gap: 20px;
 }
@@ -219,7 +219,7 @@ nav.main-nav { margin-left: auto; }
 /* Si le menu ne tient plus sur une seule ligne à cette largeur, on bascule
    en grille à colonnes fixes pour obtenir des lignes bien réparties (ex:
    6+6) plutôt qu'un retour à la ligne du dernier lien tout seul. */
-@media (max-width: 1180px) and (min-width: 861px) {
+@media (max-width: 1300px) and (min-width: 861px) {
   nav.main-nav ul {
     display: grid;
     grid-template-columns: repeat(6, auto);

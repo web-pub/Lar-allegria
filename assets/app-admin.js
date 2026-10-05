@@ -1,12 +1,12 @@
 import {
   auth, db, onAuthStateChanged, signOut,
   updatePassword, reauthenticateWithCredential, EmailAuthProvider,
-  creerCompteMembre, reinitialiserMotDePasseCompte, identifiantValide, motDePasseValide,
+  creerCompteMembre, reinitialiserMotDePasseCompte, supprimerCompteAuthMembre, identifiantValide, motDePasseValide,
   doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, collection, addDoc, query, where, orderBy, serverTimestamp
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-017';
+const VERSION_SITE = 'V01-024';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -28,9 +28,121 @@ function lundiDeLaSemaine(d) {
   return date;
 }
 
+// ==========================================================================
+// ACCORD DE COLLABORATION — texte stocké côté admin uniquement, jamais sur
+// une page publique. Affiché à Lara (role "admin") tant qu'elle n'a pas
+// accepté la version en cours ; jamais affiché au Super Admin.
+// ==========================================================================
+const VERSION_ACCORD_COLLABORATION = 'V1';
+const TEXTE_ACCORD_COLLABORATION = `Entre Hélène Laruelle (« la Développeuse ») et Lara Rossoux, gérante de Lar'Allegria by Lara Rossoux ASBL (« la Gérante »), il est convenu ce qui suit :
+
+Article 1 — Propriété du code
+Le code source du site (pages, scripts, règles de sécurité, architecture technique) est la propriété exclusive de la Développeuse. Toute copie, modification ou réutilisation par un tiers nécessite son autorisation écrite préalable.
+
+Article 2 — Propriété et responsabilité du contenu
+Le contenu du site (textes, photos, tarifs, informations sur les activités, données relatives aux membres et à leurs chevaux) appartient à la Gérante et reste sous son entière responsabilité, y compris son exactitude et sa mise à jour.
+
+Article 3 — Protection des données (RGPD)
+La Gérante est seule responsable du traitement des données personnelles collectées via le site, au sens du RGPD (information des personnes concernées, durée de conservation, droits d'accès et de suppression). La Développeuse intervient uniquement comme prestataire technique bénévole et n'est pas responsable d'un manquement de la Gérante à ses obligations légales.
+
+Article 4 — Maintenance
+La maintenance technique du site est assurée exclusivement par la Développeuse, à titre gracieux, sans garantie de délai ni de disponibilité.
+
+Article 5 — Gratuité
+Le site reste gratuit pour la Gérante tant que c'est possible. Si des frais d'hébergement ou d'infrastructure deviennent nécessaires, la Développeuse peut d'abord y ajouter de la publicité pour les couvrir, sans frais supplémentaire pour la Gérante. Si cela ne suffit pas, la Développeuse prévient la Gérante par email (lara.rossoux@hotmail.com) avec un délai d'une semaine ; la Gérante dispose d'une semaine pour répondre si elle accepte de prendre en charge les frais. En cas de refus, d'absence de réponse, ou si la Gérante souhaite elle-même mettre fin au site, il est mis fin au site avec un délai d'une semaine notifié par email dans les deux sens (adresse de la Développeuse : helene.laruelle@gmail.com).
+
+Article 6 — Durée
+Cet accord reste valable tant que la Développeuse assure la maintenance du site.
+
+Article 7 — Usage à des fins de démonstration
+La Développeuse peut utiliser le site comme exemple de son travail (portfolio, démonstration à des tiers), via un compte de démonstration dédié, vide de toute donnée réelle, sans accès aux données des vrais membres du club. La Gérante ne peut ni archiver ce compte, ni en changer le mot de passe — il est géré exclusivement par la Développeuse.
+
+Article 8 — Récupération des données en fin de site
+En cas de fin du site, la Développeuse fournit à la Gérante un export de ses données (membres, paiements, factures) dans un délai d'une semaine.
+
+Article 9 — Confidentialité
+La Développeuse s'engage à ne jamais utiliser ni partager les données des membres en dehors de ce qui est strictement nécessaire au fonctionnement du site.
+
+Article 10 — Responsabilité
+Le site est fourni tel quel, à titre bénévole, sans garantie de disponibilité, d'absence d'erreur ou de résultat. La Développeuse ne peut être tenue responsable d'un dommage résultant d'un bug, d'une interruption ou d'une perte de données.
+
+Article 11 — Notification en cas d'incident
+La Développeuse s'engage à prévenir la Gérante sans délai de tout incident de sécurité touchant les données du site.
+
+Article 12 — Mesures de sécurité
+La Développeuse met en œuvre des mesures de sécurité raisonnables pour protéger les données du site, sans garantie absolue de résultat.
+
+Article 13 — Acceptation
+Cet accord est accepté électroniquement par la Gérante depuis son espace d'administration, ce qui vaut signature entre les parties.`;
+
+function afficherAccordCollaborationSiBesoin() {
+  if (compteActuel.role !== 'admin') return; // jamais au Super Admin
+  if (compteActuel.accordAccepteVersion === VERSION_ACCORD_COLLABORATION) return;
+  const texteHtml = escapeHtml(TEXTE_ACCORD_COLLABORATION).replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
+  const html = `
+    <div class="modal-overlay" id="overlayAccordCollaboration" style="z-index:2000;">
+      <div class="modal-box" style="max-width:640px;">
+        <h3>Accord de collaboration — à lire et accepter</h3>
+        <p style="color:var(--terre); font-size:0.85rem; margin-bottom:12px;">Ce texte formalise notre collaboration sur ce site. Merci de le lire et de l'accepter pour continuer.</p>
+        <div style="max-height:360px; overflow-y:auto; border:1px solid #E9DEC8; border-radius:var(--radius); padding:14px 16px; font-size:0.9rem; line-height:1.6; background:var(--paper-warm);">
+          <p>${texteHtml}</p>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-sm primary" id="btnAccepterAccordCollaboration">J'ai lu et j'accepte</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('btnAccepterAccordCollaboration').addEventListener('click', async () => {
+    try {
+      await updateDoc(doc(db, 'membres', auth.currentUser.uid), {
+        accordAccepte: true,
+        accordAccepteVersion: VERSION_ACCORD_COLLABORATION,
+        accordAccepteDate: serverTimestamp()
+      });
+      document.getElementById('overlayAccordCollaboration').remove();
+    } catch (err) {
+      alert('Erreur lors de l\'enregistrement : ' + (err.code || err.message));
+    }
+  });
+}
+
 let membresCache = [];
 let membresParUid = {};
 let compteActuel = null; // { role, identifiant, ... } du compte connecté
+const ongletsCharges = new Set(); // évite de recharger les mêmes données à chaque clic d'onglet
+
+// Chaque onglet ne charge ses données Firestore que la première fois qu'on
+// l'ouvre (au lieu de tout charger d'un coup à la connexion) — ça réduit
+// fortement le nombre de lectures Firestore par visite, important pour
+// rester dans le quota gratuit (plan Spark).
+const CHARGEURS_PAR_ONGLET = {
+  reservations: () => { chargerMeteoResume(); chargerReservationsAttente(); renderPlanningSemaine(); chargerRecurrencesAdmin(); chargerCalendrierDeuxSemaines(); },
+  membres: () => { chargerDemandesInscription(); renderMembres(); },
+  chevaux: () => chargerChevauxAdmin(),
+  nettoyage: () => { chargerBoxes(); chargerNettoyages(); },
+  tarifs: () => chargerTarifs(),
+  activites: () => { chargerActivites(); chargerProgrammesActivites(); },
+  evenements: () => chargerEvenementsAdmin(),
+  blog: () => chargerBlogAdmin(),
+  livreor: () => chargerLivreOrAdmin(),
+  boutique: () => { chargerBoutiqueAdmin(); chargerCommandesAdmin(); },
+  stock: () => { chargerStockAdmin(); chargerStockSignalements(); },
+  'planning-benevoles': () => chargerPlanningBenevolesAdmin(),
+  messages: () => chargerConversations(),
+  contenu: () => chargerContenuAdmin(),
+  parametres: () => { chargerDisponibilitesAdmin(); chargerExceptionsAdmin(); chargerIban(); },
+  livrecaisse: () => { initSelecteurAnneeCaisse(); chargerSoldeDepartCaisse(); chargerLivreCaisse(); },
+  comptabilite: () => { initSelecteurAnneeCompta(); chargerPlanComptable(); chargerCompta(); },
+  livrerecettes: () => { initSelecteurAnneeRecettes(); chargerCategoriesRecettes(); chargerLivreRecettes(); },
+  motsdepasse: () => { chargerMotsDePasseAdmin(); chargerSauvegardesMdp(); }
+};
+function chargerOngletSiBesoin(nomOnglet) {
+  if (ongletsCharges.has(nomOnglet)) return;
+  ongletsCharges.add(nomOnglet);
+  const chargeur = CHARGEURS_PAR_ONGLET[nomOnglet];
+  if (chargeur) chargeur();
+}
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) { window.location.href = 'connexion.html'; return; }
@@ -43,45 +155,12 @@ onAuthStateChanged(auth, async (user) => {
   document.getElementById('adminNom').textContent = compteActuel.prenom || 'Lara';
   if (compteActuel.role === 'superadmin') {
     document.getElementById('tabMotsDePasseBtn').classList.remove('hidden');
-    chargerMotsDePasseAdmin();
-    chargerSauvegardesMdp();
+    document.getElementById('btnCreerCompteDemo').classList.remove('hidden');
   }
+  afficherAccordCollaborationSiBesoin();
 
   await chargerMembres();
-  chargerMeteoResume();
-  chargerReservationsAttente();
-  renderPlanningSemaine();
-  chargerRecurrencesAdmin();
-  chargerCalendrierDeuxSemaines();
-  chargerDemandesInscription();
-  renderMembres();
-  chargerBoxes();
-  chargerNettoyages();
-  chargerTarifs();
-  chargerIban();
-  chargerActivites();
-  chargerProgrammesActivites();
-  initSelecteurAnneeCaisse();
-  chargerSoldeDepartCaisse();
-  chargerLivreCaisse();
-  initSelecteurAnneeCompta();
-  chargerPlanComptable();
-  chargerCompta();
-  initSelecteurAnneeRecettes();
-  chargerLivreRecettes();
-  chargerLivreOrAdmin();
-  chargerConversations();
-  chargerDisponibilitesAdmin();
-  chargerExceptionsAdmin();
-  chargerBoutiqueAdmin();
-  chargerCommandesAdmin();
-  chargerChevauxAdmin();
-  chargerEvenementsAdmin();
-  chargerBlogAdmin();
-  chargerStockAdmin();
-  chargerStockSignalements();
-  chargerContenuAdmin();
-  chargerPlanningBenevolesAdmin();
+  chargerOngletSiBesoin('reservations'); // onglet ouvert par défaut à l'arrivée
 });
 
 document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth).then(() => window.location.href = 'connexion.html'));
@@ -92,6 +171,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
     btn.classList.add('active');
     document.getElementById('panel-' + btn.dataset.tab).classList.remove('hidden');
+    chargerOngletSiBesoin(btn.dataset.tab);
   });
 });
 
@@ -219,7 +299,7 @@ async function chargerReservationsAttente() {
         ${alerte ? `<div class="banner-alert" style="margin-top:6px; padding:6px 10px; background:${alerte.couleur}1a; border-color:${alerte.couleur}; color:${alerte.couleur};">${alerte.texte}</div>` : ''}
       </div>
       <div class="data-actions">
-        <button class="btn-sm primary" onclick="window.validerReservation('${r.id}','${r.date}','${r.heureDebut}','${r.membreId}')">Valider</button>
+        <button class="btn-sm primary" onclick="window.validerReservation('${r.id}','${r.date}','${r.heureDebut}','${r.membreId}','${r.type}')">Valider</button>
         <button class="btn-sm danger" onclick="window.refuserReservation('${r.id}','${r.date}','${r.heureDebut}','${r.membreId}')">Refuser</button>
       </div>
     </div>`;
@@ -227,13 +307,14 @@ async function chargerReservationsAttente() {
   wrap.innerHTML = lignes.join('');
 }
 
-window.validerReservation = async (id, dateISO, heure, membreId) => {
+window.validerReservation = async (id, dateISO, heure, membreId, type) => {
   const snap = await getDocs(query(collection(db, 'reservations'), where('date', '==', dateISO), where('heureDebut', '==', heure), where('statut', '==', 'validee')));
   if (!snap.empty) {
     alert("Attention : une autre réservation est déjà validée sur ce créneau (une seule personne à la fois sur la piste). Refuse-la d'abord si tu veux valider celle-ci à la place.");
     return;
   }
   await updateDoc(doc(db, 'reservations', id), { statut: 'validee' });
+  if (type === 'cours') consommerCoursAbonnement(membreId, dateISO);
   notifierMembreReservation(membreId, `✅ Votre réservation du ${libelleDateHeure(dateISO, heure)} a été validée par Lara.`);
   chargerReservationsAttente();
   renderPlanningSemaine();
@@ -291,9 +372,10 @@ async function renderPlanningSemaine() {
 window.annulerReservationAdmin = async (id) => {
   if (!confirm('Annuler cette réservation ?')) return;
   const avant = await getDoc(doc(db, 'reservations', id));
-  await updateDoc(doc(db, 'reservations', id), { statut: 'annulee' });
+  await updateDoc(doc(db, 'reservations', id), { statut: 'annulee', annulePar: 'admin' });
   if (avant.exists()) {
     const r = avant.data();
+    if (r.type === 'cours' && r.statut === 'validee') rendreCoursAbonnement(r.membreId, r.date);
     notifierMembreReservation(r.membreId, `⚠️ Votre réservation du ${libelleDateHeure(r.date, r.heureDebut)} a été annulée par Lara.`);
   }
   chargerReservationsAttente();
@@ -324,6 +406,56 @@ async function exceptionJourAdmin(dateISO) {
 document.getElementById('btnAjouterReservation').addEventListener('click', () => window.ouvrirModalAjouterReservation());
 document.getElementById('calBlocPrec').addEventListener('click', () => { calBlocOffset -= 15; chargerCalendrierDeuxSemaines(); });
 document.getElementById('calBlocSuiv').addEventListener('click', () => { calBlocOffset += 15; chargerCalendrierDeuxSemaines(); });
+
+// ==========================================================================
+// HISTORIQUE DES RÉSERVATIONS (contrôle) — recherche libre par période
+// ==========================================================================
+window._historiqueResa = [];
+async function rechercherHistoriqueResa() {
+  const dateDebut = document.getElementById('hr-dateDebut').value;
+  const dateFin = document.getElementById('hr-dateFin').value;
+  const wrap = document.getElementById('listeHistoriqueResa');
+  if (!dateDebut || !dateFin) { alert('Merci de choisir une date de début et une date de fin.'); return; }
+  if (dateDebut > dateFin) { alert('La date de début doit être avant la date de fin.'); return; }
+  wrap.innerHTML = '<div class="empty-state">Recherche en cours...</div>';
+  const snap = await getDocs(query(collection(db, 'reservations'), where('date', '>=', dateDebut), where('date', '<=', dateFin)));
+  let resultats = [];
+  snap.forEach(d => resultats.push({ id: d.id, ...d.data() }));
+  resultats.sort((a, b) => a.date.localeCompare(b.date) || (a.heureDebut || '').localeCompare(b.heureDebut || ''));
+  window._historiqueResa = resultats;
+  if (resultats.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucune réservation sur cette période.</div>'; return; }
+  wrap.innerHTML = resultats.map(r => {
+    const dateLabel = capitalize(new Date(r.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long', year:'numeric'}));
+    const badge = r.statut === 'validee' ? '<span class="badge badge-ok">Validée</span>'
+      : r.statut === 'en_attente' ? '<span class="badge badge-warn">En attente</span>'
+      : r.statut === 'refusee' ? '<span class="badge badge-danger">Refusée</span>'
+      : '<span class="badge badge-neutral">Annulée</span>';
+    return `<div class="data-row"><div class="data-main">
+      <div class="data-title">${dateLabel} — ${r.heureDebut || ''} — ${escapeHtml(nomAffichageReservation(r))}</div>
+      <div class="data-sub">${r.type === 'libre' ? 'Piste libre' : 'Cours'} ${badge}${r.recurrenceId ? ' <span class="badge badge-neutral">Récurrence</span>' : ''}</div>
+    </div></div>`;
+  }).join('');
+}
+document.getElementById('btnRechercherHistorique').addEventListener('click', rechercherHistoriqueResa);
+document.getElementById('btnExporterHistorique').addEventListener('click', () => {
+  const resultats = window._historiqueResa || [];
+  if (resultats.length === 0) { alert('Fais d\'abord une recherche (bouton "Rechercher") avant d\'exporter.'); return; }
+  const lignes = resultats.map(r => ({
+    'Date': r.date,
+    'Heure': r.heureDebut || '',
+    'Membre': nomAffichageReservation(r),
+    'Type': r.type === 'libre' ? 'Piste libre' : 'Cours',
+    'Statut': r.statut === 'validee' ? 'Validée' : r.statut === 'en_attente' ? 'En attente' : r.statut === 'refusee' ? 'Refusée' : 'Annulée',
+    'Récurrence': r.recurrenceId ? 'Oui' : 'Non'
+  }));
+  const dateDebut = document.getElementById('hr-dateDebut').value;
+  const dateFin = document.getElementById('hr-dateFin').value;
+  const feuille = XLSX.utils.json_to_sheet(lignes);
+  feuille['!cols'] = [{wch:12},{wch:8},{wch:26},{wch:12},{wch:12},{wch:11}];
+  const classeur = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(classeur, feuille, 'Historique réservations');
+  XLSX.writeFile(classeur, `Historique-reservations-Lar-Allegria-${dateDebut}_${dateFin}.xlsx`);
+});
 
 document.getElementById('btnVerifierOrphelines').addEventListener('click', async () => {
   document.getElementById('wrapOrphelines').classList.remove('hidden');
@@ -444,6 +576,12 @@ window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
         ajouteParAdmin: true, recurrenceId, nomClientEssai: nomClientEssai || null,
         createdAt: serverTimestamp()
       })));
+      if (type === 'cours' && aCreer.length > 0) {
+        // Traitement séquentiel (pas Promise.all) : chaque date est ajoutée
+        // au même abonnement, un traitement en parallèle écraserait les
+        // mises à jour les unes les autres.
+        for (const d of aCreer) { await consommerCoursAbonnement(membreId, d); }
+      }
       window.fermerModal();
       chargerReservationsAttente();
       renderPlanningSemaine();
@@ -463,13 +601,12 @@ window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
 let calBlocOffset = 0; // en jours, multiple de 15
 
 async function chargerRecurrencesAdmin() {
-  const snap = await getDocs(collection(db, 'reservations'));
   const aujourdhui = dateISOLocale(new Date());
+  const snap = await getDocs(query(collection(db, 'reservations'), where('date', '>=', aujourdhui)));
   const parRecurrence = {};
   snap.forEach(d => {
     const r = d.data();
     if (!r.recurrenceId || r.statut === 'annulee' || r.statut === 'refusee') return;
-    if (r.date < aujourdhui) return;
     (parRecurrence[r.recurrenceId] ||= []).push(r);
   });
   const groupes = Object.entries(parRecurrence).map(([recurrenceId, occurrences]) => {
@@ -644,11 +781,11 @@ function renderMembres(filtre = '') {
       <div class="data-row">
         <div class="data-main">
           <div class="data-title">${escapeHtml(m.prenom)} ${escapeHtml(m.nom)}</div>
-          <div class="data-sub">${labelTypeMembre(m.typeMembre)} · ${escapeHtml(m.email||'')} ${m.typeMembre !== 'benevole' ? (m.cotisationPayee ? '<span class="badge badge-ok">Cotisation OK</span>' : '<span class="badge badge-warn">Cotisation à régler</span>') : ''} ${m.recurrenceCours === 'hebdomadaire' ? '<span class="badge badge-neutral">Cours 1x/semaine</span>' : m.recurrenceCours === 'bimensuelle' ? '<span class="badge badge-neutral">Cours 1x/2 semaines</span>' : ''} ${m.chefBenevoles ? '<span class="badge badge-danger">Chef des bénévoles</span>' : ''}</div>
+          <div class="data-sub">${labelTypeMembre(m.typeMembre)} · ${escapeHtml(m.email||'')} ${m.typeMembre !== 'benevole' ? (m.cotisationPayee ? '<span class="badge badge-ok">Cotisation OK</span>' : '<span class="badge badge-warn">Cotisation à régler</span>') : ''} ${m.recurrenceCours === 'hebdomadaire' ? '<span class="badge badge-neutral">Cours 1x/semaine</span>' : m.recurrenceCours === 'bimensuelle' ? '<span class="badge badge-neutral">Cours 1x/2 semaines</span>' : ''} ${m.chefBenevoles ? '<span class="badge badge-danger">Chef des bénévoles</span>' : ''} ${m.abonnement ? '<span class="badge badge-neutral">Abonnement</span>' : ''} ${m.abonnementRenouvellementDemande ? '<span class="badge badge-warn">Nouvel abonnement demandé</span>' : ''} ${m.suppressionDemandee ? '<span class="badge badge-danger">Suppression demandée</span>' : ''} ${m.compteDemo ? '<span class="badge badge-neutral">Compte démo — géré par Hélène</span>' : ''}</div>
         </div>
         <div class="data-actions">
           <button class="btn-sm" onclick="window.editerMembre('${m.id}')">Modifier</button>
-          <button class="btn-sm danger" onclick="window.archiverMembre('${m.id}')">Archiver</button>
+          ${(!m.compteDemo || compteActuel.role === 'superadmin') ? `<button class="btn-sm danger" onclick="window.archiverMembre('${m.id}')">Archiver</button>` : ''}
         </div>
       </div>`).join('');
   }
@@ -671,9 +808,73 @@ document.getElementById('btnVoirArchives').addEventListener('click', () => {
 });
 document.getElementById('rechercheMembre').addEventListener('input', (e) => renderMembres(e.target.value));
 document.getElementById('btnAjouterMembre').addEventListener('click', () => window.ouvrirModalMembre());
+document.getElementById('btnCreerCompteDemo').addEventListener('click', async () => {
+  if (Object.values(membresParUid).some(m => m.compteDemo)) {
+    alert('Le compte de démonstration existe déjà — ouvre-le depuis la liste des membres (badge "Compte démo") pour le modifier.');
+    return;
+  }
+  if (!confirm('Créer le compte de démonstration (identifiant "HLa", mot de passe "demohla") ? Il sera protégé contre l\'archivage et le changement de mot de passe par Lara — seule toi (Super Admin) pourras le gérer.')) return;
+  try {
+    const uid = await creerCompteMembre('HLa', 'demohla');
+    await setDoc(doc(db, 'membres', uid), {
+      role: 'membre',
+      identifiant: 'HLa',
+      prenom: 'Compte',
+      nom: 'Démo',
+      typeMembre: 'cours',
+      compteDemo: true,
+      motDePasseActuel: 'demohla',
+      dateInscription: new Date().toISOString(),
+      archive: false
+    });
+    await chargerMembres();
+    renderMembres();
+    alert('Compte démo créé. La fiche s\'ouvre pour que tu la complètes.');
+    window.ouvrirModalMembre(membresParUid[uid]);
+  } catch (err) {
+    if (err.code === 'auth/email-already-in-use') {
+      alert('Un compte avec l\'identifiant "HLa" existe déjà dans Firebase Authentication.');
+    } else {
+      alert('Erreur lors de la création : ' + (err.code || err.message));
+    }
+  }
+});
 
 window.editerMembre = (id) => window.ouvrirModalMembre(membresParUid[id]);
+window.supprimerDefinitivementMembre = async (id, identifiant) => {
+  const m = membresParUid[id];
+  if (m?.compteDemo && compteActuel.role !== 'superadmin') {
+    alert('Ce compte de démonstration ne peut être géré que par Hélène (Super Admin).');
+    return;
+  }
+  if (!confirm(`Supprimer définitivement la fiche de "${identifiant}" ? Cette action est irréversible (fiche + historique de connexion).`)) return;
+  let compteAuthSupprime = false;
+  if (m?.motDePasseActuel) {
+    try {
+      await supprimerCompteAuthMembre(identifiant, m.motDePasseActuel);
+      compteAuthSupprime = true;
+    } catch (err) {
+      console.warn('Suppression du compte Firebase Authentication impossible :', err);
+    }
+  }
+  try {
+    await deleteDoc(doc(db, 'membres', id));
+    window.fermerModal();
+    await chargerMembres();
+    renderMembres();
+    alert(compteAuthSupprime
+      ? 'Fiche et compte de connexion supprimés.'
+      : 'Fiche supprimée. Le compte de connexion n\'a pas pu être supprimé automatiquement (mot de passe non à jour) — supprime-le manuellement dans Firebase Console → Authentication → Users.');
+  } catch (err) {
+    alert('Erreur lors de la suppression de la fiche : ' + (err.code || err.message));
+  }
+};
 window.archiverMembre = async (id) => {
+  const m = membresParUid[id];
+  if (m?.compteDemo && compteActuel.role !== 'superadmin') {
+    alert('Ce compte de démonstration ne peut être géré que par Hélène (Super Admin).');
+    return;
+  }
   await updateDoc(doc(db, 'membres', id), { archive: true });
   await chargerMembres(); renderMembres();
 };
@@ -691,6 +892,12 @@ window.ouvrirModalMembre = (membre, demandeId) => {
       <div class="modal-box" style="max-width:640px;">
         <h3>${membre ? 'Modifier le membre' : 'Ajouter un membre'}</h3>
         ${estNouveau ? `<div class="banner-alert info">Le compte de connexion (identifiant + mot de passe) est créé automatiquement quand tu cliques sur "Enregistrer" — rien à faire dans Firebase.</div>` : ''}
+        ${src.suppressionDemandee ? `
+        <div class="banner-alert danger">
+          <strong>Ce membre a demandé la suppression de sa fiche.</strong><br>
+          Motif : ${escapeHtml(src.suppressionMotif || '—')}
+          <div style="margin-top:8px;"><button class="btn-sm danger" type="button" onclick="window.supprimerDefinitivementMembre('${membre?.id}','${escapeHtml(membre?.identifiant||'')}')">Supprimer définitivement cette fiche</button></div>
+        </div>` : ''}
         <div class="form-grid">
           <div class="field"><label>Identifiant de connexion *</label><input id="fm-identifiant" value="${escapeHtml(src.identifiant||src.identifiantSouhaite||src.prenom||'')}"></div>
           <div class="field"><label>Type de membre</label>
@@ -739,6 +946,28 @@ window.ouvrirModalMembre = (membre, demandeId) => {
               <option value="bimensuelle" ${src.recurrenceCours==='bimensuelle'?'selected':''}>1x toutes les deux semaines</option>
             </select>
           </div>
+          <div class="field"><label>Fonctionne par abonnement <span class="hint">— 10+1 cours, décomptés à chaque leçon validée</span></label>
+            <select id="fm-abonnement">
+              <option value="non" ${!src.abonnement?'selected':''}>Non</option>
+              <option value="oui" ${src.abonnement?'selected':''}>Oui</option>
+            </select>
+          </div>
+          ${src.abonnementRenouvellementDemande ? `<div class="banner-alert" style="margin-bottom:16px;">Ce membre a demandé un nouvel abonnement.</div>` : ''}
+          ${!estNouveau ? `
+          <div class="field" id="fm-zoneAbonnements" style="${src.abonnement?'':'display:none;'}">
+            <div class="section-heading" style="margin-bottom:8px;">
+              <label style="margin-bottom:0;">Abonnements</label>
+              <button class="collapse-toggle" type="button" data-target="wrapAbonnementsMembre" aria-expanded="false">▸</button>
+            </div>
+            <div id="wrapAbonnementsMembre" class="hidden">
+              <div id="zoneAbonnementActif"><div class="empty-state">Chargement...</div></div>
+              <button class="btn-sm primary" type="button" id="fm-btnNouvelAbonnement" style="margin-top:10px;">+ Nouvel abonnement (11 cours)</button>
+              <div style="margin-top:14px;">
+                <h4 style="font-size:0.8rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--terre); margin-bottom:8px;">Historique des abonnements</h4>
+                <div id="zoneAbonnementsHistorique"></div>
+              </div>
+            </div>
+          </div>` : ''}
         </div>
         ${!estNouveau ? `
         <div class="field" id="fm-zoneCoursHistorique">
@@ -802,6 +1031,17 @@ window.ouvrirModalMembre = (membre, demandeId) => {
   document.getElementById('fm-type').addEventListener('change', majAffichageSelonType);
   majAffichageSelonType();
 
+  const champAbonnement = document.getElementById('fm-abonnement');
+  const zoneAbos = document.getElementById('fm-zoneAbonnements');
+  champAbonnement.addEventListener('change', () => {
+    if (zoneAbos) zoneAbos.style.display = champAbonnement.value === 'oui' ? '' : 'none';
+  });
+  if (!estNouveau && membre) {
+    chargerAbonnementsMembre(membre.id);
+    const btnNouvelAbo = document.getElementById('fm-btnNouvelAbonnement');
+    if (btnNouvelAbo) btnNouvelAbo.addEventListener('click', () => window.creerNouvelAbonnement(membre.id));
+  }
+
   document.getElementById('fm-save').addEventListener('click', async () => {
     const identifiant = document.getElementById('fm-identifiant').value.trim();
     const motDePasse = estNouveau ? document.getElementById('fm-motdepasse').value.trim() : '';
@@ -846,6 +1086,7 @@ window.ouvrirModalMembre = (membre, demandeId) => {
       cotisationPayee: document.getElementById('fm-cotisationPayee').value === 'oui',
       cotisationDateEcheance: document.getElementById('fm-cotisationEcheance').value,
       recurrenceCours: document.getElementById('fm-recurrenceCours').value,
+      abonnement: document.getElementById('fm-abonnement').value === 'oui',
       chefBenevoles: document.getElementById('fm-chefBenevoles').value === 'oui',
       archive: false
     };
@@ -925,6 +1166,133 @@ async function chargerStockMembre(membreId) {
     const dateLabel = p.dateSignalement ? new Date(p.dateSignalement).toLocaleString('fr-BE', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : '';
     return `<div class="data-row"><div class="data-main"><div class="data-title">${p.quantitePrise} ${escapeHtml(p.unite||'')} de ${escapeHtml(p.nom)}</div><div class="data-sub">${dateLabel}</div></div></div>`;
   }).join('');
+}
+
+// ==========================================================================
+// ABONNEMENTS (10+1 cours) — historique complet par membre
+// ==========================================================================
+function formatDateCourte(iso) {
+  if (!iso) return '—';
+  return capitalize(new Date(iso + 'T00:00:00').toLocaleDateString('fr-BE', { day:'numeric', month:'long', year:'numeric' }));
+}
+async function chargerAbonnementsMembre(membreId) {
+  const snap = await getDocs(query(collection(db, 'abonnements_membres'), where('membreId', '==', membreId)));
+  let abonnements = [];
+  snap.forEach(d => abonnements.push({ id: d.id, ...d.data() }));
+  abonnements.sort((a, b) => (b.dateSouscription || '').localeCompare(a.dateSouscription || ''));
+  window._abonnementsMembreActuel = abonnements;
+
+  const actif = abonnements.find(a => a.actif);
+  const zoneActif = document.getElementById('zoneAbonnementActif');
+  if (!actif) {
+    zoneActif.innerHTML = '<div class="empty-state">Aucun abonnement actif pour ce membre.</div>';
+  } else {
+    const utilises = actif.coursUtilises || [];
+    const restants = 11 - utilises.length;
+    const listeDates = utilises.map((c, i) => `
+      <div class="data-row">
+        <div class="data-main"><div class="data-title">Cours du ${formatDateCourte(c.date)}</div></div>
+        <div class="data-actions"><button class="btn-sm danger" onclick="window.retirerCoursUtilise('${actif.id}', ${i}, '${membreId}')">Retirer</button></div>
+      </div>`).join('');
+    zoneActif.innerHTML = `
+      <div class="data-row">
+        <div class="data-main">
+          <div class="data-title">Abonnement actif — souscrit le ${formatDateCourte(actif.dateSouscription)}</div>
+          <div class="data-sub">
+            ${actif.paye ? `<span class="badge badge-ok">Payé le ${formatDateCourte(actif.datePaiement)}</span>` : '<span class="badge badge-warn">Non payé</span>'}
+            <span class="badge ${restants<=2 ? 'badge-danger' : 'badge-neutral'}">${restants} / 11 cours restants</span>
+          </div>
+        </div>
+        <div class="data-actions">
+          <button class="btn-sm" onclick="window.togglePayeAbonnement('${actif.id}','${membreId}')">${actif.paye ? 'Marquer non payé' : 'Marquer payé'}</button>
+          <button class="btn-sm" onclick="window.marquerCoursUtiliseManuel('${actif.id}','${membreId}')">+ Marquer un cours utilisé</button>
+        </div>
+      </div>
+      ${listeDates ? `<div style="margin-top:8px;">${listeDates}</div>` : ''}`;
+  }
+
+  const historique = abonnements.filter(a => !a.actif);
+  document.getElementById('zoneAbonnementsHistorique').innerHTML = historique.length === 0
+    ? '<div class="empty-state">Aucun abonnement passé.</div>'
+    : historique.map(a => {
+        const utilises = a.coursUtilises || [];
+        return `<div class="data-row"><div class="data-main"><div class="data-title">Souscrit le ${formatDateCourte(a.dateSouscription)}</div><div class="data-sub">${a.paye ? 'Payé le ' + formatDateCourte(a.datePaiement) : 'Non payé'} · ${utilises.length}/11 cours utilisés</div></div></div>`;
+      }).join('');
+}
+window.creerNouvelAbonnement = async (membreId) => {
+  if (!confirm("Créer un nouvel abonnement de 11 cours pour ce membre ? L'abonnement actif précédent, s'il existe, sera archivé dans l'historique.")) return;
+  const estPaye = confirm('L\'abonnement est-il déjà payé ? (Annuler = non payé pour l\'instant)');
+  try {
+    const ancienActif = (window._abonnementsMembreActuel || []).find(a => a.actif);
+    if (ancienActif) await updateDoc(doc(db, 'abonnements_membres', ancienActif.id), { actif: false });
+    await addDoc(collection(db, 'abonnements_membres'), {
+      membreId,
+      dateSouscription: dateISOLocale(new Date()),
+      paye: estPaye,
+      datePaiement: estPaye ? dateISOLocale(new Date()) : null,
+      actif: true,
+      coursUtilises: []
+    });
+    await updateDoc(doc(db, 'membres', membreId), { abonnementRenouvellementDemande: false });
+    chargerAbonnementsMembre(membreId);
+  } catch (err) {
+    alert('Erreur : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore (voir le README, section 4).');
+  }
+};
+window.togglePayeAbonnement = async (abonnementId, membreId) => {
+  const a = (window._abonnementsMembreActuel || []).find(x => x.id === abonnementId);
+  const nouveauPaye = !a?.paye;
+  await updateDoc(doc(db, 'abonnements_membres', abonnementId), {
+    paye: nouveauPaye,
+    datePaiement: nouveauPaye ? dateISOLocale(new Date()) : null
+  });
+  chargerAbonnementsMembre(membreId);
+};
+window.marquerCoursUtiliseManuel = async (abonnementId, membreId) => {
+  const dateStr = prompt('Date du cours (JJ/MM/AAAA) :', new Date().toLocaleDateString('fr-BE'));
+  if (!dateStr) return;
+  const [j, m, a] = dateStr.split('/');
+  if (!j || !m || !a) { alert('Format de date non reconnu.'); return; }
+  const dateISO = `${a}-${m.padStart(2,'0')}-${j.padStart(2,'0')}`;
+  const abo = (window._abonnementsMembreActuel || []).find(x => x.id === abonnementId);
+  const utilises = [...(abo?.coursUtilises || []), { date: dateISO }];
+  await updateDoc(doc(db, 'abonnements_membres', abonnementId), { coursUtilises: utilises });
+  chargerAbonnementsMembre(membreId);
+};
+window.retirerCoursUtilise = async (abonnementId, index, membreId) => {
+  if (!confirm('Retirer ce cours de la liste des cours utilisés (le crédite à nouveau) ?')) return;
+  const abo = (window._abonnementsMembreActuel || []).find(x => x.id === abonnementId);
+  const utilises = [...(abo?.coursUtilises || [])];
+  utilises.splice(index, 1);
+  await updateDoc(doc(db, 'abonnements_membres', abonnementId), { coursUtilises: utilises });
+  chargerAbonnementsMembre(membreId);
+};
+// Décompte (ou recrédite) un cours sur l'abonnement actif d'un membre,
+// appelé quand un cours est validé / annulé côté admin.
+async function consommerCoursAbonnement(membreId, dateCours) {
+  const m = membresParUid[membreId];
+  if (!m || !m.abonnement) return;
+  const snap = await getDocs(query(collection(db, 'abonnements_membres'), where('membreId', '==', membreId), where('actif', '==', true)));
+  if (snap.empty) return;
+  const aboDoc = snap.docs[0];
+  const utilises = [...(aboDoc.data().coursUtilises || []), { date: dateCours }];
+  await updateDoc(doc(db, 'abonnements_membres', aboDoc.id), { coursUtilises: utilises });
+  const restants = 11 - utilises.length;
+  if ([2, 1, 0].includes(restants)) {
+    notifierMembreReservation(membreId, `ℹ️ Il vous reste ${restants} cours dans votre abonnement.`);
+  }
+}
+async function rendreCoursAbonnement(membreId, dateCours) {
+  const m = membresParUid[membreId];
+  if (!m || !m.abonnement) return;
+  const snap = await getDocs(query(collection(db, 'abonnements_membres'), where('membreId', '==', membreId), where('actif', '==', true)));
+  if (snap.empty) return;
+  const aboDoc = snap.docs[0];
+  const utilises = [...(aboDoc.data().coursUtilises || [])];
+  const idx = utilises.findIndex(c => c.date === dateCours);
+  if (idx === -1) return;
+  utilises.splice(idx, 1);
+  await updateDoc(doc(db, 'abonnements_membres', aboDoc.id), { coursUtilises: utilises });
 }
 
 // ==========================================================================
@@ -2142,8 +2510,10 @@ document.getElementById('exc-statut').addEventListener('change', (e) => {
   document.getElementById('exc-horaireZone').style.display = e.target.value === 'horaire' ? 'grid' : 'none';
 });
 document.getElementById('btnAjouterException').addEventListener('click', async () => {
-  const dateISO = document.getElementById('exc-date').value;
-  if (!dateISO) { alert('Merci de choisir une date.'); return; }
+  const dateDebut = document.getElementById('exc-date').value;
+  const dateFin = document.getElementById('exc-dateFin').value || dateDebut;
+  if (!dateDebut) { alert('Merci de choisir au moins une date de début.'); return; }
+  if (dateFin < dateDebut) { alert('La date de fin doit être après la date de début.'); return; }
   const statut = document.getElementById('exc-statut').value;
   const data = statut === 'ferme'
     ? { ferme: true }
@@ -2156,38 +2526,100 @@ document.getElementById('btnAjouterException').addEventListener('click', async (
     alert('Merci d\'indiquer une heure d\'ouverture et de fermeture.');
     return;
   }
+  // Une exception par jour de la période choisie (même s'il n'y en a qu'un).
+  const dates = [];
+  let courante = new Date(dateDebut + 'T00:00:00');
+  const fin = new Date(dateFin + 'T00:00:00');
+  while (courante <= fin) {
+    dates.push(dateISOLocale(courante));
+    courante = new Date(courante); courante.setDate(courante.getDate() + 1);
+    if (dates.length >= 366) break; // garde-fou (1 an max)
+  }
   try {
-    await setDoc(doc(db, 'disponibilites_exceptions', dateISO), data);
+    await Promise.all(dates.map(d => setDoc(doc(db, 'disponibilites_exceptions', d), data)));
     document.getElementById('exc-date').value = '';
+    document.getElementById('exc-dateFin').value = '';
     chargerExceptionsAdmin();
+    let messageFinal = `${dates.length} jour(s) mis à jour (${dateDebut}${dates.length>1 ? ' au ' + dateFin : ''}).`;
+    if (statut === 'ferme') {
+      const nbAnnulees = await annulerReservationsPourFermeture(dateDebut, dateFin);
+      if (nbAnnulees > 0) messageFinal += `\n${nbAnnulees} réservation(s) déjà prévue(s) sur cette période ont été annulée(s) automatiquement, et les membres concernés ont été prévenus.`;
+      renderPlanningSemaine();
+      chargerReservationsAttente();
+      chargerRecurrencesAdmin();
+      chargerCalendrierDeuxSemaines();
+    }
+    alert(messageFinal);
   } catch (err) {
     alert('Erreur lors de l\'enregistrement : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore (voir le README, section 4).');
   }
 });
+// Quand une période est marquée "fermée", les réservations déjà prises sur
+// cette période (quel que soit leur statut en cours) sont annulées
+// automatiquement, le cours est recrédité si besoin, et chaque membre
+// concerné reçoit un message (point rouge) l'informant de l'annulation.
+async function annulerReservationsPourFermeture(dateDebut, dateFin) {
+  const snap = await getDocs(query(collection(db, 'reservations'), where('date', '>=', dateDebut), where('date', '<=', dateFin)));
+  let compteur = 0;
+  for (const d of snap.docs) {
+    const r = d.data();
+    if (r.statut === 'annulee' || r.statut === 'refusee') continue;
+    await updateDoc(doc(db, 'reservations', d.id), { statut: 'annulee', annulePar: 'admin' });
+    if (r.type === 'cours' && r.statut === 'validee') await rendreCoursAbonnement(r.membreId, r.date);
+    notifierMembreReservation(r.membreId, `⚠️ Votre réservation du ${libelleDateHeure(r.date, r.heureDebut)} a été annulée par Lara (piste fermée sur cette période).`);
+    compteur++;
+  }
+  return compteur;
+}
 async function chargerExceptionsAdmin() {
   const snap = await getDocs(collection(db, 'disponibilites_exceptions'));
   let exceptions = [];
   snap.forEach(d => exceptions.push({ date: d.id, ...d.data() }));
   exceptions = exceptions.filter(e => e.date >= dateISOLocale(new Date()));
   exceptions.sort((a, b) => a.date.localeCompare(b.date));
+
+  // Regroupe les jours consécutifs ayant le même statut en une seule ligne
+  // (ex: 15 au 28 septembre — Fermé) plutôt qu'une ligne par jour.
+  const groupes = [];
+  for (const e of exceptions) {
+    const dernier = groupes[groupes.length - 1];
+    const memeStatut = dernier && dernier.ferme === e.ferme && dernier.heureDebut === e.heureDebut && dernier.heureFin === e.heureFin;
+    const veille = dernier ? dateISOLocale(new Date(new Date(dernier.dateFin + 'T00:00:00').setDate(new Date(dernier.dateFin + 'T00:00:00').getDate() + 1))) : null;
+    if (dernier && memeStatut && veille === e.date) {
+      dernier.dateFin = e.date;
+    } else {
+      groupes.push({ dateDebut: e.date, dateFin: e.date, ferme: e.ferme, heureDebut: e.heureDebut, heureFin: e.heureFin });
+    }
+  }
+
   const wrap = document.getElementById('listeExceptions');
-  if (exceptions.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucune exception à venir.</div>'; return; }
-  wrap.innerHTML = exceptions.map(e => {
-    const dateLabel = capitalize(new Date(e.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
+  if (groupes.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucune exception à venir.</div>'; return; }
+  wrap.innerHTML = groupes.map(g => {
+    const labelDebut = capitalize(new Date(g.dateDebut + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
+    const labelFin = capitalize(new Date(g.dateFin + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
+    const dateLabel = g.dateDebut === g.dateFin ? labelDebut : `Du ${labelDebut} au ${labelFin}`;
     return `
     <div class="data-row">
       <div class="data-main">
         <div class="data-title">${dateLabel}</div>
-        <div class="data-sub">${e.ferme ? '<span class="badge badge-danger">Fermé</span>' : `<span class="badge badge-neutral">Horaire spécial : ${e.heureDebut} – ${e.heureFin}</span>`}</div>
+        <div class="data-sub">${g.ferme ? '<span class="badge badge-danger">Fermé</span>' : `<span class="badge badge-neutral">Horaire spécial : ${g.heureDebut} – ${g.heureFin}</span>`}</div>
       </div>
       <div class="data-actions">
-        <button class="btn-sm danger" onclick="window.supprimerException('${e.date}')">Supprimer</button>
+        <button class="btn-sm danger" onclick="window.supprimerException('${g.dateDebut}','${g.dateFin}')">Supprimer</button>
       </div>
     </div>`;
   }).join('');
 }
-window.supprimerException = async (dateISO) => {
-  await deleteDoc(doc(db, 'disponibilites_exceptions', dateISO));
+window.supprimerException = async (dateDebut, dateFin) => {
+  if (dateDebut !== dateFin && !confirm(`Supprimer l'exception sur toute la période du ${dateDebut} au ${dateFin} ?`)) return;
+  const dates = [];
+  let courante = new Date(dateDebut + 'T00:00:00');
+  const fin = new Date(dateFin + 'T00:00:00');
+  while (courante <= fin) {
+    dates.push(dateISOLocale(courante));
+    courante = new Date(courante); courante.setDate(courante.getDate() + 1);
+  }
+  await Promise.all(dates.map(d => deleteDoc(doc(db, 'disponibilites_exceptions', d))));
   chargerExceptionsAdmin();
 };
 
@@ -2678,6 +3110,56 @@ function initSelecteurAnneeRecettes() {
   sel.addEventListener('change', () => { anneeActuelleRecettes = parseInt(sel.value, 10); chargerLivreRecettes(); });
 }
 
+let categoriesRecettesCache = [];
+const CATEGORIES_RECETTES_DE_BASE = ['Abonnement', 'Cours sans abonnement', 'Cotisation', 'Sponsor', 'Don', 'Autre'];
+async function chargerCategoriesRecettes() {
+  const snap = await getDocs(collection(db, 'livre_recettes_categories'));
+  categoriesRecettesCache = [];
+  snap.forEach(d => categoriesRecettesCache.push({ id: d.id, ...d.data() }));
+  categoriesRecettesCache.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+  const wrap = document.getElementById('listeCategoriesRecettes');
+  wrap.innerHTML = categoriesRecettesCache.length === 0
+    ? '<div class="empty-state">Aucune catégorie — clique sur "Initialiser" ou ajoutes-en une.</div>'
+    : categoriesRecettesCache.map(c => `
+      <div class="data-row">
+        <div class="data-main"><div class="data-title">${escapeHtml(c.nom)}</div></div>
+        <div class="data-actions"><button class="btn-sm danger" onclick="window.supprimerCategorieRecette('${c.id}')">Supprimer</button></div>
+      </div>`).join('');
+}
+document.getElementById('btnInitCategoriesRecettes').addEventListener('click', async () => {
+  if (!confirm("Créer les catégories de base (Abonnement, Cours sans abonnement, Cotisation, Sponsor, Don, Autre) ? (à ne faire qu'une fois)")) return;
+  try {
+    await Promise.all(CATEGORIES_RECETTES_DE_BASE.map(nom => addDoc(collection(db, 'livre_recettes_categories'), { nom })));
+    chargerCategoriesRecettes();
+  } catch (err) {
+    alert('Erreur : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore (voir le README, section 4).');
+  }
+});
+document.getElementById('btnAjouterCategorieRecette').addEventListener('click', async () => {
+  const nom = document.getElementById('cr-nom').value.trim();
+  if (!nom) { alert('Merci de donner un nom à cette catégorie.'); return; }
+  try {
+    await addDoc(collection(db, 'livre_recettes_categories'), { nom });
+    document.getElementById('cr-nom').value = '';
+    chargerCategoriesRecettes();
+  } catch (err) {
+    alert('Erreur : ' + (err.code || err.message));
+  }
+});
+window.supprimerCategorieRecette = async (id) => {
+  if (!confirm('Supprimer cette catégorie ? (les recettes déjà encodées avec ne sont pas modifiées)')) return;
+  await deleteDoc(doc(db, 'livre_recettes_categories', id));
+  chargerCategoriesRecettes();
+};
+
+function totalLignesJour(r) {
+  if (!r) return 0;
+  if (Array.isArray(r.lignes) && r.lignes.length > 0) {
+    return r.lignes.reduce((s, l) => s + (Number(l.montant) || 0), 0);
+  }
+  return Number(r.montant) || 0; // ancien format (un seul montant, sans catégorie)
+}
+
 async function chargerLivreRecettes() {
   const corps = document.getElementById('corpsTableauRecettes');
   const an = anneeActuelleRecettes;
@@ -2695,12 +3177,13 @@ async function chargerLivreRecettes() {
     for (let jour = 1; jour <= joursParMois[mois]; jour++) {
       const dateISO = `${an}-${String(mois+1).padStart(2,'0')}-${String(jour).padStart(2,'0')}`;
       const r = parDate[dateISO];
-      const montant = r ? (Number(r.montant) || 0) : 0;
+      const montant = totalLignesJour(r);
       total += montant;
       const dateLabel = capitalize(new Date(dateISO + 'T00:00:00').toLocaleDateString('fr-BE', { weekday:'short', day:'2-digit', month:'2-digit' }));
+      const nbCategories = r?.lignes?.length ? ` <span class="badge badge-neutral">${r.lignes.length} cat.</span>` : '';
       lignes += `<tr onclick="window.ouvrirModalRecette('${dateISO}')" style="cursor:pointer;">
         <td>${dateLabel}</td>
-        <td class="${montant>0?'montant-recette':''}">${montant.toFixed(2)} €</td>
+        <td class="${montant>0?'montant-recette':''}">${montant.toFixed(2)} €${nbCategories}</td>
         <td>${r?.factureJournalVente ? '✓' : ''}</td>
         <td>${escapeHtml(r?.referenceJournalVente||'')}</td>
         <td class="solde">${total.toFixed(2)} €</td>
@@ -2717,11 +3200,35 @@ async function chargerLivreRecettes() {
 window.ouvrirModalRecette = (dateISO) => {
   const r = window._livreRecettesParDate[dateISO];
   const dateLabel = capitalize(new Date(dateISO + 'T00:00:00').toLocaleDateString('fr-BE', { weekday:'long', day:'numeric', month:'long', year:'numeric' }));
+  // Reprend les lignes existantes, ou convertit l'ancien format (un seul
+  // montant sans catégorie) en une première ligne "Autre" éditable.
+  let lignesInitiales = Array.isArray(r?.lignes) && r.lignes.length > 0
+    ? r.lignes.map(l => ({ ...l }))
+    : (r?.montant ? [{ categorie: '', montant: r.montant }] : []);
+  if (lignesInitiales.length === 0) lignesInitiales = [{ categorie: '', montant: '' }];
+
+  const optionsCategories = (categorieChoisie) => categoriesRecettesCache.map(c =>
+    `<option value="${escapeHtml(c.nom)}" ${categorieChoisie === c.nom ? 'selected' : ''}>${escapeHtml(c.nom)}</option>`).join('');
+
+  const ligneHtml = (l, i) => `
+    <div class="form-grid lr-ligne" data-index="${i}" style="align-items:end;">
+      <div class="field"><label>Catégorie</label>
+        <select class="lr-ligne-categorie">${categoriesRecettesCache.length ? `<option value="">— Choisir —</option>${optionsCategories(l.categorie)}` : '<option value="">Aucune catégorie créée</option>'}</select>
+      </div>
+      <div class="field" style="display:flex; gap:6px; align-items:end;">
+        <div style="flex:1;"><label>Montant (€)</label><input type="number" step="0.01" class="lr-ligne-montant" value="${l.montant ?? ''}"></div>
+        <button class="btn-sm danger" type="button" onclick="this.closest('.lr-ligne').remove(); window._recalculerTotalLigneRecette()">✕</button>
+      </div>
+    </div>`;
+
   const html = `
     <div class="modal-overlay" id="modalOverlayRecette">
       <div class="modal-box">
         <h3>Recette du ${dateLabel}</h3>
-        <div class="field"><label>Montant (€)</label><input type="number" step="0.01" id="lr-montant" value="${r?.montant ?? 0}"></div>
+        <p style="color:var(--terre); font-size:0.85rem; margin-bottom:8px;">Ventile la recette du jour par catégorie (une ligne par catégorie). Le total se calcule tout seul.</p>
+        <div id="lr-lignesZone">${lignesInitiales.map(ligneHtml).join('')}</div>
+        <button class="btn-sm" type="button" id="lr-ajouterLigne">+ Ajouter une catégorie</button>
+        <p style="margin-top:10px; font-weight:700;">Total du jour : <span id="lr-totalCalcule">0.00</span> €</p>
         <div class="field"><label>Facturé (via journal de vente) ?</label>
           <select id="lr-facture">
             <option value="non" ${!r?.factureJournalVente?'selected':''}>Non</option>
@@ -2736,12 +3243,34 @@ window.ouvrirModalRecette = (dateISO) => {
       </div>
     </div>`;
   document.getElementById('modalZone').innerHTML = html;
+
+  window._recalculerTotalLigneRecette = () => {
+    let total = 0;
+    document.querySelectorAll('#lr-lignesZone .lr-ligne-montant').forEach(inp => { total += parseFloat(inp.value) || 0; });
+    document.getElementById('lr-totalCalcule').textContent = total.toFixed(2);
+  };
+  document.getElementById('lr-lignesZone').addEventListener('input', (e) => {
+    if (e.target.classList.contains('lr-ligne-montant')) window._recalculerTotalLigneRecette();
+  });
+  document.getElementById('lr-ajouterLigne').addEventListener('click', () => {
+    const zone = document.getElementById('lr-lignesZone');
+    const div = document.createElement('div');
+    div.innerHTML = ligneHtml({ categorie: '', montant: '' }, zone.children.length);
+    zone.appendChild(div.firstElementChild);
+  });
+  window._recalculerTotalLigneRecette();
+
   document.getElementById('lr-save').addEventListener('click', async () => {
-    const montant = parseFloat(document.getElementById('lr-montant').value) || 0;
+    const lignesSaisies = [...document.querySelectorAll('#lr-lignesZone .lr-ligne')].map(el => ({
+      categorie: el.querySelector('.lr-ligne-categorie')?.value || '',
+      montant: parseFloat(el.querySelector('.lr-ligne-montant').value) || 0
+    })).filter(l => l.montant > 0);
     const factureJournalVente = document.getElementById('lr-facture').value === 'oui';
     const referenceJournalVente = document.getElementById('lr-reference').value.trim();
     try {
-      await setDoc(doc(db, 'livre_recettes', dateISO), { date: dateISO, montant, factureJournalVente, referenceJournalVente }, { merge: true });
+      await setDoc(doc(db, 'livre_recettes', dateISO), {
+        date: dateISO, lignes: lignesSaisies, montant: null, factureJournalVente, referenceJournalVente
+      }, { merge: true });
       window.fermerModal();
       chargerLivreRecettes();
     } catch (err) {
@@ -2756,24 +3285,37 @@ document.getElementById('btnExporterRecettes').addEventListener('click', () => {
   const bissextile = (an % 4 === 0 && (an % 100 !== 0 || an % 400 === 0));
   const joursParMois = [31, bissextile ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   let total = 0;
-  const lignes = [];
+  const lignesExport = [];
   for (let mois = 0; mois < 12; mois++) {
     for (let jour = 1; jour <= joursParMois[mois]; jour++) {
       const dateISO = `${an}-${String(mois+1).padStart(2,'0')}-${String(jour).padStart(2,'0')}`;
       const r = parDate[dateISO];
-      const montant = r ? (Number(r.montant) || 0) : 0;
-      total += montant;
-      lignes.push({
-        'Date': dateISO,
-        'Recette du jour (€)': montant,
-        'Facturé ?': r?.factureJournalVente ? 'Oui' : 'Non',
-        'Référence journal de vente': r?.referenceJournalVente || '',
-        'Cumul (€)': Number(total.toFixed(2))
-      });
+      const montantJour = totalLignesJour(r);
+      total += montantJour;
+      if (Array.isArray(r?.lignes) && r.lignes.length > 0) {
+        r.lignes.forEach((l, i) => {
+          lignesExport.push({
+            'Date': i === 0 ? dateISO : '',
+            'Catégorie': l.categorie || '',
+            'Montant (€)': Number(l.montant) || 0,
+            'Total du jour (€)': i === 0 ? montantJour : '',
+            'Facturé ?': i === 0 ? (r?.factureJournalVente ? 'Oui' : 'Non') : '',
+            'Référence journal de vente': i === 0 ? (r?.referenceJournalVente || '') : '',
+            'Cumul (€)': i === 0 ? Number(total.toFixed(2)) : ''
+          });
+        });
+      } else {
+        lignesExport.push({
+          'Date': dateISO, 'Catégorie': '', 'Montant (€)': montantJour, 'Total du jour (€)': montantJour,
+          'Facturé ?': r?.factureJournalVente ? 'Oui' : 'Non',
+          'Référence journal de vente': r?.referenceJournalVente || '',
+          'Cumul (€)': Number(total.toFixed(2))
+        });
+      }
     }
   }
-  const feuille = XLSX.utils.json_to_sheet(lignes);
-  feuille['!cols'] = [{wch:12},{wch:16},{wch:9},{wch:22},{wch:12}];
+  const feuille = XLSX.utils.json_to_sheet(lignesExport);
+  feuille['!cols'] = [{wch:12},{wch:18},{wch:12},{wch:14},{wch:9},{wch:22},{wch:12}];
   const classeur = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(classeur, feuille, `Recettes ${an}`);
   XLSX.writeFile(classeur, `Livre-des-recettes-Lar-Allegria-${an}.xlsx`);

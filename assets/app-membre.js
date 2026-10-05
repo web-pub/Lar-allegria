@@ -5,7 +5,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-017';
+const VERSION_SITE = 'V01-024';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -44,6 +44,7 @@ onAuthStateChanged(auth, async (user) => {
   document.getElementById('tabNettoyageBtn').classList.toggle('hidden', membreData.typeMembre !== 'pension');
   document.getElementById('tabBenevolatBtn').classList.toggle('hidden', membreData.typeMembre !== 'benevole');
   document.getElementById('tabStockBtn').classList.toggle('hidden', membreData.typeMembre !== 'benevole');
+  document.getElementById('tabAbonnementBtn').classList.toggle('hidden', !membreData.abonnement);
   document.getElementById('resaTypeChoix').classList.toggle('hidden', membreData.typeMembre !== 'pension');
 
   afficherAccueil();
@@ -56,6 +57,7 @@ onAuthStateChanged(auth, async (user) => {
   chargerBoutiqueMembre();
   chargerHistoriquePaiementsMembre();
   chargerStockMembre();
+  if (membreData.abonnement) chargerAbonnementMembre();
   if (membreData.typeMembre === 'pension') chargerNettoyage();
   if (membreData.typeMembre === 'benevole') chargerPlanningBenevole();
 
@@ -83,9 +85,78 @@ function afficherAccueil() {
   const badgeCotis = membreData.typeMembre === 'benevole' ? '' : (membreData.cotisationPayee
     ? `<span class="badge badge-ok">Cotisation à jour</span>`
     : `<span class="badge badge-warn">Cotisation à régler</span>`);
-  document.getElementById('badgesAbo').innerHTML = badgeType + ' ' + badgeCotis;
+  const badgeAbo = membreData.abonnement ? `<span class="badge badge-neutral">Abonnement</span>` : '';
+  document.getElementById('badgesAbo').innerHTML = badgeType + ' ' + badgeCotis + ' ' + badgeAbo;
   afficherRappelCotisation();
+  afficherRappelAbonnement();
+  afficherZoneSuppressionCompte();
 }
+
+function afficherZoneSuppressionCompte() {
+  const zone = document.getElementById('zoneSuppressionCompte');
+  if (!zone) return;
+  if (membreData.suppressionDemandee) {
+    zone.innerHTML = `<p style="color:var(--terre); font-size:0.85rem;">Vous avez demandé la suppression de votre fiche le ${new Date(membreData.suppressionDateDemande?.seconds ? membreData.suppressionDateDemande.seconds*1000 : Date.now()).toLocaleDateString('fr-BE')}. Lara va la traiter.</p>`;
+    return;
+  }
+  zone.innerHTML = `<button class="btn-sm danger" onclick="window.ouvrirModalSuppressionCompte()">Demander la suppression de ma fiche</button>`;
+}
+window.ouvrirModalSuppressionCompte = () => {
+  const html = `
+    <div class="modal-overlay" id="modalOverlaySuppressionCompte">
+      <div class="modal-box">
+        <h3>Demander la suppression de ma fiche</h3>
+        <p style="color:var(--terre); font-size:0.85rem; margin-bottom:12px;">Cette demande sera transmise à Lara, qui traitera la suppression définitive de votre compte. Merci d'indiquer le motif de votre départ.</p>
+        <div class="field"><label>Motif *</label><textarea id="sc-motif" rows="3" required spellcheck="true" lang="fr"></textarea></div>
+        <div class="modal-actions">
+          <button class="btn-sm" type="button" onclick="document.getElementById('modalOverlaySuppressionCompte').remove()">Annuler</button>
+          <button class="btn-sm danger" type="button" id="sc-confirmer">Envoyer la demande</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('sc-confirmer').addEventListener('click', async () => {
+    const motif = document.getElementById('sc-motif').value.trim();
+    if (!motif) { alert('Merci d\'indiquer un motif.'); return; }
+    try {
+      await updateDoc(doc(db, 'membres', membreUid), {
+        suppressionDemandee: true,
+        suppressionMotif: motif,
+        suppressionDateDemande: serverTimestamp()
+      });
+      membreData.suppressionDemandee = true;
+      membreData.suppressionMotif = motif;
+      document.getElementById('modalOverlaySuppressionCompte').remove();
+      afficherZoneSuppressionCompte();
+    } catch (err) {
+      alert('Erreur : ' + (err.code || err.message));
+    }
+  });
+};
+
+function afficherRappelAbonnement() {
+  const zone = document.getElementById('zoneAbonnement');
+  if (!zone) return;
+  if (!membreData.abonnement) { zone.innerHTML = ''; return; }
+  const restants = membreData.abonnementCoursRestants ?? 0;
+  if (restants > 2) { zone.innerHTML = ''; return; }
+  if (membreData.abonnementRenouvellementDemande) {
+    zone.innerHTML = `<div class="banner-alert">Il vous reste <strong>${restants} cours</strong> — vous avez demandé le renouvellement de votre abonnement, Lara s'en occupe.</div>`;
+    return;
+  }
+  zone.innerHTML = `
+    <div class="banner-alert ${restants === 0 ? 'danger' : ''}">
+      ${restants === 0 ? "Votre abonnement est épuisé (0 cours restant)." : `Il ne vous reste que <strong>${restants} cours</strong> dans votre abonnement.`}
+      <div class="presence-btns">
+        <button class="btn-sm primary" onclick="window.demanderRenouvellementAbonnement()">Demander le renouvellement</button>
+      </div>
+    </div>`;
+}
+window.demanderRenouvellementAbonnement = async () => {
+  await updateDoc(doc(db, 'membres', membreUid), { abonnementRenouvellementDemande: true });
+  membreData.abonnementRenouvellementDemande = true;
+  afficherRappelAbonnement();
+};
 
 function afficherRappelCotisation() {
   const zone = document.getElementById('zoneCotisation');
@@ -532,8 +603,8 @@ async function chargerMesReservations() {
   let mesResa = [];
   snap.forEach(d => mesResa.push({ id: d.id, ...d.data() }));
   const aujourdhui = dateISOLocale(new Date());
-  const aVenir = mesResa.filter(r => r.date >= aujourdhui && r.statut !== 'annulee' && r.statut !== 'refusee').sort((a,b) => (a.date+a.heureDebut).localeCompare(b.date+b.heureDebut));
-  const passees = mesResa.filter(r => r.date < aujourdhui || r.statut === 'annulee' || r.statut === 'refusee').sort((a,b) => (b.date+b.heureDebut).localeCompare(a.date+a.heureDebut));
+  const aVenir = mesResa.filter(r => r.date >= aujourdhui && r.statut !== 'refusee').sort((a,b) => (a.date+a.heureDebut).localeCompare(b.date+b.heureDebut));
+  const passees = mesResa.filter(r => r.date < aujourdhui || r.statut === 'refusee').sort((a,b) => (b.date+b.heureDebut).localeCompare(a.date+a.heureDebut));
 
   const wrapListe = document.getElementById('zoneMesReservations');
   const wrapAccueil = document.getElementById('zoneProchaines');
@@ -550,10 +621,13 @@ async function chargerMesReservations() {
     const badge = r.statut === 'validee' ? '<span class="badge badge-ok">Validée par Lara</span>'
       : r.statut === 'en_attente' ? '<span class="badge badge-warn">En attente de validation</span>'
       : r.statut === 'refusee' ? '<span class="badge badge-danger">Refusée</span>'
+      : r.annulePar === 'admin' ? '<span class="badge badge-danger">Annulée par Lara</span>'
       : '<span class="badge badge-neutral">Annulée</span>';
     const motifLabel = { vacances: 'Vacances', malade: 'Malade' }[r.motifAnnulation] || (r.motifAnnulation === 'autre' ? r.motifAnnulationDetail : '');
     const motifHtml = (r.statut === 'annulee' && motifLabel) ? `<div class="data-sub">Motif : ${escapeHtml(motifLabel)}</div>` : '';
-    const peutAnnuler = (r.statut === 'en_attente' || r.statut === 'validee') && r.date >= aujourdhui;
+    const heuresRestantes = (new Date(`${r.date}T${r.heureDebut}:00`) - new Date()) / 3600000;
+    const peutAnnuler = r.statut === 'en_attente' || (r.statut === 'validee' && heuresRestantes >= 24);
+    const troplTardPourAnnuler = r.statut === 'validee' && r.date >= aujourdhui && heuresRestantes >= 0 && heuresRestantes < 24;
     const libelleAnnuler = r.recurrenceId ? 'Libérer ce créneau' : 'Annuler';
     return `
     <div class="data-row">
@@ -561,9 +635,10 @@ async function chargerMesReservations() {
         <div class="data-title">${dateLabel} — ${r.heureDebut} (${r.type === 'libre' ? 'piste libre' : 'cours'})</div>
         <div class="data-sub">${badge}</div>
         ${motifHtml}
+        ${troplTardPourAnnuler ? '<div class="data-sub">Annulation en ligne impossible à moins de 24h — contactez Lara si besoin.</div>' : ''}
         ${meteoHtml}
       </div>
-      ${peutAnnuler ? `<div class="data-actions"><button class="btn-sm danger" onclick="window.demanderAnnulationReservation('${r.id}','${escapeHtml(dateLabel)}','${r.heureDebut}',${r.recurrenceId ? 'true' : 'false'})">${libelleAnnuler}</button></div>` : ''}
+      ${peutAnnuler ? `<div class="data-actions"><button class="btn-sm danger" onclick="window.demanderAnnulationReservation('${r.id}','${escapeHtml(dateLabel)}','${r.heureDebut}',${r.recurrenceId ? 'true' : 'false'},'${r.type}',${r.statut==='validee'},'${r.date}')">${libelleAnnuler}</button></div>` : ''}
     </div>`;
   };
 
@@ -572,7 +647,7 @@ async function chargerMesReservations() {
   wrapHisto.innerHTML = passees.length ? (await Promise.all(passees.map(r => ligneResa(r, false)))).join('') : '<div class="empty-state">Aucun historique pour l\'instant.</div>';
 }
 
-window.demanderAnnulationReservation = (id, dateLabel, heure, estRecurrence) => {
+window.demanderAnnulationReservation = (id, dateLabel, heure, estRecurrence, type, etaitValidee, dateISOCours) => {
   const html = `
     <div class="modal-overlay" id="modalOverlayAnnulResa">
       <div class="modal-box" style="max-width:440px;">
@@ -607,6 +682,24 @@ window.demanderAnnulationReservation = (id, dateLabel, heure, estRecurrence) => 
         motifAnnulation: motif,
         motifAnnulationDetail: motif === 'autre' ? motifAutre : ''
       });
+      // Annulation à ≥24h d'un cours confirmé sur abonnement : le cours est
+      // recrédité automatiquement (comme pour Les Cabots de Fernelmont) en
+      // retirant cette date précise de l'abonnement actif.
+      if (type === 'cours' && etaitValidee && membreData.abonnement) {
+        try {
+          const snapAbo = await getDocs(query(collection(db, 'abonnements_membres'), where('membreId', '==', membreUid), where('actif', '==', true)));
+          if (!snapAbo.empty) {
+            const aboDoc = snapAbo.docs[0];
+            const utilises = [...(aboDoc.data().coursUtilises || [])];
+            const idx = utilises.findIndex(c => c.date === dateISOCours);
+            if (idx !== -1) {
+              utilises.splice(idx, 1);
+              await updateDoc(doc(db, 'abonnements_membres', aboDoc.id), { coursUtilises: utilises });
+              await chargerAbonnementMembre();
+            }
+          }
+        } catch (err) { /* si le crédit échoue, l'annulation reste valable ; Lara pourra ajuster manuellement */ }
+      }
       document.getElementById('modalOverlayAnnulResa').remove();
       await renderGrilleReservations();
       await chargerMesReservations();
@@ -1038,6 +1131,61 @@ async function chargerStockMembre() {
     wrap.innerHTML = `<div class="banner-alert danger">Erreur : ${escapeHtml(err.code || '')} — ${escapeHtml(err.message || String(err))}</div>`;
   }
 }
+function formatDateCourteMembre(iso) {
+  if (!iso) return '—';
+  return capitalize(new Date(iso + 'T00:00:00').toLocaleDateString('fr-BE', { day:'numeric', month:'long', year:'numeric' }));
+}
+let abonnementsMembreCache = [];
+async function chargerAbonnementMembre() {
+  const zoneActuel = document.getElementById('zoneAbonnementMembreActuel');
+  const zoneHisto = document.getElementById('zoneAbonnementMembreHistorique');
+  try {
+    const snap = await getDocs(query(collection(db, 'abonnements_membres'), where('membreId', '==', membreUid)));
+    abonnementsMembreCache = [];
+    snap.forEach(d => abonnementsMembreCache.push({ id: d.id, ...d.data() }));
+    abonnementsMembreCache.sort((a, b) => (b.dateSouscription || '').localeCompare(a.dateSouscription || ''));
+
+    const actif = abonnementsMembreCache.find(a => a.actif);
+    if (!actif) {
+      zoneActuel.innerHTML = `
+        <div class="empty-state">Vous n'avez pas d'abonnement actif pour le moment.</div>
+        <button class="btn-sm primary" style="margin-top:10px;" onclick="window.demanderNouvelAbonnement()">Demander un nouvel abonnement</button>`;
+    } else {
+      const utilises = actif.coursUtilises || [];
+      const restants = 11 - utilises.length;
+      const listeDates = utilises.length
+        ? utilises.map(c => `<li>${formatDateCourteMembre(c.date)}</li>`).join('')
+        : '<li>Aucun cours utilisé pour l\'instant.</li>';
+      zoneActuel.innerHTML = `
+        <div class="data-row">
+          <div class="data-main">
+            <div class="data-title">Abonnement souscrit le ${formatDateCourteMembre(actif.dateSouscription)}</div>
+            <div class="data-sub">
+              ${actif.paye ? `<span class="badge badge-ok">Payé le ${formatDateCourteMembre(actif.datePaiement)}</span>` : '<span class="badge badge-warn">Non payé</span>'}
+              <span class="badge ${restants<=2 ? 'badge-danger' : 'badge-neutral'}">${restants} / 11 cours restants</span>
+            </div>
+          </div>
+        </div>
+        ${restants <= 2 ? `<div class="banner-alert ${restants===0?'danger':''}" style="margin-top:10px;">${restants === 0 ? "Votre abonnement est épuisé." : `Il ne vous reste que ${restants} cours.`} <button class="btn-sm primary" style="margin-top:6px;" onclick="window.demanderNouvelAbonnement()">Demander un nouvel abonnement</button></div>` : ''}
+        <ul style="margin-top:12px; padding-left:20px; color:var(--terre); font-size:0.9rem;">${listeDates}</ul>`;
+    }
+
+    const historique = abonnementsMembreCache.filter(a => !a.actif);
+    zoneHisto.innerHTML = historique.length === 0
+      ? '<div class="empty-state">Aucun abonnement passé.</div>'
+      : historique.map(a => {
+          const utilises = a.coursUtilises || [];
+          return `<div class="data-row"><div class="data-main"><div class="data-title">Souscrit le ${formatDateCourteMembre(a.dateSouscription)}</div><div class="data-sub">${a.paye ? 'Payé le ' + formatDateCourteMembre(a.datePaiement) : 'Non payé'} · ${utilises.length}/11 cours utilisés</div></div></div>`;
+        }).join('');
+  } catch (err) {
+    zoneActuel.innerHTML = '<div class="empty-state">Impossible de charger votre abonnement pour le moment.</div>';
+  }
+}
+window.demanderNouvelAbonnement = async () => {
+  await updateDoc(doc(db, 'membres', membreUid), { abonnementRenouvellementDemande: true });
+  alert('Votre demande a bien été transmise à Lara.');
+};
+
 window.signalerPriseStock = async (id) => {
   const item = stockCache.find(s => s.id === id);
   if (!item) return;
