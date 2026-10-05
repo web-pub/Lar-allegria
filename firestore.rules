@@ -1,5 +1,5 @@
 // Projet : Lar-allegria
-// Site : Lar'Allegria by Lara Rossoux — V01-021
+// Site : Lar'Allegria by Lara Rossoux — V01-024
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -29,14 +29,37 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys()
         .hasOnly(['gsm','email','adressePostale','niveauEquitation','contactUrgence',
                   'assuranceRC','chevaux','cotisationRenouvellement',
-                  'motDePasseActuel','derniereConnexion','abonnementRenouvellementDemande']);
+                  'motDePasseActuel','derniereConnexion','abonnementRenouvellementDemande',
+                  'suppressionDemandee','suppressionMotif','suppressionDateDemande']);
     }
 
     match /membres/{uid} {
       allow read: if estConnecte() && (request.auth.uid == uid || estAdmin());
       allow create: if estAdmin();
-      allow update: if estAdmin() || (estConnecte() && request.auth.uid == uid && champsAutorisesMembre());
-      allow delete: if estAdmin();
+      // Le compte de démonstration (compteDemo == true) ne peut être
+      // modifié ou supprimé que par le super-admin — un admin classique
+      // (Lara) ne peut ni l'archiver, ni changer son mot de passe, ni le
+      // modifier d'aucune façon, même si elle a par ailleurs tous les
+      // droits sur les autres fiches membres.
+      allow update: if estSuperAdmin() ||
+        (estAdmin() && resource.data.get('compteDemo', false) != true) ||
+        (estConnecte() && request.auth.uid == uid && champsAutorisesMembre());
+      allow delete: if estSuperAdmin() || (estAdmin() && resource.data.get('compteDemo', false) != true);
+    }
+
+    // Abonnements (10+1 cours) : historique complet par membre. L'admin
+    // gère tout. Un membre peut lire les siens, et peut seulement RETIRER
+    // une date de cours utilisée de son abonnement actif (jamais en
+    // ajouter, jamais toucher aux autres champs) — c'est ce qui permet le
+    // crédit automatique quand il annule un cours ≥24h à l'avance.
+    match /abonnements_membres/{id} {
+      allow read: if estAdmin() || (estConnecte() && resource.data.membreId == request.auth.uid);
+      allow create, delete: if estAdmin();
+      allow update: if estAdmin() || (
+        estConnecte() && resource.data.membreId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coursUtilises']) &&
+        request.resource.data.coursUtilises.size() == resource.data.coursUtilises.size() - 1
+      );
     }
 
     // Demandes d'inscription : formulaire public, écrit par des visiteurs

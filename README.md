@@ -1,4 +1,4 @@
-# Lar'Allegria by Lara Rossoux — site du club (V01-021)
+# Lar'Allegria by Lara Rossoux — site du club (V01-024)
 
 Dépôt GitHub : **web-pub/Lar-allegria**. Projet Firebase : **Lar-allegria**.
 

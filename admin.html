@@ -136,7 +136,10 @@
     <div class="app-panel">
       <div class="section-heading">
         <h2>Membres</h2>
-        <button class="btn-sm primary" id="btnAjouterMembre">+ Ajouter un membre</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-sm primary" id="btnAjouterMembre">+ Ajouter un membre</button>
+          <button class="btn-sm hidden" id="btnCreerCompteDemo">+ Créer le compte de démonstration</button>
+        </div>
       </div>
       <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Pour créer l'accès d'un membre, crée d'abord son compte dans Firebase Authentication (voir README), puis ajoute sa fiche ici avec l'UID généré.</p>
       <input type="text" id="rechercheMembre" placeholder="🔍 Rechercher un membre..." style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #DCCBA8; border-radius:6px; margin-bottom:14px; font-size:0.95rem;">

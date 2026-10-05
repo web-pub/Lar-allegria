@@ -37,6 +37,7 @@
     <button class="tab-btn" data-tab="tarifs">Tarifs</button>
     <button class="tab-btn" data-tab="boutique" id="tabBoutiqueBtn">Boutique</button>
     <button class="tab-btn hidden" data-tab="stock" id="tabStockBtn">Stock</button>
+    <button class="tab-btn hidden" data-tab="abonnement" id="tabAbonnementBtn">Abonnement</button>
     <button class="tab-btn" data-tab="messages" id="tabMessagesBtn">Messages</button>
     <button class="tab-btn" data-tab="historique">Historique</button>
   </div>
@@ -48,6 +49,7 @@
       <div id="badgesAbo"></div>
       <div id="zoneCotisation" style="margin-top:12px;"></div>
       <div id="zoneAbonnement" style="margin-top:12px;"></div>
+      <div id="zoneSuppressionCompte" style="margin-top:20px; padding-top:16px; border-top:1px solid #EDE3D0;"></div>
     </div>
 
     <div class="app-panel">
@@ -221,6 +223,19 @@
       <h2>Stock du club</h2>
       <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Foin, nourriture, litière... Si vous prenez quelque chose, signalez-le ici pour tenir le stock à jour.</p>
       <div class="data-list" id="zoneStockMembre"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+
+  <!-- ==================== ABONNEMENT ==================== -->
+  <div id="panel-abonnement" class="tab-panel hidden">
+    <div class="app-panel">
+      <h2>Mon abonnement</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Abonnement de 10 cours + 1 offert. Chaque cours validé par Lara décompte un cours.</p>
+      <div id="zoneAbonnementMembreActuel"><div class="empty-state">Chargement...</div></div>
+    </div>
+    <div class="app-panel">
+      <h2>Historique de mes abonnements</h2>
+      <div id="zoneAbonnementMembreHistorique"><div class="empty-state">...</div></div>
     </div>
   </div>
 
