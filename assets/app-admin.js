@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-026';
+const VERSION_SITE = 'V01-030';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -141,7 +141,11 @@ function afficherSignatureContrat(c) {
 }
 
 async function afficherAccordCollaborationSiBesoin() {
-  if (compteActuel.role !== 'admin') return; // jamais au Super Admin
+  if (compteActuel.role === 'superadmin') { // crée la V1 dès la connexion si absente
+    try { await chargerContratCourant(); } catch (err) { console.warn('Contrat :', err); }
+    return;
+  }
+  if (compteActuel.role !== 'admin') return;
   try {
     const versions = await chargerContratCourant();
     if (!versions.length) return;
@@ -156,7 +160,7 @@ async function renderContrat() {
   let versions;
   try { versions = await chargerContratCourant(); }
   catch (err) { zone.innerHTML = '<div class="empty-state">Lecture impossible : ' + escapeHtml(err.code || err.message) + '</div>'; return; }
-  if (!versions.length) { zone.innerHTML = '<div class="empty-state">Aucun contrat n\'est encore publié.</div>'; return; }
+  if (!versions.length) { zone.innerHTML = '<div class="empty-state">Le contrat n\'est pas encore publié. Il sera disponible ici dès qu\'il aura été mis en ligne.</div>'; return; }
   contratCourant = versions[0];
   const c = contratCourant;
   const estSuper = compteActuel.role === 'superadmin';
@@ -318,7 +322,21 @@ async function chargerMeteoResume() {
 // ==========================================================================
 // MEMBRES (cache utilisé par plusieurs sections)
 // ==========================================================================
-async function chargerMembres() {
+// Sans argument : recharge toute la liste (1 lecture par membre). Avec un
+// uid : ne relit que cette fiche (1 seule lecture) — utilisé après chaque
+// modification pour rester dans le quota gratuit Firestore.
+async function chargerMembres(uidUnique) {
+  if (uidUnique) {
+    const d = await getDoc(doc(db, 'membres', uidUnique));
+    membresCache = membresCache.filter(x => x.id !== uidUnique);
+    delete membresParUid[uidUnique];
+    if (d.exists()) {
+      const m = { id: d.id, ...d.data() };
+      if (m.role !== 'admin' && m.role !== 'superadmin') membresCache.push(m);
+      membresParUid[d.id] = m;
+    }
+    return;
+  }
   // Lara (admin) ne peut pas lire la fiche du Super Admin : on filtre côté requête.
   const snap = compteActuel.role === 'superadmin'
     ? await getDocs(collection(db, 'membres'))
@@ -975,7 +993,7 @@ window.supprimerDefinitivementMembre = async (id, identifiant) => {
   try {
     await deleteDoc(doc(db, 'membres', id));
     window.fermerModal();
-    await chargerMembres();
+    await chargerMembres(id);
     renderMembres();
     alert(compteAuthSupprime
       ? 'Fiche et compte de connexion supprimés.'
@@ -991,11 +1009,11 @@ window.archiverMembre = async (id) => {
     return;
   }
   await updateDoc(doc(db, 'membres', id), { archive: true });
-  await chargerMembres(); renderMembres();
+  await chargerMembres(id); renderMembres();
 };
 window.reactiverMembre = async (id) => {
   await updateDoc(doc(db, 'membres', id), { archive: false });
-  await chargerMembres(); renderMembres();
+  await chargerMembres(id); renderMembres();
 };
 
 window.ouvrirModalMembre = (membre, demandeId) => {
@@ -1228,7 +1246,7 @@ window.ouvrirModalMembre = (membre, demandeId) => {
       await setDoc(doc(db, 'membres', uid), data, { merge: true });
       if (demandeId) await updateDoc(doc(db, 'demandes_inscription', demandeId), { statut: 'traitee' });
       window.fermerModal();
-      await chargerMembres();
+      await chargerMembres(uid);
       renderMembres();
       chargerDemandesInscription();
     } catch (err) {
@@ -2802,7 +2820,7 @@ window.reinitialiserMotDePasse = async (uid, identifiant) => {
     await reinitialiserMotDePasseCompte(identifiant, ancien, nouveau);
     await updateDoc(doc(db, 'membres', uid), { motDePasseActuel: nouveau });
     alert(`Mot de passe de "${identifiant}" réinitialisé.`);
-    await chargerMembres();
+    await chargerMembres(uid);
     chargerMotsDePasseAdmin();
   } catch (err) {
     if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
