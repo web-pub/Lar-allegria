@@ -34,6 +34,7 @@
     <button class="tab-btn" data-tab="evenements">Événements</button>
     <button class="tab-btn" data-tab="blog">Blog</button>
     <button class="tab-btn" data-tab="livreor">📖 Livre d'or</button>
+    <button class="tab-btn" data-tab="partenaires">🤝 Partenaires</button>
     <button class="tab-btn" data-tab="boutique" id="tabBoutiqueBtn">Boutique</button>
     <button class="tab-btn" data-tab="stock">Stock</button>
     <button class="tab-btn" data-tab="planning-benevoles">Planning bénévoles</button>
@@ -43,7 +44,9 @@
     <button class="tab-btn" data-tab="livrecaisse">💰 Livre de caisse</button>
     <button class="tab-btn" data-tab="comptabilite">📒 Comptabilité</button>
     <button class="tab-btn" data-tab="livrerecettes">📗 Livre des recettes</button>
+    <button class="tab-btn" data-tab="contrat">📄 Contrat</button>
     <button class="tab-btn hidden" data-tab="motsdepasse" id="tabMotsDePasseBtn">🔑 Mots de passe</button>
+    <button class="tab-btn hidden" data-tab="maintenance" id="tabMaintenanceBtn">🛠 Maintenance</button>
   </div>
 
   <!-- ==================== RÉSERVATIONS ==================== -->
@@ -136,10 +139,7 @@
     <div class="app-panel">
       <div class="section-heading">
         <h2>Membres</h2>
-        <div style="display:flex; gap:8px;">
-          <button class="btn-sm primary" id="btnAjouterMembre">+ Ajouter un membre</button>
-          <button class="btn-sm hidden" id="btnCreerCompteDemo">+ Créer le compte de démonstration</button>
-        </div>
+        <button class="btn-sm primary" id="btnAjouterMembre">+ Ajouter un membre</button>
       </div>
       <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Pour créer l'accès d'un membre, crée d'abord son compte dans Firebase Authentication (voir README), puis ajoute sa fiche ici avec l'UID généré.</p>
       <input type="text" id="rechercheMembre" placeholder="🔍 Rechercher un membre..." style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #DCCBA8; border-radius:6px; margin-bottom:14px; font-size:0.95rem;">
@@ -488,6 +488,47 @@
     </div>
   </div>
 
+
+  <!-- ==================== PARTENAIRES ==================== -->
+  <div id="panel-partenaires" class="tab-panel hidden">
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>Partenaires</h2>
+        <button class="btn-sm primary" id="btnAjouterPartenaire">+ Ajouter un partenaire</button>
+      </div>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Affichés sur la page publique "Partenaires", visible de tous les visiteurs, dans l'ordre indiqué.</p>
+      <div class="data-list" id="listePartenaires"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+
+  <!-- ==================== CONTRAT ==================== -->
+  <div id="panel-contrat" class="tab-panel hidden">
+    <div id="zoneContrat"><div class="empty-state">Chargement…</div></div>
+  </div>
+
+  <!-- ==================== MAINTENANCE (super-admin uniquement) ==================== -->
+  <div id="panel-maintenance" class="tab-panel hidden">
+    <div class="app-panel">
+      <h2>🛠 Maintenance</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Outils réservés au Super Admin. Chaque bouton ne sert qu'une fois (il détecte si l'élément existe déjà).</p>
+      <div class="data-list">
+        <div class="data-row">
+          <div class="data-main">
+            <div class="data-title">Compte de démonstration "Hexelya"</div>
+            <div class="data-sub">Crée le compte membre de démo (identifiant Hexelya) pour présenter le site, sans déconnecter ta session. Invisible et intouchable depuis l'Admin simple.</div>
+          </div>
+          <div class="data-actions"><button class="btn-sm primary" id="btnCreerCompteDemo">Créer le compte démo Hexelya</button></div>
+        </div>
+        <div class="data-row">
+          <div class="data-main">
+            <div class="data-title">Partenaire par défaut "Hexelya"</div>
+            <div class="data-sub">Crée la fiche partenaire Hexelya (texte et logo par défaut) sur la page publique "Partenaires". Modifiable uniquement ici, depuis le Super Admin.</div>
+          </div>
+          <div class="data-actions"><button class="btn-sm primary" id="btnCreerPartenaireHexelya">Créer le partenaire Hexelya</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ==================== MOTS DE PASSE (super-admin uniquement) ==================== -->
   <div id="panel-motsdepasse" class="tab-panel hidden">

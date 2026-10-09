@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nous contacter — Lar'Allegria by Lara Rossoux | Grâce-Hollogne</title>
-<meta name="description" content="Contactez l'école équestre Lar'Allegria by Lara Rossoux à Grâce-Hollogne par téléphone ou par email pour toute question ou inscription.">
-<link rel="canonical" href="https://web-pub.github.io/Lar-allegria/contact.html">
+<title>Partenaires — Lar'Allegria by Lara Rossoux | École équestre</title>
+<meta name="description" content="Les partenaires de l'école équestre Lar'Allegria by Lara Rossoux à Grâce-Hollogne.">
+<link rel="canonical" href="https://web-pub.github.io/Lar-allegria/partenaires.html">
 <link rel="icon" href="assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -36,7 +36,7 @@
         <li><a href="livre-or.html">Livre d'or</a></li>
         <li><a href="tarifs.html">Tarifs</a></li>
         <li><a href="inscription.html">Inscription</a></li>
-        <li><a href="contact.html" class="active">Nous contacter</a></li>
+        <li><a href="contact.html">Nous contacter</a></li>
         <li><a href="connexion.html">Connexion</a></li>
       </ul>
     </nav>
@@ -45,40 +45,17 @@
 
 <section class="page-hero">
   <div class="container">
-    <span class="eyebrow">Contact</span>
-    <h1>Nous contacter</h1>
-    <p class="lead">Une question sur les cours, les tarifs ou une inscription ? N'hésitez pas à nous appeler ou à nous écrire.</p>
+    <span class="eyebrow">Ils nous accompagnent</span>
+    <h1>Partenaires</h1>
+    <p class="lead">Les entreprises et professionnels qui soutiennent le club ou collaborent avec lui.</p>
     <div class="flourish"><span></span><i>&#10022;</i><span></span></div>
   </div>
 </section>
 
 <section>
-  <div class="container">
-    <div class="two-col">
-      <div class="contact-card">
-        <div class="cc-side"><img src="assets/logo.png" alt="Logo Lar'Allegria by Lara Rossoux"></div>
-        <div class="cc-body">
-          <h3>Lar'Allegria by Lara Rossoux</h3>
-          <div class="cc-role">ASBL</div>
-          <ul class="contact-list">
-            <li><span class="label">GSM</span><a href="tel:+32497639618">0497 63 96 18</a></li>
-            <li><span class="label">Email</span><a href="mailto:lara.rossoux@hotmail.com">lara.rossoux@hotmail.com</a></li>
-            <li><span class="label">Adresse</span><a href="https://www.google.com/maps/search/?api=1&query=Rue+Mahay+66%2C+4460+Gr%C3%A2ce-Hollogne" target="_blank" rel="noopener">Rue Mahay 66, 4460 Grâce-Hollogne</a></li>
-            <li><span class="label">TVA</span><span>BE 0756.844.280</span></li>
-          </ul>
-        </div>
-      </div>
-      <div>
-        <div class="info-block">
-          <h2>Nos cours</h2>
-          <p id="site-contactCours">Les cours de dressage se donnent en individuel, une heure à la fois, sur le manège privé de Lara. Pour connaître les prochains créneaux disponibles ou organiser une première séance, le plus simple est de nous appeler ou de nous envoyer un email — Lara vous répondra directement.</p>
-        </div>
-        <div class="info-block">
-          <h2>Rejoindre le club</h2>
-          <p id="site-contactRejoindre">Vous pouvez dès à présent compléter votre fiche membre en ligne, que vous veniez pour un cours ponctuel ou pour un cheval du club en demi-pension.</p>
-          <a class="btn btn-primary" href="inscription.html">Faire ma demande d'inscription</a>
-        </div>
-      </div>
+  <div class="container" style="max-width: 820px;">
+    <div id="zonePartenairesPublic">
+      <div class="empty-state">Chargement des partenaires...</div>
     </div>
   </div>
 </section>
@@ -88,7 +65,7 @@
     <div class="footer-grid">
       <div>
         <h4>Lar'Allegria by Lara Rossoux</h4>
-        <p>École équestre ASBL proposant école d'équitation, cours de dressage, écurie privée, stages et spectacles équestres à Grâce-Hollogne.</p>
+        <p>École équestre familiale à Grâce-Hollogne — dressage, demi-pension, stages et spectacles.</p>
       </div>
       <div>
         <h4>Navigation</h4>
@@ -100,10 +77,10 @@
           <li><a href="lara.html">Lara</a></li>
           <li><a href="evenements.html">Événements</a></li>
           <li><a href="blog.html">Blog</a></li>
-        <li><a href="livre-or.html">Livre d'or</a></li>
+          <li><a href="livre-or.html">Livre d'or</a></li>
+          <li><a href="partenaires.html">Partenaires</a></li>
           <li><a href="tarifs.html">Tarifs</a></li>
           <li><a href="inscription.html">Inscription</a></li>
-          <li><a href="partenaires.html">Partenaires</a></li>
           <li><a href="contact.html">Nous contacter</a></li>
           <li><a href="connexion.html">Connexion</a></li>
         </ul>
@@ -139,16 +116,52 @@
   });
 </script>
 <script type="module">
-  import { db, doc, getDoc } from "./assets/firebase-config.js";
+  import { db, collection, getDocs, linkify } from "./assets/firebase-config.js";
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  // N'accepte que des liens http(s) (évite tout lien "javascript:").
+  function lienSur(url) { return /^https?:\/\//i.test(url || '') ? url : ''; }
+
   (async () => {
+    const zone = document.getElementById('zonePartenairesPublic');
     try {
-      const snap = await getDoc(doc(db, 'contenu_site', 'global'));
-      if (!snap.exists()) return;
-      const c = snap.data();
-      if (c.contactCours) document.getElementById('site-contactCours').textContent = c.contactCours;
-      if (c.contactRejoindre) document.getElementById('site-contactRejoindre').textContent = c.contactRejoindre;
-    } catch (err) { /* on garde le texte par défaut */ }
+      const snap = await getDocs(collection(db, 'partenaires'));
+      const partenaires = [];
+      snap.forEach(d => { const p = d.data(); if (p.visiblePublic !== false) partenaires.push(p); });
+      partenaires.sort((a, b) => (a.ordre ?? 999) - (b.ordre ?? 999));
+
+      if (partenaires.length === 0) {
+        zone.innerHTML = '<div class="empty-state">Nos partenaires arrivent bientôt.</div>';
+        return;
+      }
+      zone.innerHTML = partenaires.map(p => {
+        const logo = (/^https?:\/\//i.test(p.logoUrl || '') || (p.logoUrl || '').startsWith('assets/'))
+          ? `<img src="${escapeHtml(p.logoUrl)}" alt="Logo ${escapeHtml(p.nom)}" loading="lazy" style="max-height:90px; max-width:260px; width:auto; height:auto; margin-bottom:14px; display:block;">` : '';
+        const lien = lienSur(p.lien);
+        return `
+        <article class="info-block" style="margin-bottom:22px;">
+          ${logo}
+          <h2 style="text-transform:uppercase; margin-bottom:10px;">${escapeHtml(p.nom)}${p.slogan ? ` — ${escapeHtml(p.slogan)}` : ''}</h2>
+          <p style="white-space:pre-line;">${linkify(p.texte || '')}</p>
+          ${lien ? `<p style="margin-top:14px;"><a class="btn btn-primary" href="${escapeHtml(lien)}" target="_blank" rel="noopener">Découvrir ${escapeHtml(p.nom)}</a></p>` : ''}
+        </article>`;
+      }).join('');
+    } catch (err) {
+      zone.innerHTML = '<div class="empty-state">Les partenaires ne sont pas disponibles pour le moment.</div>';
+    }
   })();
+</script>
+<script>
+  setTimeout(() => {
+    document.querySelectorAll('[id^="zone"]').forEach(zone => {
+      if (zone.textContent.includes('Chargement')) {
+        zone.innerHTML = '<div class="empty-state">Le chargement prend plus de temps que prévu. Essayez de rafraîchir la page (Ctrl+F5) ; si ça persiste, contactez-nous.</div>';
+      }
+    });
+  }, 8000);
 </script>
 <script src="assets/protection.js" defer></script>
 <a href="https://hexelya.web.app/index.html" target="_blank" rel="noopener" aria-label="Site développé par Hélène Laruelle" title="Site développé par Hélène Laruelle"><img src="assets/logo-helene-laruelle.png" alt="Site développé par Hélène Laruelle" class="badge-helene"></a>

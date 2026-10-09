@@ -1,5 +1,5 @@
 // Projet : Lar-allegria
-// Site : Lar'Allegria by Lara Rossoux — V01-024
+// Site : Lar'Allegria by Lara Rossoux — V01-026
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -34,7 +34,10 @@ service cloud.firestore {
     }
 
     match /membres/{uid} {
-      allow read: if estConnecte() && (request.auth.uid == uid || estAdmin());
+      // Le Super Admin reste invisible pour l'admin simple (Lara) : sa fiche
+      // n'est lisible que par lui-même.
+      allow read: if estConnecte() && (request.auth.uid == uid || estSuperAdmin() ||
+        (estAdmin() && resource.data.get('role', 'membre') != 'superadmin'));
       allow create: if estAdmin();
       // Le compte de démonstration (compteDemo == true) ne peut être
       // modifié ou supprimé que par le super-admin — un admin classique
@@ -156,6 +159,33 @@ service cloud.firestore {
     match /chevaux_ecurie/{id} {
       allow read: if true;
       allow write: if estAdmin();
+    }
+
+    // Partenaires (page publique). Lecture publique. Un admin classique gère
+    // les partenaires ordinaires ; la fiche partenaire par défaut
+    // (partenaireDefaut == true, "Hexelya") n'est créable, modifiable et
+    // supprimable que par le super-admin.
+    // Contrat de collaboration : versions numérotées. Lecture admin + super
+    // admin ; création/modification du texte par le super admin seul ; l'admin
+    // ne peut qu'apposer sa signature (signeLe / signeVersion) une seule fois.
+    match /contrat_versions/{id} {
+      allow read: if estAdmin();
+      allow create: if estSuperAdmin();
+      allow update: if estAdmin() && !estSuperAdmin() &&
+        resource.data.get('signeLe', null) == null &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['signeLe', 'signeVersion']);
+      allow delete: if false;
+    }
+
+    match /partenaires/{id} {
+      allow read: if true;
+      allow create: if estSuperAdmin() ||
+        (estAdmin() && request.resource.data.get('partenaireDefaut', false) != true);
+      allow update: if estSuperAdmin() ||
+        (estAdmin() && resource.data.get('partenaireDefaut', false) != true &&
+         request.resource.data.get('partenaireDefaut', false) != true);
+      allow delete: if estSuperAdmin() ||
+        (estAdmin() && resource.data.get('partenaireDefaut', false) != true);
     }
 
     // Cartes numérotées de la page publique "Activités" — numérotation
