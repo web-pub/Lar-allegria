@@ -5,7 +5,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-024';
+const VERSION_SITE = 'V01-026';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -1112,6 +1112,7 @@ async function chargerStockMembre() {
     const snap = await getDocs(collection(db, 'stock'));
     stockCache = [];
     snap.forEach(d => stockCache.push({ id: d.id, ...d.data() }));
+    document.getElementById('tabStockBtn')?.classList.toggle('has-unread', stockCache.some(x => (Number(x.quantite)||0) <= 1));
     if (stockCache.length === 0) {
       wrap.innerHTML = '<div class="empty-state">Aucun article de stock enregistré pour l\'instant.</div>';
       return;
@@ -1119,8 +1120,8 @@ async function chargerStockMembre() {
     wrap.innerHTML = stockCache.map(s => `
       <div class="data-row">
         <div class="data-main">
-          <div class="data-title">${escapeHtml(s.nom)}</div>
-          <div class="data-sub">${s.quantite <= 0 ? '<span class="badge badge-danger">Épuisé</span>' : `${s.quantite} ${escapeHtml(s.unite || '')} en stock`}</div>
+          <div class="data-title">${(Number(s.quantite)||0) <= 1 ? '<span class="point-rouge"></span>' : ''}${escapeHtml(s.nom)}</div>
+          <div class="data-sub">${s.quantite <= 0 ? '<span class="badge badge-danger">Épuisé</span>' : `${s.quantite} ${escapeHtml(s.unite || '')} en stock`} ${(Number(s.quantite)||0) <= 1 ? '<span class="badge badge-danger">À recommander</span>' : ''}</div>
         </div>
         <div class="data-actions">
           ${membreData.chefBenevoles ? `<button class="btn-sm primary" onclick="window.ajouterStock('${s.id}')">+ Ajouter</button>` : ''}

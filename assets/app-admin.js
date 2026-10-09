@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-024';
+const VERSION_SITE = 'V01-026';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -33,8 +33,7 @@ function lundiDeLaSemaine(d) {
 // une page publique. Affiché à Lara (role "admin") tant qu'elle n'a pas
 // accepté la version en cours ; jamais affiché au Super Admin.
 // ==========================================================================
-const VERSION_ACCORD_COLLABORATION = 'V1';
-const TEXTE_ACCORD_COLLABORATION = `Entre Hélène Laruelle (« la Développeuse ») et Lara Rossoux, gérante de Lar'Allegria by Lara Rossoux ASBL (« la Gérante »), il est convenu ce qui suit :
+const TEXTE_ACCORD_PAR_DEFAUT = `Entre Hélène Laruelle (« la Développeuse ») et Lara Rossoux, gérante de Lar'Allegria by Lara Rossoux ASBL (« la Gérante »), il est convenu ce qui suit :
 
 Article 1 — Propriété du code
 Le code source du site (pages, scripts, règles de sécurité, architecture technique) est la propriété exclusive de la Développeuse. Toute copie, modification ou réutilisation par un tiers nécessite son autorisation écrite préalable.
@@ -75,36 +74,147 @@ La Développeuse met en œuvre des mesures de sécurité raisonnables pour prot�
 Article 13 — Acceptation
 Cet accord est accepté électroniquement par la Gérante depuis son espace d'administration, ce qui vaut signature entre les parties.`;
 
-function afficherAccordCollaborationSiBesoin() {
-  if (compteActuel.role !== 'admin') return; // jamais au Super Admin
-  if (compteActuel.accordAccepteVersion === VERSION_ACCORD_COLLABORATION) return;
-  const texteHtml = escapeHtml(TEXTE_ACCORD_COLLABORATION).replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
+let contratCourant = null; // { version, texte, dateModification, signeLe }
+function labelVersionContrat(n) { return 'V' + n; }
+
+// Lit la version en vigueur (la plus haute). Si aucune n'existe encore, le
+// Super Admin la crée (version 1 = texte par défaut) ; Lara voit un état vide
+// tant que ce n'est pas fait.
+async function chargerContratCourant() {
+  const snap = await getDocs(query(collection(db, 'contrat_versions'), orderBy('version', 'desc')));
+  const versions = [];
+  snap.forEach(d => versions.push({ id: d.id, ...d.data() }));
+  if (!versions.length && compteActuel.role === 'superadmin') {
+    const v1 = { version: 1, texte: TEXTE_ACCORD_PAR_DEFAUT, dateModification: serverTimestamp(), motif: 'Version initiale' };
+    await setDoc(doc(db, 'contrat_versions', 'V1'), v1);
+    return chargerContratCourant();
+  }
+  return versions;
+}
+
+function formatDateContrat(ts) {
+  if (!ts) return '—';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleDateString('fr-BE') + ' ' + d.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' });
+}
+function texteContratEnHtml(t) {
+  return '<p>' + escapeHtml(t).replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
+}
+
+async function signerContrat(version) {
+  await updateDoc(doc(db, 'contrat_versions', labelVersionContrat(version)), {
+    signeLe: serverTimestamp(),
+    signeVersion: version
+  });
+  await updateDoc(doc(db, 'membres', auth.currentUser.uid), {
+    accordAccepte: true,
+    accordAccepteVersion: labelVersionContrat(version),
+    accordAccepteDate: serverTimestamp()
+  });
+  compteActuel.accordAccepteVersion = labelVersionContrat(version);
+}
+
+// Fenêtre bloquante pour Lara tant que la version en vigueur n'est pas signée.
+function afficherSignatureContrat(c) {
+  if (document.getElementById('overlayAccordCollaboration')) return;
   const html = `
     <div class="modal-overlay" id="overlayAccordCollaboration" style="z-index:2000;">
       <div class="modal-box" style="max-width:640px;">
-        <h3>Accord de collaboration — à lire et accepter</h3>
-        <p style="color:var(--terre); font-size:0.85rem; margin-bottom:12px;">Ce texte formalise notre collaboration sur ce site. Merci de le lire et de l'accepter pour continuer.</p>
-        <div style="max-height:360px; overflow-y:auto; border:1px solid #E9DEC8; border-radius:var(--radius); padding:14px 16px; font-size:0.9rem; line-height:1.6; background:var(--paper-warm);">
-          <p>${texteHtml}</p>
-        </div>
+        <h3>Contrat de collaboration — version ${c.version} à lire et signer</h3>
+        <p style="color:var(--terre); font-size:0.85rem; margin-bottom:12px;">${c.version > 1 ? 'Le contrat a été modifié. ' : ''}Merci de le lire et de le signer électroniquement pour continuer.</p>
+        <div style="max-height:360px; overflow-y:auto; border:1px solid #E9DEC8; border-radius:var(--radius); padding:14px 16px; font-size:0.9rem; line-height:1.6; background:var(--paper-warm);">${texteContratEnHtml(c.texte)}</div>
         <div class="modal-actions">
-          <button class="btn-sm primary" id="btnAccepterAccordCollaboration">J'ai lu et j'accepte</button>
+          <button class="btn-sm primary" id="btnAccepterAccordCollaboration">J'ai lu et je signe la version ${c.version}</button>
         </div>
       </div>
     </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
   document.getElementById('btnAccepterAccordCollaboration').addEventListener('click', async () => {
     try {
-      await updateDoc(doc(db, 'membres', auth.currentUser.uid), {
-        accordAccepte: true,
-        accordAccepteVersion: VERSION_ACCORD_COLLABORATION,
-        accordAccepteDate: serverTimestamp()
-      });
+      await signerContrat(c.version);
       document.getElementById('overlayAccordCollaboration').remove();
+      if (ongletsCharges.has('contrat')) renderContrat();
     } catch (err) {
       alert('Erreur lors de l\'enregistrement : ' + (err.code || err.message));
     }
   });
+}
+
+async function afficherAccordCollaborationSiBesoin() {
+  if (compteActuel.role !== 'admin') return; // jamais au Super Admin
+  try {
+    const versions = await chargerContratCourant();
+    if (!versions.length) return;
+    contratCourant = versions[0];
+    if (compteActuel.accordAccepteVersion !== labelVersionContrat(contratCourant.version)) afficherSignatureContrat(contratCourant);
+  } catch (err) { console.warn('Contrat :', err); }
+}
+
+// ----- Onglet Contrat (Lara : lecture + signature ; Super Admin : édition) -----
+async function renderContrat() {
+  const zone = document.getElementById('zoneContrat');
+  let versions;
+  try { versions = await chargerContratCourant(); }
+  catch (err) { zone.innerHTML = '<div class="empty-state">Lecture impossible : ' + escapeHtml(err.code || err.message) + '</div>'; return; }
+  if (!versions.length) { zone.innerHTML = '<div class="empty-state">Aucun contrat n\'est encore publié.</div>'; return; }
+  contratCourant = versions[0];
+  const c = contratCourant;
+  const estSuper = compteActuel.role === 'superadmin';
+  const signe = !!c.signeLe;
+  const statut = signe
+    ? `<span class="badge badge-ok">Signé le ${formatDateContrat(c.signeLe)}</span>`
+    : `<span class="badge badge-warn">En attente de signature</span>`;
+  const editeur = estSuper ? `
+    <div class="app-panel" style="margin-top:16px;">
+      <h3>Modifier le contrat (crée la version ${c.version + 1})</h3>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:10px;">Toute modification crée une nouvelle version qui devra être signée par la Gérante. Les versions précédentes sont conservées.</p>
+      <textarea id="contratTexteEdition" rows="16" style="width:100%; font-family:inherit; line-height:1.5;">${escapeHtml(c.texte)}</textarea>
+      <input type="text" id="contratMotif" placeholder="Motif de la modification (visible dans l'historique)" style="width:100%; margin-top:8px;">
+      <div class="modal-actions" style="margin-top:10px;"><button class="btn-sm primary" id="btnPublierContrat">Publier la version ${c.version + 1}</button></div>
+    </div>` : '';
+  const histo = versions.map(v => `
+    <div class="data-row">
+      <div class="data-main">
+        <div class="data-title">Version ${v.version} — ${formatDateContrat(v.dateModification)}</div>
+        <div class="data-sub">${escapeHtml(v.motif || '')} · ${v.signeLe ? 'Signée le ' + formatDateContrat(v.signeLe) : 'Non signée'}</div>
+      </div>
+      <div class="data-actions"><button class="btn-sm" data-voir-contrat="${v.version}">Voir</button></div>
+    </div>`).join('');
+  zone.innerHTML = `
+    <div class="app-panel">
+      <div class="section-heading"><h2>📄 Contrat de collaboration — version ${c.version}</h2> ${statut}</div>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:10px;">Dernière modification : ${formatDateContrat(c.dateModification)}</p>
+      <div style="border:1px solid #E9DEC8; border-radius:var(--radius); padding:14px 16px; font-size:0.9rem; line-height:1.6; background:var(--paper-warm);">${texteContratEnHtml(c.texte)}</div>
+      ${(!estSuper && !signe) ? `<div class="modal-actions" style="margin-top:12px;"><button class="btn-sm primary" id="btnSignerContratOnglet">Signer la version ${c.version}</button></div>` : ''}
+    </div>
+    ${editeur}
+    <div class="app-panel"><h3>Historique des versions</h3><div class="data-list">${histo}</div></div>`;
+  const btnSign = document.getElementById('btnSignerContratOnglet');
+  if (btnSign) btnSign.addEventListener('click', async () => {
+    try { await signerContrat(c.version); const o = document.getElementById('overlayAccordCollaboration'); if (o) o.remove(); renderContrat(); }
+    catch (err) { alert('Erreur : ' + (err.code || err.message)); }
+  });
+  const btnPub = document.getElementById('btnPublierContrat');
+  if (btnPub) btnPub.addEventListener('click', async () => {
+    const texte = document.getElementById('contratTexteEdition').value.trim();
+    const motif = document.getElementById('contratMotif').value.trim();
+    if (!texte) { alert('Le texte est vide.'); return; }
+    if (texte === c.texte.trim()) { alert('Aucune modification du texte.'); return; }
+    if (!motif) { alert('Indique un motif de modification.'); return; }
+    if (!confirm(`Publier la version ${c.version + 1} ? La Gérante devra la signer.`)) return;
+    try {
+      const n = c.version + 1;
+      await setDoc(doc(db, 'contrat_versions', labelVersionContrat(n)), { version: n, texte, motif, dateModification: serverTimestamp() });
+      renderContrat();
+    } catch (err) { alert('Erreur : ' + (err.code || err.message)); }
+  });
+  zone.querySelectorAll('[data-voir-contrat]').forEach(b => b.addEventListener('click', () => {
+    const v = versions.find(x => x.version === Number(b.dataset.voirContrat));
+    const html = `<div class="modal-overlay" id="overlayVoirContrat" style="z-index:2000;"><div class="modal-box" style="max-width:640px;"><h3>Contrat — version ${v.version}</h3>
+      <div style="max-height:400px; overflow-y:auto; border:1px solid #E9DEC8; border-radius:var(--radius); padding:14px 16px; font-size:0.9rem; line-height:1.6; background:var(--paper-warm);">${texteContratEnHtml(v.texte)}</div>
+      <div class="modal-actions"><button class="btn-sm" onclick="document.getElementById('overlayVoirContrat').remove()">Fermer</button></div></div></div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+  }));
 }
 
 let membresCache = [];
@@ -135,7 +245,10 @@ const CHARGEURS_PAR_ONGLET = {
   livrecaisse: () => { initSelecteurAnneeCaisse(); chargerSoldeDepartCaisse(); chargerLivreCaisse(); },
   comptabilite: () => { initSelecteurAnneeCompta(); chargerPlanComptable(); chargerCompta(); },
   livrerecettes: () => { initSelecteurAnneeRecettes(); chargerCategoriesRecettes(); chargerLivreRecettes(); },
-  motsdepasse: () => { chargerMotsDePasseAdmin(); chargerSauvegardesMdp(); }
+  motsdepasse: () => { chargerMotsDePasseAdmin(); chargerSauvegardesMdp(); },
+  partenaires: () => chargerPartenairesAdmin(),
+  contrat: () => renderContrat(),
+  maintenance: () => {}
 };
 function chargerOngletSiBesoin(nomOnglet) {
   if (ongletsCharges.has(nomOnglet)) return;
@@ -155,11 +268,11 @@ onAuthStateChanged(auth, async (user) => {
   document.getElementById('adminNom').textContent = compteActuel.prenom || 'Lara';
   if (compteActuel.role === 'superadmin') {
     document.getElementById('tabMotsDePasseBtn').classList.remove('hidden');
-    document.getElementById('btnCreerCompteDemo').classList.remove('hidden');
+    document.getElementById('tabMaintenanceBtn').classList.remove('hidden');
   }
-  afficherAccordCollaborationSiBesoin();
-
   await chargerMembres();
+  afficherAccordCollaborationSiBesoin();
+  chargerAlerteStockAdmin();
   chargerOngletSiBesoin('reservations'); // onglet ouvert par défaut à l'arrivée
 });
 
@@ -206,7 +319,10 @@ async function chargerMeteoResume() {
 // MEMBRES (cache utilisé par plusieurs sections)
 // ==========================================================================
 async function chargerMembres() {
-  const snap = await getDocs(collection(db, 'membres'));
+  // Lara (admin) ne peut pas lire la fiche du Super Admin : on filtre côté requête.
+  const snap = compteActuel.role === 'superadmin'
+    ? await getDocs(collection(db, 'membres'))
+    : await getDocs(query(collection(db, 'membres'), where('role', '!=', 'superadmin')));
   membresCache = [];
   membresParUid = {};
   snap.forEach(d => {
@@ -781,11 +897,11 @@ function renderMembres(filtre = '') {
       <div class="data-row">
         <div class="data-main">
           <div class="data-title">${escapeHtml(m.prenom)} ${escapeHtml(m.nom)}</div>
-          <div class="data-sub">${labelTypeMembre(m.typeMembre)} · ${escapeHtml(m.email||'')} ${m.typeMembre !== 'benevole' ? (m.cotisationPayee ? '<span class="badge badge-ok">Cotisation OK</span>' : '<span class="badge badge-warn">Cotisation à régler</span>') : ''} ${m.recurrenceCours === 'hebdomadaire' ? '<span class="badge badge-neutral">Cours 1x/semaine</span>' : m.recurrenceCours === 'bimensuelle' ? '<span class="badge badge-neutral">Cours 1x/2 semaines</span>' : ''} ${m.chefBenevoles ? '<span class="badge badge-danger">Chef des bénévoles</span>' : ''} ${m.abonnement ? '<span class="badge badge-neutral">Abonnement</span>' : ''} ${m.abonnementRenouvellementDemande ? '<span class="badge badge-warn">Nouvel abonnement demandé</span>' : ''} ${m.suppressionDemandee ? '<span class="badge badge-danger">Suppression demandée</span>' : ''} ${m.compteDemo ? '<span class="badge badge-neutral">Compte démo — géré par Hélène</span>' : ''}</div>
+          <div class="data-sub">${labelTypeMembre(m.typeMembre)} · ${escapeHtml(m.email||'')} ${m.typeMembre !== 'benevole' ? (m.cotisationPayee ? '<span class="badge badge-ok">Cotisation OK</span>' : '<span class="badge badge-warn">Cotisation à régler</span>') : ''} ${m.recurrenceCours === 'hebdomadaire' ? '<span class="badge badge-neutral">Cours 1x/semaine</span>' : m.recurrenceCours === 'bimensuelle' ? '<span class="badge badge-neutral">Cours 1x/2 semaines</span>' : ''} ${m.chefBenevoles ? '<span class="badge badge-danger">Chef des bénévoles</span>' : ''} ${m.abonnement ? '<span class="badge badge-neutral">Abonnement</span>' : ''} ${m.abonnementRenouvellementDemande ? '<span class="badge badge-warn">Nouvel abonnement demandé</span>' : ''} ${m.suppressionDemandee ? '<span class="badge badge-danger">Suppression demandée</span>' : ''} ${(m.compteDemo && compteActuel.role === 'superadmin') ? '<span class="badge badge-neutral">Compte démo</span>' : ''}</div>
         </div>
         <div class="data-actions">
-          <button class="btn-sm" onclick="window.editerMembre('${m.id}')">Modifier</button>
-          ${(!m.compteDemo || compteActuel.role === 'superadmin') ? `<button class="btn-sm danger" onclick="window.archiverMembre('${m.id}')">Archiver</button>` : ''}
+          ${(!m.compteDemo || compteActuel.role === 'superadmin') ? `<button class="btn-sm" onclick="window.editerMembre('${m.id}')">Modifier</button>
+          <button class="btn-sm danger" onclick="window.archiverMembre('${m.id}')">Archiver</button>` : ''}
         </div>
       </div>`).join('');
   }
@@ -810,30 +926,29 @@ document.getElementById('rechercheMembre').addEventListener('input', (e) => rend
 document.getElementById('btnAjouterMembre').addEventListener('click', () => window.ouvrirModalMembre());
 document.getElementById('btnCreerCompteDemo').addEventListener('click', async () => {
   if (Object.values(membresParUid).some(m => m.compteDemo)) {
-    alert('Le compte de démonstration existe déjà — ouvre-le depuis la liste des membres (badge "Compte démo") pour le modifier.');
+    alert('Le compte de démonstration existe déjà (onglet Membres, fiche "Hexelya").');
     return;
   }
-  if (!confirm('Créer le compte de démonstration (identifiant "HLa", mot de passe "demohla") ? Il sera protégé contre l\'archivage et le changement de mot de passe par Lara — seule toi (Super Admin) pourras le gérer.')) return;
+  if (!confirm('Créer le compte de démonstration "Hexelya" (identifiant "Hexelya", mot de passe "hexelya") ? Il sera invisible et intouchable depuis l\'Admin simple. Ta session reste ouverte.')) return;
   try {
-    const uid = await creerCompteMembre('HLa', 'demohla');
+    const uid = await creerCompteMembre('Hexelya', 'hexelya'); // via une app Firebase secondaire
     await setDoc(doc(db, 'membres', uid), {
       role: 'membre',
-      identifiant: 'HLa',
-      prenom: 'Compte',
+      identifiant: 'Hexelya',
+      prenom: 'Hexelya',
       nom: 'Démo',
       typeMembre: 'cours',
       compteDemo: true,
-      motDePasseActuel: 'demohla',
+      motDePasseActuel: 'hexelya',
       dateInscription: new Date().toISOString(),
       archive: false
     });
     await chargerMembres();
     renderMembres();
-    alert('Compte démo créé. La fiche s\'ouvre pour que tu la complètes.');
-    window.ouvrirModalMembre(membresParUid[uid]);
+    alert('Compte démo créé. Retrouve-le dans l\'onglet Membres pour compléter sa fiche comme celle d\'un vrai membre.');
   } catch (err) {
     if (err.code === 'auth/email-already-in-use') {
-      alert('Un compte avec l\'identifiant "HLa" existe déjà dans Firebase Authentication.');
+      alert('Un compte avec l\'identifiant "Hexelya" existe déjà dans Firebase Authentication.');
     } else {
       alert('Erreur lors de la création : ' + (err.code || err.message));
     }
@@ -2274,11 +2389,12 @@ async function chargerStockAdmin() {
   let stock = [];
   snap.forEach(d => stock.push({ id: d.id, ...d.data() }));
   const wrap = document.getElementById('listeStock');
+  majPointRougeStockAdmin(stock);
   if (stock.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun article de stock créé.</div>'; return; }
   wrap.innerHTML = stock.map(s => `
     <div class="data-row">
       <div class="data-main">
-        <div class="data-title">${escapeHtml(s.nom)} ${s.quantite <= 0 ? '<span class="badge badge-danger">Épuisé</span>' : ''}</div>
+        <div class="data-title">${(Number(s.quantite)||0) <= SEUIL_RECOMMANDE_STOCK ? '<span class="point-rouge"></span>' : ''}${escapeHtml(s.nom)} ${s.quantite <= 0 ? '<span class="badge badge-danger">Épuisé</span>' : ''} ${(Number(s.quantite)||0) <= SEUIL_RECOMMANDE_STOCK ? '<span class="badge badge-danger">À recommander</span>' : ''}</div>
         <div class="data-sub">${s.quantite} ${escapeHtml(s.unite || '')}</div>
       </div>
       <div class="data-actions">
@@ -2288,6 +2404,7 @@ async function chargerStockAdmin() {
       </div>
     </div>`).join('');
   window._stock = {}; stock.forEach(s => window._stock[s.id] = s);
+  majPointRougeStockAdmin(stock);
 }
 document.getElementById('btnAjouterStock').addEventListener('click', () => {
   const html = `
@@ -3371,3 +3488,140 @@ window.supprimerLivreOr = async (id) => {
   await deleteDoc(doc(db, 'livre_or', id));
   chargerLivreOrAdmin();
 };
+
+// ==========================================================================
+// PARTENAIRES (page publique) — la fiche par défaut "Hexelya" n'est
+// gérable que depuis le Super Admin ; l'Admin simple n'y voit aucun bouton.
+// ==========================================================================
+const HEXELYA_PARTENAIRE_DEFAUT = {
+  nom: 'Hexelya',
+  slogan: 'Anticiper. Structurer. Accompagner.',
+  logoUrl: 'https://hexelya.web.app/logo-full.png',
+  lien: 'https://hexelya.web.app/index.html',
+  ordre: 1,
+  visiblePublic: true,
+  partenaireDefaut: true,
+  texte: `Vous êtes indépendant, dirigez une ASBL ou une petite entreprise ?
+Vous avez besoin d’organisation, de structure… mais pas forcément d’une personne à temps plein ?
+
+Hexelya vous apporte une seule interlocutrice pour plusieurs facettes de votre activité.
+
+Administration, comptabilité, finance, RH, gestion du personnel : je vous aide à remettre de l’ordre et à garder le cap.
+Besoin de renfort ponctuel ? D’un accompagnement dans un rush ou un remplacement ? Hexelya s’adapte.
+Besoin de moderniser votre organisation ? Je vous accompagne aussi dans vos outils digitaux et l’implémentation d’ERP.
+Et parce qu’une entreprise ne fonctionne plus sans le digital, Hexelya crée également des sites vitrines et des espaces membres sécurisés.
+
+Une structure simple, plusieurs compétences, un objectif : vous libérer du temps.
+
+HEXELYA — L’organisation qui permet aux entrepreneurs d’avancer sereinement.`
+};
+
+async function chargerPartenairesAdmin() {
+  const snap = await getDocs(collection(db, 'partenaires'));
+  let partenaires = [];
+  snap.forEach(d => partenaires.push({ id: d.id, ...d.data() }));
+  partenaires.sort((a, b) => (a.ordre ?? 999) - (b.ordre ?? 999));
+  window._partenaires = {}; partenaires.forEach(p => window._partenaires[p.id] = p);
+  const wrap = document.getElementById('listePartenaires');
+  if (partenaires.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun partenaire pour l\'instant.</div>'; return; }
+  const estSuper = compteActuel.role === 'superadmin';
+  wrap.innerHTML = partenaires.map(p => {
+    const peutGerer = !p.partenaireDefaut || estSuper; // Admin simple : rien du tout sur la fiche par défaut
+    return `
+    <div class="data-row">
+      <div class="data-main">
+        <div class="data-title">${escapeHtml(p.nom)} ${p.slogan ? `<span style="font-weight:400; color:var(--terre);">— ${escapeHtml(p.slogan)}</span>` : ''}</div>
+        <div class="data-sub">${p.visiblePublic === false ? '<span class="badge badge-neutral">Masqué du site public</span>' : '<span class="badge badge-ok">Visible</span>'}</div>
+      </div>
+      ${peutGerer ? `<div class="data-actions">
+        <button class="btn-sm" onclick="window.editerPartenaire('${p.id}')">Modifier</button>
+        <button class="btn-sm danger" onclick="window.supprimerPartenaire('${p.id}')">Supprimer</button>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+window.editerPartenaire = (id) => window.ouvrirModalPartenaire(window._partenaires[id]);
+window.supprimerPartenaire = async (id) => {
+  const p = window._partenaires[id];
+  if (p?.partenaireDefaut && compteActuel.role !== 'superadmin') return;
+  if (!confirm('Supprimer ce partenaire ?')) return;
+  await deleteDoc(doc(db, 'partenaires', id));
+  chargerPartenairesAdmin();
+};
+document.getElementById('btnAjouterPartenaire').addEventListener('click', () => window.ouvrirModalPartenaire());
+window.ouvrirModalPartenaire = (p) => {
+  const html = `
+    <div class="modal-overlay" id="modalOverlayPartenaire">
+      <div class="modal-box" style="max-width:620px;">
+        <h3>${p ? 'Modifier le partenaire' : 'Ajouter un partenaire'}</h3>
+        <div class="form-grid">
+          <div class="field"><label>Nom *</label><input id="pt-nom" value="${escapeHtml(p?.nom||'')}"></div>
+          <div class="field"><label>Ordre d'affichage</label><input type="number" id="pt-ordre" value="${p?.ordre ?? 50}"></div>
+        </div>
+        <div class="field"><label>Slogan <span class="hint">— affiché après le nom</span></label><input id="pt-slogan" value="${escapeHtml(p?.slogan||'')}"></div>
+        <div class="field"><label>Adresse du logo (URL)</label><input id="pt-logo" value="${escapeHtml(p?.logoUrl||'')}" placeholder="https://..."></div>
+        <div class="field"><label>Texte de présentation</label><textarea id="pt-texte" rows="9" spellcheck="true" lang="fr">${escapeHtml(p?.texte||'')}</textarea></div>
+        <div class="form-grid">
+          <div class="field"><label>Lien du site</label><input id="pt-lien" value="${escapeHtml(p?.lien||'')}" placeholder="https://..."></div>
+          <div class="field"><label>Visible sur le site public</label>
+            <select id="pt-visible"><option value="oui" ${p?.visiblePublic!==false?'selected':''}>Oui</option><option value="non" ${p?.visiblePublic===false?'selected':''}>Non</option></select>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-sm" type="button" onclick="window.fermerModal()">Annuler</button>
+          <button class="btn-sm primary" type="button" id="pt-save">Enregistrer</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modalZone').innerHTML = html;
+  document.getElementById('pt-save').addEventListener('click', async () => {
+    const data = {
+      nom: document.getElementById('pt-nom').value.trim(),
+      slogan: document.getElementById('pt-slogan').value.trim(),
+      logoUrl: document.getElementById('pt-logo').value.trim(),
+      texte: document.getElementById('pt-texte').value.trim(),
+      lien: document.getElementById('pt-lien').value.trim(),
+      ordre: parseInt(document.getElementById('pt-ordre').value, 10) || 50,
+      visiblePublic: document.getElementById('pt-visible').value === 'oui'
+    };
+    if (!data.nom) { alert('Le nom est obligatoire.'); return; }
+    if (data.lien && !/^https?:\/\//i.test(data.lien)) { alert('Le lien doit commencer par http:// ou https://'); return; }
+    if (data.logoUrl && !/^https?:\/\//i.test(data.logoUrl) && !data.logoUrl.startsWith('assets/')) { alert('L\'adresse du logo doit commencer par https:// (ou assets/ pour un fichier du site).'); return; }
+    try {
+      if (p) await updateDoc(doc(db, 'partenaires', p.id), data);
+      else await addDoc(collection(db, 'partenaires'), data);
+      window.fermerModal();
+      chargerPartenairesAdmin();
+    } catch (err) {
+      alert('Erreur : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore.');
+    }
+  });
+};
+document.getElementById('btnCreerPartenaireHexelya').addEventListener('click', async () => {
+  try {
+    const existant = await getDocs(query(collection(db, 'partenaires'), where('partenaireDefaut', '==', true)));
+    if (!existant.empty) { alert('Le partenaire Hexelya existe déjà (onglet Partenaires).'); return; }
+    await addDoc(collection(db, 'partenaires'), HEXELYA_PARTENAIRE_DEFAUT);
+    ongletsCharges.delete('partenaires');
+    alert('Partenaire Hexelya créé. Il apparaît maintenant sur la page publique "Partenaires".');
+  } catch (err) {
+    alert('Erreur : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore.');
+  }
+});
+
+// ==========================================================================
+// STOCK — point rouge "à recommander" quand une quantité est à 1 ou moins
+// ==========================================================================
+const SEUIL_RECOMMANDE_STOCK = 1;
+function majPointRougeStockAdmin(stock) {
+  const btn = document.querySelector('.tab-btn[data-tab="stock"]');
+  if (btn) btn.classList.toggle('has-unread', stock.some(s => (Number(s.quantite) || 0) <= SEUIL_RECOMMANDE_STOCK));
+}
+async function chargerAlerteStockAdmin() {
+  try {
+    const snap = await getDocs(collection(db, 'stock'));
+    const stock = [];
+    snap.forEach(d => stock.push(d.data()));
+    majPointRougeStockAdmin(stock);
+  } catch (err) { /* sans conséquence : l'onglet Stock reste consultable */ }
+}
