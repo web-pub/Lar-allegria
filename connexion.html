@@ -130,7 +130,13 @@
         // Sauvegarde automatique de l'état des mots de passe à chaque
         // connexion réussie du super-admin (historique consultable dans
         // l'onglet "🔑 Mots de passe" de l'espace admin).
+        // Au maximum une sauvegarde par jour et par navigateur : évite de relire
+        // toute la collection "membres" (et de créer un document) à chaque connexion.
+        let dejaFaiteAujourdhui = false;
+        const cleSauv = 'sauvMdp_' + new Date().toISOString().slice(0, 10);
+        try { dejaFaiteAujourdhui = localStorage.getItem(cleSauv) === '1'; } catch (e) {}
         try {
+          if (dejaFaiteAujourdhui) throw new Error('sauvegarde déjà faite aujourd\'hui');
           const snap = await getDocs(collection(db, 'membres'));
           const comptes = [];
           snap.forEach(d => {
@@ -138,9 +144,10 @@
             comptes.push({ identifiant: m.identifiant || '', role: m.role || 'membre', motDePasseActuel: m.motDePasseActuel || null });
           });
           await addDoc(collection(db, 'sauvegardes_mdp'), { date: serverTimestamp(), comptes });
+          try { localStorage.setItem(cleSauv, '1'); } catch (e) {}
         } catch (e) {
           // Ne bloque jamais la connexion si la sauvegarde échoue.
-          console.warn('Sauvegarde des mots de passe impossible :', e);
+          if (!dejaFaiteAujourdhui) console.warn('Sauvegarde des mots de passe impossible :', e);
         }
       }
       window.location.href = (role === 'admin' || role === 'superadmin') ? 'admin.html' : 'espace-membre.html';

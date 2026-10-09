@@ -1,5 +1,5 @@
 // Projet : Lar-allegria
-// Site : Lar'Allegria by Lara Rossoux — V01-026
+// Site : Lar'Allegria by Lara Rossoux — V01-030
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -38,16 +38,24 @@ service cloud.firestore {
       // n'est lisible que par lui-même.
       allow read: if estConnecte() && (request.auth.uid == uid || estSuperAdmin() ||
         (estAdmin() && resource.data.get('role', 'membre') != 'superadmin'));
-      allow create: if estAdmin();
+      // Garde-fou anti-escalade : seul le Super Admin peut créer/modifier un
+      // compte "superadmin" ; l'admin simple ne peut ni se promouvoir, ni
+      // toucher à la fiche du Super Admin, ni créer un compte admin.
+      allow create: if estSuperAdmin() ||
+        (estAdmin() && request.resource.data.get('role', 'membre') == 'membre' &&
+         request.resource.data.get('compteDemo', false) != true);
       // Le compte de démonstration (compteDemo == true) ne peut être
       // modifié ou supprimé que par le super-admin — un admin classique
       // (Lara) ne peut ni l'archiver, ni changer son mot de passe, ni le
       // modifier d'aucune façon, même si elle a par ailleurs tous les
       // droits sur les autres fiches membres.
       allow update: if estSuperAdmin() ||
-        (estAdmin() && resource.data.get('compteDemo', false) != true) ||
+        (estAdmin() && resource.data.get('compteDemo', false) != true &&
+         resource.data.get('role', 'membre') != 'superadmin' &&
+         request.resource.data.get('role', 'membre') == resource.data.get('role', 'membre')) ||
         (estConnecte() && request.auth.uid == uid && champsAutorisesMembre());
-      allow delete: if estSuperAdmin() || (estAdmin() && resource.data.get('compteDemo', false) != true);
+      allow delete: if estSuperAdmin() ||
+        (estAdmin() && resource.data.get('compteDemo', false) != true && resource.data.get('role', 'membre') == 'membre');
     }
 
     // Abonnements (10+1 cours) : historique complet par membre. L'admin
@@ -68,7 +76,7 @@ service cloud.firestore {
     // Demandes d'inscription : formulaire public, écrit par des visiteurs
     // non connectés. Lecture/traitement réservés à l'admin.
     match /demandes_inscription/{id} {
-      allow create: if request.resource.data.statut == 'en_attente';
+      allow create: if request.resource.data.statut == 'en_attente' && request.resource.data.keys().size() <= 30;
       allow read, update, delete: if estAdmin();
     }
 
@@ -103,7 +111,7 @@ service cloud.firestore {
       );
     }
 
-    // Grille tarifaire : lisible publiquement (page tarifs.html du site).
+    // Grille tarifaire : lisible publiquement (section "Nos tarifs" de la page Le Club).
     match /tarifs/{id} {
       allow read: if true;
       allow write: if estAdmin();
@@ -117,14 +125,21 @@ service cloud.firestore {
     match /activites_reponses/{id} {
       allow read: if estConnecte() && (resource.data.uid == request.auth.uid || estAdmin());
       allow create: if estConnecte() && request.resource.data.uid == request.auth.uid;
-      allow update: if estAdmin() || (estConnecte() && resource.data.uid == request.auth.uid);
+      allow update: if estAdmin() || (estConnecte() && resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid);
       allow delete: if estAdmin();
     }
 
     match /conversations/{uid} {
       allow read, write: if estConnecte() && (request.auth.uid == uid || estAdmin());
       match /messages/{msgId} {
-        allow read, create, update: if estConnecte() && (request.auth.uid == uid || estAdmin());
+        allow read: if estConnecte() && (request.auth.uid == uid || estAdmin());
+        // Un membre ne peut écrire que des messages signés "membre" dans sa
+        // propre conversation, et ne peut que marquer un message comme lu.
+        allow create: if estAdmin() ||
+          (estConnecte() && request.auth.uid == uid && request.resource.data.expediteur == 'membre');
+        allow update: if estAdmin() ||
+          (estConnecte() && request.auth.uid == uid &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lu']));
       }
     }
 

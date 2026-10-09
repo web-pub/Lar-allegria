@@ -34,7 +34,7 @@
         <li><a href="evenements.html">Événements</a></li>
         <li><a href="blog.html">Blog</a></li>
         <li><a href="livre-or.html">Livre d'or</a></li>
-        <li><a href="tarifs.html">Tarifs</a></li>
+        <li><a href="partenaires.html">Partenaires</a></li>
         <li><a href="inscription.html">Inscription</a></li>
         <li><a href="contact.html">Nous contacter</a></li>
         <li><a href="connexion.html">Connexion</a></li>
@@ -86,7 +86,7 @@
           <li><a href="evenements.html">Événements</a></li>
           <li><a href="blog.html">Blog</a></li>
         <li><a href="livre-or.html">Livre d'or</a></li>
-          <li><a href="tarifs.html">Tarifs</a></li>
+          <li><a href="club.html#tarifs">Tarifs</a></li>
           <li><a href="inscription.html">Inscription</a></li>
           <li><a href="partenaires.html">Partenaires</a></li>
           <li><a href="contact.html">Nous contacter</a></li>
@@ -109,20 +109,13 @@
       <span>Site développé par Hélène Laruelle</span>
       <span>Contenu sous la responsabilité de Lara Rossoux</span>
       <span>TVA BE 0756.844.280</span>
-      <span>Site V01-026</span>
+      <span>Site V01-030</span>
     </div>
     <div class="footer-legal-links"><a href="securisation.html">Sécurisation</a> | <a href="confidentialite.html">Déclaration de confidentialité</a> | <a href="business-ethics-gouvernance.html">Business Ethics &amp; Governance</a> | <a href="confidentialite.html#cookies">Politique en matière de cookies</a> | <a href="limitation-responsabilite.html">Limitation de responsabilité</a> | <a href="mentions-legales.html">Mentions légales</a> / <a href="confidentialite.html#rgpd">RGPD</a> / <a href="cgv.html">CGV</a></div>
   </div>
 </footer>
 
-<script>
-  const toggle = document.querySelector('.nav-toggle');
-  const nav = document.getElementById('main-nav');
-  toggle.addEventListener('click', () => {
-    const isOpen = nav.classList.toggle('open');
-    toggle.setAttribute('aria-expanded', isOpen);
-  });
-</script>
+<script src="assets/nav.js" defer></script>
 <script type="module">
   import { db, collection, getDocs, linkify } from "./assets/firebase-config.js";
 
@@ -198,6 +191,6 @@
   }, 8000);
 </script>
 <script src="assets/protection.js" defer></script>
-<a href="https://hexelya.web.app/index.html" target="_blank" rel="noopener" aria-label="Site développé par Hélène Laruelle" title="Site développé par Hélène Laruelle"><img src="assets/logo-helene-laruelle.png" alt="Site développé par Hélène Laruelle" class="badge-helene"></a>
+<a href="https://hexelya.web.app/index.html" target="_blank" rel="noopener" aria-label="Site développé par Hélène Laruelle" title="Site développé par Hélène Laruelle"><img loading="lazy" decoding="async" src="assets/logo-helene-laruelle.png" alt="Site développé par Hélène Laruelle" class="badge-helene"></a>
 </body>
 </html>
