@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-030';
+const VERSION_SITE = 'V01-034';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -15,6 +15,8 @@ function dateISOLocale(d) {
   const j = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${j}`;
 }
+// Valeur sûre à insérer dans un attribut onclick='...' : ne garde que lettres, chiffres, - _ : .
+function idSur(v) { return String(v ?? '').replace(/[^\w:.\-]/g, ''); }
 function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 function escapeHtml(str) {
   if (!str) return '';
@@ -83,7 +85,7 @@ function labelVersionContrat(n) { return 'V' + n; }
 async function chargerContratCourant() {
   const snap = await getDocs(query(collection(db, 'contrat_versions'), orderBy('version', 'desc')));
   const versions = [];
-  snap.forEach(d => versions.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => versions.push({ ...d.data(), id: d.id }));
   if (!versions.length && compteActuel.role === 'superadmin') {
     const v1 = { version: 1, texte: TEXTE_ACCORD_PAR_DEFAUT, dateModification: serverTimestamp(), motif: 'Version initiale' };
     await setDoc(doc(db, 'contrat_versions', 'V1'), v1);
@@ -234,6 +236,7 @@ const CHARGEURS_PAR_ONGLET = {
   reservations: () => { chargerMeteoResume(); chargerReservationsAttente(); renderPlanningSemaine(); chargerRecurrencesAdmin(); chargerCalendrierDeuxSemaines(); },
   membres: () => { chargerDemandesInscription(); renderMembres(); },
   chevaux: () => chargerChevauxAdmin(),
+  planningchevaux: () => chargerPlanningChevaux(),
   nettoyage: () => { chargerBoxes(); chargerNettoyages(); },
   tarifs: () => chargerTarifs(),
   activites: () => { chargerActivites(); chargerProgrammesActivites(); },
@@ -331,7 +334,7 @@ async function chargerMembres(uidUnique) {
     membresCache = membresCache.filter(x => x.id !== uidUnique);
     delete membresParUid[uidUnique];
     if (d.exists()) {
-      const m = { id: d.id, ...d.data() };
+      const m = { ...d.data(), id: d.id };
       if (m.role !== 'admin' && m.role !== 'superadmin') membresCache.push(m);
       membresParUid[d.id] = m;
     }
@@ -344,7 +347,7 @@ async function chargerMembres(uidUnique) {
   membresCache = [];
   membresParUid = {};
   snap.forEach(d => {
-    const m = { id: d.id, ...d.data() };
+    const m = { ...d.data(), id: d.id };
     if (m.role !== 'admin' && m.role !== 'superadmin') membresCache.push(m);
     membresParUid[d.id] = m;
   });
@@ -411,7 +414,7 @@ function libelleDateHeure(dateISO, heure) {
 async function chargerReservationsAttente() {
   const snap = await getDocs(query(collection(db, 'reservations'), where('statut', '==', 'en_attente')));
   let resa = [];
-  snap.forEach(d => resa.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => resa.push({ ...d.data(), id: d.id }));
   resa.sort((a, b) => (a.date + a.heureDebut).localeCompare(b.date + b.heureDebut));
 
   const wrap = document.getElementById('listeReservationsAttente');
@@ -428,13 +431,13 @@ async function chargerReservationsAttente() {
     return `
     <div class="data-row">
       <div class="data-main">
-        <div class="data-title">${escapeHtml(nomAffichageReservation(r))} — ${dateLabel} ${r.heureDebut}</div>
-        <div class="data-sub">${r.type === 'libre' ? 'Piste libre' : 'Cours de dressage'} ${meteoHtml}</div>
+        <div class="data-title">${escapeHtml(nomAffichageReservation(r))} — ${dateLabel} ${escapeHtml(r.heureDebut)}</div>
+        <div class="data-sub">${r.type === 'libre' ? 'Piste libre' : 'Cours de dressage'} ${r.chevalSouhaiteNom ? `· 🐴 Souhait : ${escapeHtml(r.chevalSouhaiteNom)}` : ''} ${meteoHtml}</div>
         ${alerte ? `<div class="banner-alert" style="margin-top:6px; padding:6px 10px; background:${alerte.couleur}1a; border-color:${alerte.couleur}; color:${alerte.couleur};">${alerte.texte}</div>` : ''}
       </div>
       <div class="data-actions">
-        <button class="btn-sm primary" onclick="window.validerReservation('${r.id}','${r.date}','${r.heureDebut}','${r.membreId}','${r.type}')">Valider</button>
-        <button class="btn-sm danger" onclick="window.refuserReservation('${r.id}','${r.date}','${r.heureDebut}','${r.membreId}')">Refuser</button>
+        <button class="btn-sm primary" onclick="window.validerReservation('${idSur(r.id)}','${idSur(r.date)}','${idSur(r.heureDebut)}','${idSur(r.membreId)}','${idSur(r.type)}')">Valider</button>
+        <button class="btn-sm danger" onclick="window.refuserReservation('${idSur(r.id)}','${idSur(r.date)}','${idSur(r.heureDebut)}','${idSur(r.membreId)}')">Refuser</button>
       </div>
     </div>`;
   }));
@@ -494,7 +497,7 @@ async function renderPlanningSemaine() {
     return `
     <div class="data-row">
       <div class="data-main">
-        <div class="data-title">${dateLabel} ${r.heureDebut} — ${escapeHtml(nomAffichageReservation(r))}</div>
+        <div class="data-title">${dateLabel} ${escapeHtml(r.heureDebut)} — ${escapeHtml(nomAffichageReservation(r))}</div>
         <div class="data-sub">${r.type === 'libre' ? 'Piste libre' : 'Cours de dressage'} ${badge}</div>
       </div>
       <div class="data-actions">
@@ -554,7 +557,7 @@ async function rechercherHistoriqueResa() {
   wrap.innerHTML = '<div class="empty-state">Recherche en cours...</div>';
   const snap = await getDocs(query(collection(db, 'reservations'), where('date', '>=', dateDebut), where('date', '<=', dateFin)));
   let resultats = [];
-  snap.forEach(d => resultats.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => resultats.push({ ...d.data(), id: d.id }));
   resultats.sort((a, b) => a.date.localeCompare(b.date) || (a.heureDebut || '').localeCompare(b.heureDebut || ''));
   window._historiqueResa = resultats;
   if (resultats.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucune réservation sur cette période.</div>'; return; }
@@ -612,7 +615,7 @@ document.getElementById('btnVerifierOrphelines').addEventListener('click', async
     return `
     <div class="data-row">
       <div class="data-main">
-        <div class="data-title">${dateLabel} — ${r.heureDebut}</div>
+        <div class="data-title">${dateLabel} — ${escapeHtml(r.heureDebut)}</div>
         <div class="data-sub">Identifiant du compte introuvable : <code>${escapeHtml(r.membreId||'')}</code></div>
       </div>
       <div class="data-actions">
@@ -765,7 +768,7 @@ async function chargerRecurrencesAdmin() {
         <div class="data-sub">${g.frequence} · ${g.nb} prochaine(s) occurrence(s) planifiée(s), à partir du ${capitalize(new Date(g.prochaineDate+'T00:00:00').toLocaleDateString('fr-BE',{day:'numeric', month:'long'}))}</div>
       </div>
       <div class="data-actions">
-        <button class="btn-sm danger" onclick="window.supprimerRecurrence('${g.recurrenceId}')">Supprimer la récurrence</button>
+        <button class="btn-sm danger" onclick="window.supprimerRecurrence('${idSur(g.recurrenceId)}')">Supprimer la récurrence</button>
       </div>
     </div>`;
   }).join('');
@@ -838,7 +841,7 @@ async function chargerCalendrierDeuxSemaines() {
 async function chargerDemandesInscription() {
   const snap = await getDocs(query(collection(db, 'demandes_inscription'), where('statut', '==', 'en_attente')));
   let demandes = [];
-  snap.forEach(d => demandes.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => demandes.push({ ...d.data(), id: d.id }));
   demandes.sort((a, b) => (b.dateCreation?.toMillis?.() || 0) - (a.dateCreation?.toMillis?.() || 0));
 
   document.getElementById('tabMembresBtn').classList.toggle('has-unread', demandes.length > 0);
@@ -1029,7 +1032,7 @@ window.ouvrirModalMembre = (membre, demandeId) => {
         <div class="banner-alert danger">
           <strong>Ce membre a demandé la suppression de sa fiche.</strong><br>
           Motif : ${escapeHtml(src.suppressionMotif || '—')}
-          <div style="margin-top:8px;"><button class="btn-sm danger" type="button" onclick="window.supprimerDefinitivementMembre('${membre?.id}','${escapeHtml(membre?.identifiant||'')}')">Supprimer définitivement cette fiche</button></div>
+          <div style="margin-top:8px;"><button class="btn-sm danger" type="button" onclick="window.supprimerDefinitivementMembre('${idSur(membre?.id)}','${idSur(membre?.identifiant||'')}')">Supprimer définitivement cette fiche</button></div>
         </div>` : ''}
         <div class="form-grid">
           <div class="field"><label>Identifiant de connexion *</label><input id="fm-identifiant" value="${escapeHtml(src.identifiant||src.identifiantSouhaite||src.prenom||'')}"></div>
@@ -1261,7 +1264,7 @@ async function chargerCoursMembre(membreId) {
   const aujourdhui = dateISOLocale(new Date());
   const snap = await getDocs(query(collection(db, 'reservations'), where('membreId', '==', membreId)));
   let toutes = [];
-  snap.forEach(d => toutes.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => toutes.push({ ...d.data(), id: d.id }));
 
   const ligne = (r) => {
     const dateLabel = r.date ? capitalize(new Date(r.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'})) : '';
@@ -1291,7 +1294,7 @@ async function chargerCoursMembre(membreId) {
 async function chargerStockMembre(membreId) {
   const snap = await getDocs(query(collection(db, 'stock_signalements'), where('membreId', '==', membreId)));
   let prises = [];
-  snap.forEach(d => prises.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => prises.push({ ...d.data(), id: d.id }));
   prises.sort((a, b) => (b.dateSignalement || '').localeCompare(a.dateSignalement || ''));
   const wrap = document.getElementById('zoneStockMembre');
   if (prises.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucune prise de stock signalée pour ce membre.</div>'; return; }
@@ -1311,7 +1314,7 @@ function formatDateCourte(iso) {
 async function chargerAbonnementsMembre(membreId) {
   const snap = await getDocs(query(collection(db, 'abonnements_membres'), where('membreId', '==', membreId)));
   let abonnements = [];
-  snap.forEach(d => abonnements.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => abonnements.push({ ...d.data(), id: d.id }));
   abonnements.sort((a, b) => (b.dateSouscription || '').localeCompare(a.dateSouscription || ''));
   window._abonnementsMembreActuel = abonnements;
 
@@ -1435,7 +1438,7 @@ let boxesCache = [];
 async function chargerBoxes() {
   const snap = await getDocs(collection(db, 'boxes'));
   boxesCache = [];
-  snap.forEach(d => boxesCache.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => boxesCache.push({ ...d.data(), id: d.id }));
   renderBoxes();
 }
 function renderBoxes() {
@@ -1496,7 +1499,7 @@ window.ouvrirModalBox = (box) => {
 async function chargerNettoyages() {
   const snap = await getDocs(collection(db, 'nettoyages'));
   let taches = [];
-  snap.forEach(d => taches.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => taches.push({ ...d.data(), id: d.id }));
   taches.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
   // Retrouve la photo du cheval du box concerné (par nom, insensible à la
@@ -1573,7 +1576,7 @@ document.getElementById('btnAjouterNettoyage').addEventListener('click', () => {
 async function chargerTarifs() {
   const snap = await getDocs(collection(db, 'tarifs'));
   let tarifs = [];
-  snap.forEach(d => tarifs.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => tarifs.push({ ...d.data(), id: d.id }));
   const wrap = document.getElementById('listeTarifs');
   if (tarifs.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun tarif créé.</div>'; return; }
   const categories = [...new Set(tarifs.map(t => t.categorie || 'Autres'))];
@@ -1773,7 +1776,7 @@ const PROGRAMMES_DE_BASE = [
 async function chargerProgrammesActivites() {
   const snap = await getDocs(collection(db, 'programme_activites'));
   let programmes = [];
-  snap.forEach(d => programmes.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => programmes.push({ ...d.data(), id: d.id }));
   programmes.sort((a, b) => (a.ordre ?? 999) - (b.ordre ?? 999));
   const wrap = document.getElementById('listeProgrammesActivites');
   if (programmes.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun programme — clique sur "Initialiser" pour repartir des 5 programmes actuels, ou ajoutes-en un.</div>'; return; }
@@ -1854,7 +1857,7 @@ window.ouvrirModalProgramme = (p) => {
 async function chargerActivites() {
   const snap = await getDocs(collection(db, 'activites'));
   let activites = [];
-  snap.forEach(d => activites.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => activites.push({ ...d.data(), id: d.id }));
   activites.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const wrap = document.getElementById('listeActivites');
   if (activites.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucune activité créée.</div>'; return; }
@@ -1914,7 +1917,7 @@ window.supprimerActivite = async (id) => { if (!confirm('Supprimer cette activit
 window.voirReponsesActivite = async (id) => {
   const snap = await getDocs(query(collection(db, 'activites_reponses'), where('activiteId', '==', id)));
   let reponses = [];
-  snap.forEach(d => reponses.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => reponses.push({ ...d.data(), id: d.id }));
   const html = `
     <div class="modal-overlay" id="modalOverlayReponses">
       <div class="modal-box" style="max-width:560px;">
@@ -1945,7 +1948,7 @@ window.validerPaiementActivite = async (reponseId, activiteId) => {
 async function chargerBoutiqueAdmin() {
   const snap = await getDocs(collection(db, 'articles_boutique'));
   let articles = [];
-  snap.forEach(d => articles.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => articles.push({ ...d.data(), id: d.id }));
   const wrap = document.getElementById('listeArticlesBoutique');
   wrap.innerHTML = articles.length ? articles.map(a => `
     <div class="data-row">
@@ -2001,7 +2004,7 @@ window.ouvrirModalArticleBoutique = (a) => {
 async function chargerCommandesAdmin() {
   const snap = await getDocs(collection(db, 'commandes'));
   let commandes = [];
-  snap.forEach(d => commandes.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => commandes.push({ ...d.data(), id: d.id }));
   commandes.sort((a, b) => (b.dateCreation?.toMillis?.() || 0) - (a.dateCreation?.toMillis?.() || 0));
   const wrap = document.getElementById('listeCommandes');
   wrap.innerHTML = commandes.length ? commandes.map(c => {
@@ -2024,19 +2027,155 @@ async function chargerCommandesAdmin() {
 window.validerCommande = async (id) => { await updateDoc(doc(db, 'commandes', id), { statut: 'validee' }); chargerCommandesAdmin(); };
 window.annulerCommande = async (id) => { await updateDoc(doc(db, 'commandes', id), { statut: 'annulee' }); chargerCommandesAdmin(); };
 
+
+// ==========================================================================
+// PLANNING DES CHEVAUX — choix du cheval par cours, validé par Lara.
+// Règle : 1 cours d'1 h puis repos d'1 h (deux cours à moins de 2 h d'écart
+// = conflit). Les chevaux décédés / archivés / non proposés sont exclus.
+// ==========================================================================
+let semainePlanningChevaux = lundiDeLaSemaine(new Date());
+let planChevauxDonnees = { chevaux: [], resa: [] };
+
+function heureEnMinutes(h) { const [a, b] = String(h || '0:0').split(':'); return (Number(a) || 0) * 60 + (Number(b) || 0); }
+function chevalUtilisable(c) { return !c.decede && !c.archive && c.proposeAuxMembres !== false; }
+
+// Un cheval est en conflit sur (date, heure) si un AUTRE cours actif l'utilise
+// à moins de 2 h d'écart (même heure, ou juste avant/après sans repos).
+function conflitCheval(chevalId, dateISO, heure, exclureResaId) {
+  if (!chevalId) return null;
+  const m = heureEnMinutes(heure);
+  return planChevauxDonnees.resa.find(x =>
+    x.id !== exclureResaId && x.chevalValideId === chevalId && x.date === dateISO &&
+    (x.statut === 'validee' || x.statut === 'en_attente') && Math.abs(heureEnMinutes(x.heureDebut) - m) < 120) || null;
+}
+
+async function chargerPlanningChevaux() {
+  const lundi = new Date(semainePlanningChevaux);
+  const dimanche = new Date(lundi); dimanche.setDate(dimanche.getDate() + 6);
+  document.getElementById('pcSemaineLabel').textContent =
+    `Semaine du ${lundi.toLocaleDateString('fr-BE', {day:'numeric', month:'long'})} au ${dimanche.toLocaleDateString('fr-BE', {day:'numeric', month:'long', year:'numeric'})}`;
+  const wrap = document.getElementById('listePlanningChevaux');
+  wrap.innerHTML = '<div class="empty-state">Chargement…</div>';
+  try {
+    // On élargit d'un jour de chaque côté : le conflit se calcule par date, donc inutile, mais ça reste léger.
+    const [snapC, snapR] = await Promise.all([
+      getDocs(collection(db, 'chevaux_ecurie')),
+      getDocs(query(collection(db, 'reservations'), where('date', '>=', dateISOLocale(lundi)), where('date', '<=', dateISOLocale(dimanche))))
+    ]);
+    const chevaux = []; snapC.forEach(d => chevaux.push({ ...d.data(), id: d.id }));
+    const resa = []; snapR.forEach(d => resa.push({ ...d.data(), id: d.id }));
+    planChevauxDonnees = { chevaux, resa };
+    renderPlanningChevaux();
+  } catch (err) {
+    wrap.innerHTML = '<div class="empty-state">Erreur : ' + escapeHtml(err.code || err.message) + '</div>';
+  }
+}
+
+function renderPlanningChevaux() {
+  const wrap = document.getElementById('listePlanningChevaux');
+  const { chevaux, resa } = planChevauxDonnees;
+  const parId = {}; chevaux.forEach(c => parId[c.id] = c);
+  const cours = resa.filter(r => r.type === 'cours' && (r.statut === 'validee' || r.statut === 'en_attente'))
+    .sort((a, b) => (a.date + a.heureDebut).localeCompare(b.date + b.heureDebut));
+  if (!cours.length) { wrap.innerHTML = '<div class="empty-state">Aucun cours cette semaine.</div>'; return; }
+  const utilisables = chevaux.filter(chevalUtilisable).sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+  wrap.innerHTML = cours.map(r => {
+    const dateLabel = capitalize(new Date(r.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
+    const souhait = r.chevalSouhaiteId ? parId[r.chevalSouhaiteId] : null;
+    const aTraiter = (r.chevalSouhaiteId || '') !== (r.chevalSouhaiteTraiteId || '') || (!r.chevalValideId && r.chevalSouhaiteId);
+    const valide = r.chevalValideId ? parId[r.chevalValideId] : null;
+    const valideDecede = valide && !chevalUtilisable(valide);
+    const defaut = r.chevalValideId || r.chevalSouhaiteId || '';
+    const options = ['<option value="">— Aucun cheval —</option>'].concat(utilisables.map(c => {
+      const conf = conflitCheval(c.id, r.date, r.heureDebut, r.id);
+      return `<option value="${escapeHtml(c.id)}" ${c.id === defaut ? 'selected' : ''}>${escapeHtml(c.nom)} ${conf ? '⛔ pris/repos (' + escapeHtml(conf.heureDebut) + ')' : '✅ libre'}</option>`;
+    })).join('');
+    const etat = valideDecede ? '<span class="badge badge-danger">Cheval décédé/indisponible — à réattribuer</span>'
+      : aTraiter ? '<span class="badge badge-warn">À valider</span>'
+      : valide ? `<span class="badge badge-ok">Validé : ${escapeHtml(valide.nom)}</span>`
+      : '<span class="badge badge-neutral">Sans cheval</span>';
+    const souhaitTxt = r.chevalSouhaiteNom ? `Souhait : ${escapeHtml(souhait?.nom || r.chevalSouhaiteNom)}${souhait && !chevalUtilisable(souhait) ? ' (indisponible)' : ''}` : 'Pas de préférence';
+    return `
+    <div class="data-row" style="flex-wrap:wrap;">
+      <div class="data-main">
+        <div class="data-title">${dateLabel} ${escapeHtml(r.heureDebut)} — ${escapeHtml(nomAffichageReservation(r))}</div>
+        <div class="data-sub">${souhaitTxt} · ${r.statut === 'en_attente' ? 'réservation en attente · ' : ''}${etat}</div>
+      </div>
+      <div class="data-actions" style="gap:8px;">
+        <select id="pc-sel-${idSur(r.id)}">${options}</select>
+        <button class="btn-sm primary" onclick="window.validerChevalCours('${idSur(r.id)}')">Valider</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Enregistre le cheval validé et prévient le membre selon le cas.
+async function enregistrerChevalCours(r, chevalId, silencieux) {
+  const { chevaux } = planChevauxDonnees;
+  const cheval = chevaux.find(c => c.id === chevalId) || null;
+  const souhaitId = r.chevalSouhaiteId || '';
+  await updateDoc(doc(db, 'reservations', r.id), {
+    chevalValideId: chevalId || '',
+    chevalValideNom: cheval?.nom || '',
+    chevalSouhaiteTraiteId: souhaitId
+  });
+  r.chevalValideId = chevalId || ''; r.chevalValideNom = cheval?.nom || ''; r.chevalSouhaiteTraiteId = souhaitId;
+  const quand = libelleDateHeure(r.date, r.heureDebut);
+  if (souhaitId && chevalId === souhaitId) {
+    await notifierMembreReservation(r.membreId, `🐴 Bonne nouvelle : le cheval ${cheval.nom} que vous souhaitiez est confirmé pour votre cours du ${quand}.`);
+  } else if (souhaitId && chevalId) {
+    await notifierMembreReservation(r.membreId, `🐴 Le cheval souhaité (${r.chevalSouhaiteNom || '—'}) n'est pas disponible pour votre cours du ${quand}. Lara vous attribue ${cheval.nom}.`);
+  } else if (souhaitId && !chevalId) {
+    await notifierMembreReservation(r.membreId, `🐴 Le cheval souhaité (${r.chevalSouhaiteNom || '—'}) n'est pas disponible pour votre cours du ${quand}. Lara vous communiquera le cheval prévu.`);
+  } else if (chevalId) {
+    await notifierMembreReservation(r.membreId, `🐴 Votre cheval pour le cours du ${quand} : ${cheval.nom}.`);
+  }
+}
+
+window.validerChevalCours = async (resaId) => {
+  const r = planChevauxDonnees.resa.find(x => x.id === resaId);
+  if (!r) return;
+  const chevalId = document.getElementById('pc-sel-' + resaId).value;
+  const conf = conflitCheval(chevalId, r.date, r.heureDebut, r.id);
+  if (conf && !confirm(`Ce cheval a déjà un cours à ${conf.heureDebut} ce jour-là : il lui faut 1 h de repos entre deux cours. Valider quand même ?`)) return;
+  try {
+    await enregistrerChevalCours(r, chevalId);
+    renderPlanningChevaux();
+  } catch (err) { alert('Erreur : ' + (err.code || err.message)); }
+};
+
+// Valide en un clic tous les souhaits sans conflit (dans l'ordre chronologique,
+// chaque validation bloquant le cheval pour les cours suivants).
+document.getElementById('pcValiderSansConflit').addEventListener('click', async () => {
+  const { chevaux, resa } = planChevauxDonnees;
+  const parId = {}; chevaux.forEach(c => parId[c.id] = c);
+  const aValider = resa.filter(r => r.type === 'cours' && (r.statut === 'validee' || r.statut === 'en_attente') &&
+    r.chevalSouhaiteId && r.chevalSouhaiteId !== r.chevalSouhaiteTraiteId && parId[r.chevalSouhaiteId] && chevalUtilisable(parId[r.chevalSouhaiteId]))
+    .sort((a, b) => (a.date + a.heureDebut).localeCompare(b.date + b.heureDebut));
+  let ok = 0, restant = 0;
+  for (const r of aValider) {
+    if (conflitCheval(r.chevalSouhaiteId, r.date, r.heureDebut, r.id)) { restant++; continue; }
+    try { await enregistrerChevalCours(r, r.chevalSouhaiteId); ok++; } catch (e) { restant++; }
+  }
+  alert(`${ok} cheval(aux) confirmé(s).${restant ? `\n${restant} souhait(s) en conflit ou en erreur : à traiter à la main.` : ''}`);
+  renderPlanningChevaux();
+});
+document.getElementById('pcSemainePrec').addEventListener('click', () => { semainePlanningChevaux.setDate(semainePlanningChevaux.getDate() - 7); chargerPlanningChevaux(); });
+document.getElementById('pcSemaineSuiv').addEventListener('click', () => { semainePlanningChevaux.setDate(semainePlanningChevaux.getDate() + 7); chargerPlanningChevaux(); });
+
 // ==========================================================================
 // MESSAGES
 // ==========================================================================
 async function chargerConversations(filtre = '') {
   const snap = await getDocs(collection(db, 'conversations'));
   let convs = [];
-  snap.forEach(d => convs.push({ uid: d.id, ...d.data() }));
+  snap.forEach(d => convs.push({ ...d.data(), uid: d.id }));
   convs.sort((a, b) => (b.dateDernierMessage || '').localeCompare(a.dateDernierMessage || ''));
   const f = filtre.toLowerCase();
   const wrap = document.getElementById('listeConversations');
   const filtrees = convs.filter(c => !f || nomMembre(c.uid).toLowerCase().includes(f));
   wrap.innerHTML = filtrees.length ? filtrees.map(c => `
-    <div class="data-row" style="cursor:pointer;" onclick="window.ouvrirConversation('${c.uid}')">
+    <div class="data-row" style="cursor:pointer;" onclick="window.ouvrirConversation('${idSur(c.uid)}')">
       <div class="data-main">
         <div class="data-title">${escapeHtml(nomMembre(c.uid))} ${c.nonLuAdmin ? '<span class="badge badge-warn">Nouveau</span>' : ''}</div>
         <div class="data-sub">${escapeHtml(c.dernierMessage || '')}</div>
@@ -2140,7 +2279,7 @@ async function envoyerNouveauxMessages(uids, texte) {
 window.ouvrirConversation = async (uid) => {
   const msgsSnap = await getDocs(collection(db, 'conversations', uid, 'messages'));
   let msgs = [];
-  msgsSnap.forEach(d => msgs.push({ id: d.id, ...d.data() }));
+  msgsSnap.forEach(d => msgs.push({ ...d.data(), id: d.id }));
   msgs.sort((a, b) => (a.dateEnvoi || '').localeCompare(b.dateEnvoi || ''));
   const nonLus = msgs.filter(m => m.expediteur === 'membre' && !m.lu);
   await Promise.all(nonLus.map(m => updateDoc(doc(db, 'conversations', uid, 'messages', m.id), { lu: true })));
@@ -2187,7 +2326,7 @@ function bulleMessage(m) {
 async function chargerChevauxAdmin() {
   const snap = await getDocs(collection(db, 'chevaux_ecurie'));
   let chevaux = [];
-  snap.forEach(d => chevaux.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => chevaux.push({ ...d.data(), id: d.id }));
   const wrap = document.getElementById('listeChevauxEcurie');
   if (chevaux.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun cheval créé.</div>'; return; }
   wrap.innerHTML = chevaux.map(c => `
@@ -2224,6 +2363,9 @@ window.ouvrirModalChevalEcurie = (c) => {
           <div class="field"><label>Visible sur le site public</label>
             <select id="ce-visible"><option value="oui" ${c?.visiblePublic!==false?'selected':''}>Oui</option><option value="non" ${c?.visiblePublic===false?'selected':''}>Non</option></select>
           </div>
+          <div class="field"><label>Proposé aux membres pour leurs cours</label>
+            <select id="ce-propose"><option value="oui" ${c?.proposeAuxMembres!==false?'selected':''}>Oui</option><option value="non" ${c?.proposeAuxMembres===false?'selected':''}>Non (ex. poney de Lara, cheval en repos)</option></select>
+          </div>
           <div class="field"><label>Statut</label>
             <select id="ce-decede"><option value="non" ${!c?.decede?'selected':''}>Vivant</option><option value="oui" ${c?.decede?'selected':''}>Décédé</option></select>
           </div>
@@ -2248,6 +2390,7 @@ window.ouvrirModalChevalEcurie = (c) => {
       signeParticulier: document.getElementById('ce-signe').value.trim(),
       visiblePublic: document.getElementById('ce-visible').value === 'oui',
       decede: document.getElementById('ce-decede').value === 'oui',
+      proposeAuxMembres: document.getElementById('ce-propose').value === 'oui',
       archive: document.getElementById('ce-archive').value === 'oui'
     };
     if (!data.nom) { alert('Merci d\'indiquer un nom.'); return; }
@@ -2271,7 +2414,7 @@ window.ouvrirModalChevalEcurie = (c) => {
 async function chargerEvenementsAdmin() {
   const snap = await getDocs(collection(db, 'evenements'));
   let evenements = [];
-  snap.forEach(d => evenements.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => evenements.push({ ...d.data(), id: d.id }));
   evenements.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const wrap = document.getElementById('listeEvenements');
   if (evenements.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun événement créé.</div>'; return; }
@@ -2337,7 +2480,7 @@ window.ouvrirModalEvenement = (e) => {
 async function chargerBlogAdmin() {
   const snap = await getDocs(collection(db, 'articles_blog'));
   let articles = [];
-  snap.forEach(d => articles.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => articles.push({ ...d.data(), id: d.id }));
   articles.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const wrap = document.getElementById('listeArticlesBlog');
   if (articles.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun article créé.</div>'; return; }
@@ -2405,7 +2548,7 @@ window.ouvrirModalArticleBlog = (a) => {
 async function chargerStockAdmin() {
   const snap = await getDocs(collection(db, 'stock'));
   let stock = [];
-  snap.forEach(d => stock.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => stock.push({ ...d.data(), id: d.id }));
   const wrap = document.getElementById('listeStock');
   majPointRougeStockAdmin(stock);
   if (stock.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun article de stock créé.</div>'; return; }
@@ -2473,7 +2616,7 @@ window.supprimerStock = async (id) => { if (!confirm('Supprimer cet article de s
 async function chargerStockSignalements() {
   const snap = await getDocs(collection(db, 'stock_signalements'));
   let logs = [];
-  snap.forEach(d => logs.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => logs.push({ ...d.data(), id: d.id }));
   logs.sort((a, b) => (b.dateSignalement || '').localeCompare(a.dateSignalement || ''));
   logs = logs.slice(0, 20);
   const wrap = document.getElementById('listeStockSignalements');
@@ -2496,7 +2639,7 @@ async function chargerStockSignalements() {
 async function chargerPlanningBenevolesAdmin() {
   const snap = await getDocs(collection(db, 'planning_benevoles'));
   let creneaux = [];
-  snap.forEach(d => creneaux.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => creneaux.push({ ...d.data(), id: d.id }));
   creneaux.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.heure || '').localeCompare(b.heure || ''));
   const wrap = document.getElementById('listePlanningBenevoles');
   if (creneaux.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun créneau planifié.</div>'; return; }
@@ -2709,7 +2852,7 @@ async function annulerReservationsPourFermeture(dateDebut, dateFin) {
 async function chargerExceptionsAdmin() {
   const snap = await getDocs(collection(db, 'disponibilites_exceptions'));
   let exceptions = [];
-  snap.forEach(d => exceptions.push({ date: d.id, ...d.data() }));
+  snap.forEach(d => exceptions.push({ ...d.data(), date: d.id }));
   exceptions = exceptions.filter(e => e.date >= dateISOLocale(new Date()));
   exceptions.sort((a, b) => a.date.localeCompare(b.date));
 
@@ -2740,7 +2883,7 @@ async function chargerExceptionsAdmin() {
         <div class="data-sub">${g.ferme ? '<span class="badge badge-danger">Fermé</span>' : `<span class="badge badge-neutral">Horaire spécial : ${g.heureDebut} – ${g.heureFin}</span>`}</div>
       </div>
       <div class="data-actions">
-        <button class="btn-sm danger" onclick="window.supprimerException('${g.dateDebut}','${g.dateFin}')">Supprimer</button>
+        <button class="btn-sm danger" onclick="window.supprimerException('${idSur(g.dateDebut)}','${idSur(g.dateFin)}')">Supprimer</button>
       </div>
     </div>`;
   }).join('');
@@ -2764,7 +2907,7 @@ window.supprimerException = async (dateDebut, dateFin) => {
 async function chargerMotsDePasseAdmin() {
   const snap = await getDocs(collection(db, 'membres'));
   let comptes = [];
-  snap.forEach(d => comptes.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => comptes.push({ ...d.data(), id: d.id }));
   comptes.sort((a, b) => {
     const ordre = { superadmin: 0, admin: 1 };
     const oa = ordre[a.role] ?? 2, ob = ordre[b.role] ?? 2;
@@ -2799,7 +2942,7 @@ function renderMotsDePasse(comptes) {
         <div class="data-sub">Dernière connexion : ${formatDateHeure(c.derniereConnexion)}</div>
       </div>
       <div class="data-actions">
-        <button class="btn-sm" onclick="window.reinitialiserMotDePasse('${c.id}','${escapeHtml(c.identifiant || '')}')">Réinitialiser</button>
+        <button class="btn-sm" onclick="window.reinitialiserMotDePasse('${idSur(c.id)}','${idSur(c.identifiant || '')}')">Réinitialiser</button>
       </div>
     </div>`;
   }).join('');
@@ -2834,7 +2977,7 @@ window.reinitialiserMotDePasse = async (uid, identifiant) => {
 async function chargerSauvegardesMdp() {
   const snap = await getDocs(collection(db, 'sauvegardes_mdp'));
   let sauvegardes = [];
-  snap.forEach(d => sauvegardes.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => sauvegardes.push({ ...d.data(), id: d.id }));
   sauvegardes.sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
   sauvegardes = sauvegardes.slice(0, 20);
   const wrap = document.getElementById('listeSauvegardesMdp');
@@ -2898,7 +3041,7 @@ async function chargerLivreCaisse() {
   const dateFin = `${anneeActuelleCaisse}-12-31`;
   const snap = await getDocs(query(collection(db, 'livre_caisse'), where('date', '>=', dateDebut), where('date', '<=', dateFin)));
   let mouvements = [];
-  snap.forEach(d => mouvements.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => mouvements.push({ ...d.data(), id: d.id }));
   mouvements.sort((a, b) => a.date.localeCompare(b.date) || (a.createdAtMs||0) - (b.createdAtMs||0));
 
   let solde = soldeDepart, totalEncaisse = 0, totalDecaisse = 0;
@@ -3025,7 +3168,7 @@ function initSelecteurAnneeCompta() {
 async function chargerPlanComptable() {
   const snap = await getDocs(collection(db, 'comptabilite_comptes'));
   planComptableCache = [];
-  snap.forEach(d => planComptableCache.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => planComptableCache.push({ ...d.data(), id: d.id }));
   planComptableCache.sort((a, b) => (a.numero || '').localeCompare(b.numero || ''));
   const wrap = document.getElementById('listePlanComptable');
   wrap.innerHTML = planComptableCache.length === 0
@@ -3063,7 +3206,7 @@ async function chargerCompta() {
   const dateFin = `${compteActuelAnnee}-12-31`;
   const snap = await getDocs(query(collection(db, 'comptabilite_ecritures'), where('date', '>=', dateDebut), where('date', '<=', dateFin)));
   let ecritures = [];
-  snap.forEach(d => ecritures.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => ecritures.push({ ...d.data(), id: d.id }));
   ecritures.sort((a, b) => a.date.localeCompare(b.date) || (a.createdAtMs||0) - (b.createdAtMs||0));
 
   if (ecritures.length === 0) {
@@ -3250,7 +3393,7 @@ const CATEGORIES_RECETTES_DE_BASE = ['Abonnement', 'Cours sans abonnement', 'Cot
 async function chargerCategoriesRecettes() {
   const snap = await getDocs(collection(db, 'livre_recettes_categories'));
   categoriesRecettesCache = [];
-  snap.forEach(d => categoriesRecettesCache.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => categoriesRecettesCache.push({ ...d.data(), id: d.id }));
   categoriesRecettesCache.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
   const wrap = document.getElementById('listeCategoriesRecettes');
   wrap.innerHTML = categoriesRecettesCache.length === 0
@@ -3462,7 +3605,7 @@ document.getElementById('btnExporterRecettes').addEventListener('click', () => {
 async function chargerLivreOrAdmin() {
   const snap = await getDocs(collection(db, 'livre_or'));
   let messages = [];
-  snap.forEach(d => messages.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => messages.push({ ...d.data(), id: d.id }));
   messages.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
   const enAttente = messages.filter(m => m.statut === 'en_attente');
@@ -3537,7 +3680,7 @@ HEXELYA — L’organisation qui permet aux entrepreneurs d’avancer sereinemen
 async function chargerPartenairesAdmin() {
   const snap = await getDocs(collection(db, 'partenaires'));
   let partenaires = [];
-  snap.forEach(d => partenaires.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => partenaires.push({ ...d.data(), id: d.id }));
   partenaires.sort((a, b) => (a.ordre ?? 999) - (b.ordre ?? 999));
   window._partenaires = {}; partenaires.forEach(p => window._partenaires[p.id] = p);
   const wrap = document.getElementById('listePartenaires');

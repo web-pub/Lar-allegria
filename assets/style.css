@@ -950,3 +950,27 @@ body:not(.app-body) textarea {
   text-decoration: underline;
 }
 .media-card p a:hover, .lb-fiche-item p a:hover { color: var(--rouge); }
+
+/* ---- Partenaires : vignette à gauche, nom + phrase d'une ligne, développer/réduire ---- */
+.partenaire-item { border:1px solid #E9DEC8; border-radius:var(--radius); background:#fff; margin-bottom:12px; overflow:hidden; }
+.partenaire-head { display:flex; align-items:center; gap:14px; padding:12px 16px; }
+.partenaire-vignette { flex:none; width:64px; height:64px; display:flex; align-items:center; justify-content:center; background:var(--paper-warm); border-radius:10px; overflow:hidden; }
+.partenaire-vignette img { max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; }
+.partenaire-vignette span { font-weight:700; font-size:1.4rem; color:var(--terre); }
+.partenaire-titres { flex:1; min-width:0; }
+.partenaire-titres h2 { font-size:1.05rem; margin:0 0 2px; text-transform:uppercase; }
+.partenaire-resume { margin:0; color:var(--terre); font-size:0.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.partenaire-toggle { flex:none; background:none; border:1px solid #E9DEC8; border-radius:999px; padding:6px 12px; font:inherit; font-size:0.82rem; font-weight:600; cursor:pointer; color:var(--rouge-dark); }
+.partenaire-toggle:hover { background:var(--paper-warm); }
+.partenaire-detail { padding:4px 16px 16px 94px; border-top:1px solid #F1E8D4; }
+.partenaire-detail p { margin:12px 0 0; }
+@media (max-width:560px) {
+  .partenaire-head { flex-wrap:wrap; }
+  .partenaire-detail { padding-left:16px; }
+  .partenaire-toggle { margin-left:78px; }
+}
+.partenaire-detail.hidden { display:none; }
+
+/* Chevaux décédés : mention "In memoriam" */
+.in-memoriam { display:inline-block; margin:2px 0 6px; padding:2px 10px; border:1px solid #CDBFA0; border-radius:999px; font-size:0.8rem; letter-spacing:0.04em; color:var(--terre); background:var(--paper-warm); }
+.in-memoriam-card .cheval-vignette img { filter:grayscale(0.85); }

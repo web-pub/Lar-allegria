@@ -5,7 +5,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-030';
+const VERSION_SITE = 'V01-034';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -14,6 +14,7 @@ function dateISOLocale(d) {
   const j = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${j}`;
 }
+function idSur(v) { return String(v ?? '').replace(/[^\w:.\-]/g, ''); }
 function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 function escapeHtml(str) {
   if (!str) return '';
@@ -579,29 +580,122 @@ async function renderGrilleReservations() {
   grille.innerHTML = blocs.join('') || '<div class="empty-state">Aucun jour d\'ouverture cette semaine.</div>';
 }
 
+// Chevaux que le membre peut choisir : ni décédés, ni archivés, ni réservés à Lara.
+let chevauxChoixCache = null;
+async function chargerChevauxChoix() {
+  if (chevauxChoixCache) return chevauxChoixCache;
+  const snap = await getDocs(collection(db, 'chevaux_ecurie'));
+  const liste = [];
+  snap.forEach(d => {
+    const c = d.data();
+    if (!c.decede && !c.archive && c.proposeAuxMembres !== false && c.nom) liste.push({ id: d.id, nom: c.nom });
+  });
+  liste.sort((a, b) => a.nom.localeCompare(b.nom));
+  chevauxChoixCache = liste;
+  return liste;
+}
+function optionsChevaux(chevaux, selectionId) {
+  return '<option value="">Pas de préférence</option>' +
+    chevaux.map(c => `<option value="${escapeHtml(c.id)}" ${c.id === selectionId ? 'selected' : ''}>${escapeHtml(c.nom)}</option>`).join('');
+}
+
 window.demanderCreneau = async (dateISO, heure) => {
   const type = membreData.typeMembre === 'pension' ? document.getElementById('resa-type').value : 'cours';
-  if (!confirm(`Confirmer votre demande de créneau le ${dateISO} à ${heure} (${type === 'cours' ? 'cours de dressage' : 'utilisation libre de la piste'}) ?\n\nCette demande sera envoyée à Lara pour validation.`)) return;
-  try {
-    await addDoc(collection(db, 'reservations'), {
-      membreId: membreUid,
-      date: dateISO,
-      heureDebut: heure,
-      type,
-      statut: 'en_attente',
-      createdAt: serverTimestamp()
-    });
-    await renderGrilleReservations();
-    await chargerMesReservations();
-  } catch (err) {
-    alert('Erreur lors de la demande : ' + (err.code || err.message));
-  }
+  let chevaux = [];
+  if (type === 'cours') { try { chevaux = await chargerChevauxChoix(); } catch (e) { chevaux = []; } }
+  const libelle = capitalize(new Date(dateISO + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
+  const html = `
+    <div class="modal-overlay" id="modalOverlayDemandeCreneau">
+      <div class="modal-box" style="max-width:440px;">
+        <h3>Demande de créneau</h3>
+        <p style="color:var(--terre); font-size:0.9rem;">${escapeHtml(libelle)} à ${escapeHtml(heure)} — ${type === 'cours' ? 'cours de dressage' : 'utilisation libre de la piste'}.</p>
+        ${type === 'cours' && chevaux.length ? `
+        <div class="field"><label>Cheval souhaité <span class="hint">— Lara valide selon les disponibilités (un cheval fait 1 cours puis se repose 1 h)</span></label>
+          <select id="dc-cheval">${optionsChevaux(chevaux, '')}</select>
+        </div>` : ''}
+        <p style="color:var(--terre); font-size:0.85rem;">Cette demande sera envoyée à Lara pour validation.</p>
+        <div class="modal-actions">
+          <button class="btn-sm" id="dc-annuler">Annuler</button>
+          <button class="btn-sm primary" id="dc-confirmer">Envoyer la demande</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  const fermer = () => document.getElementById('modalOverlayDemandeCreneau')?.remove();
+  document.getElementById('dc-annuler').addEventListener('click', fermer);
+  document.getElementById('dc-confirmer').addEventListener('click', async () => {
+    const sel = document.getElementById('dc-cheval');
+    const chevalId = sel ? sel.value : '';
+    const chevalNom = chevalId ? (chevaux.find(c => c.id === chevalId)?.nom || '') : '';
+    const btn = document.getElementById('dc-confirmer'); btn.disabled = true;
+    try {
+      const data = { membreId: membreUid, date: dateISO, heureDebut: heure, type, statut: 'en_attente', createdAt: serverTimestamp() };
+      if (chevalId) { data.chevalSouhaiteId = chevalId; data.chevalSouhaiteNom = chevalNom; }
+      await addDoc(collection(db, 'reservations'), data);
+      fermer();
+      await renderGrilleReservations();
+      await chargerMesReservations();
+    } catch (err) {
+      btn.disabled = false;
+      alert('Erreur lors de la demande : ' + (err.code || err.message));
+    }
+  });
 };
+
+// Choix / changement du cheval sur une réservation existante (séance unique
+// ou, pour un cours récurrent, la séance de la semaine — avec option pour
+// appliquer le même souhait à toutes les séances à venir de la récurrence).
+window.choisirChevalReservation = async (resaId) => {
+  const r = (window._mesReservations || []).find(x => x.id === resaId);
+  if (!r) return;
+  let chevaux = [];
+  try { chevaux = await chargerChevauxChoix(); } catch (e) { alert('Liste des chevaux indisponible.'); return; }
+  const aujourdhui = dateISOLocale(new Date());
+  const memeSerie = r.recurrenceId ? (window._mesReservations || []).filter(x => x.recurrenceId === r.recurrenceId && x.date >= aujourdhui && x.type === 'cours' && (x.statut === 'validee' || x.statut === 'en_attente')) : [];
+  const html = `
+    <div class="modal-overlay" id="modalOverlayChoixCheval">
+      <div class="modal-box" style="max-width:440px;">
+        <h3>🐴 Mon cheval</h3>
+        <p style="color:var(--terre); font-size:0.9rem;">${escapeHtml(libelleDateCourt(r.date))} à ${escapeHtml(r.heureDebut)}. Lara valide votre choix selon les disponibilités ; si le cheval n'est pas disponible, vous recevrez un message.</p>
+        <div class="field"><label>Cheval souhaité</label>
+          <select id="cc-cheval">${optionsChevaux(chevaux, r.chevalSouhaiteId || '')}</select>
+        </div>
+        ${memeSerie.length > 1 ? `<label style="display:flex; gap:8px; align-items:center; font-size:0.9rem;"><input type="checkbox" id="cc-serie"> Appliquer à mes ${memeSerie.length} prochaines séances de ce cours récurrent</label>` : ''}
+        <div class="modal-actions">
+          <button class="btn-sm" id="cc-annuler">Annuler</button>
+          <button class="btn-sm primary" id="cc-enregistrer">Enregistrer</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  const fermer = () => document.getElementById('modalOverlayChoixCheval')?.remove();
+  document.getElementById('cc-annuler').addEventListener('click', fermer);
+  document.getElementById('cc-enregistrer').addEventListener('click', async () => {
+    const chevalId = document.getElementById('cc-cheval').value;
+    const chevalNom = chevalId ? (chevaux.find(c => c.id === chevalId)?.nom || '') : '';
+    const cible = document.getElementById('cc-serie')?.checked ? memeSerie : [r];
+    const btn = document.getElementById('cc-enregistrer'); btn.disabled = true;
+    try {
+      for (const x of cible) {
+        await updateDoc(doc(db, 'reservations', x.id), { chevalSouhaiteId: chevalId, chevalSouhaiteNom: chevalNom });
+      }
+      fermer();
+      await chargerMesReservations();
+    } catch (err) {
+      btn.disabled = false;
+      alert('Erreur : ' + (err.code || err.message));
+    }
+  });
+};
+function libelleDateCourt(dateISO) {
+  return capitalize(new Date(dateISO + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
+}
 
 async function chargerMesReservations() {
   const snap = await getDocs(query(collection(db, 'reservations'), where('membreId', '==', membreUid)));
   let mesResa = [];
-  snap.forEach(d => mesResa.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => mesResa.push({ ...d.data(), id: d.id }));
+  window._mesReservations = mesResa;
   const aujourdhui = dateISOLocale(new Date());
   const aVenir = mesResa.filter(r => r.date >= aujourdhui && r.statut !== 'refusee').sort((a,b) => (a.date+a.heureDebut).localeCompare(b.date+b.heureDebut));
   const passees = mesResa.filter(r => r.date < aujourdhui || r.statut === 'refusee').sort((a,b) => (b.date+b.heureDebut).localeCompare(a.date+a.heureDebut));
@@ -629,16 +723,30 @@ async function chargerMesReservations() {
     const peutAnnuler = r.statut === 'en_attente' || (r.statut === 'validee' && heuresRestantes >= 24);
     const troplTardPourAnnuler = r.statut === 'validee' && r.date >= aujourdhui && heuresRestantes >= 0 && heuresRestantes < 24;
     const libelleAnnuler = r.recurrenceId ? 'Libérer ce créneau' : 'Annuler';
+    // Cheval : souhait du membre / validation de Lara.
+    let chevalHtml = '';
+    if (r.type === 'cours' && (r.statut === 'validee' || r.statut === 'en_attente')) {
+      const souhait = r.chevalSouhaiteId || '';
+      const traite = r.chevalSouhaiteTraiteId || '';
+      if (souhait && souhait === traite && r.chevalValideId === souhait) chevalHtml = `<div class="data-sub">🐴 Cheval confirmé : <strong>${escapeHtml(r.chevalValideNom)}</strong></div>`;
+      else if (souhait && souhait === traite && r.chevalValideId) chevalHtml = `<div class="data-sub">🐴 ${escapeHtml(r.chevalSouhaiteNom)} n'est pas disponible — cheval attribué : <strong>${escapeHtml(r.chevalValideNom)}</strong></div>`;
+      else if (souhait && souhait === traite) chevalHtml = `<div class="data-sub">🐴 ${escapeHtml(r.chevalSouhaiteNom)} n'est pas disponible — Lara vous communiquera le cheval prévu.</div>`;
+      else if (souhait) chevalHtml = `<div class="data-sub">🐴 Souhait : ${escapeHtml(r.chevalSouhaiteNom)} — en attente de validation par Lara</div>`;
+      else if (r.chevalValideId) chevalHtml = `<div class="data-sub">🐴 Cheval attribué : <strong>${escapeHtml(r.chevalValideNom)}</strong></div>`;
+      else chevalHtml = '<div class="data-sub">🐴 Pas de préférence de cheval</div>';
+    }
+    const peutChoisirCheval = r.type === 'cours' && r.date >= aujourdhui && (r.statut === 'validee' || r.statut === 'en_attente');
     return `
     <div class="data-row">
       <div class="data-main">
-        <div class="data-title">${dateLabel} — ${r.heureDebut} (${r.type === 'libre' ? 'piste libre' : 'cours'})</div>
+        <div class="data-title">${dateLabel} — ${escapeHtml(r.heureDebut)} (${r.type === 'libre' ? 'piste libre' : 'cours'})</div>
         <div class="data-sub">${badge}</div>
+        ${chevalHtml}
         ${motifHtml}
         ${troplTardPourAnnuler ? '<div class="data-sub">Annulation en ligne impossible à moins de 24h — contactez Lara si besoin.</div>' : ''}
         ${meteoHtml}
       </div>
-      ${peutAnnuler ? `<div class="data-actions"><button class="btn-sm danger" onclick="window.demanderAnnulationReservation('${r.id}','${escapeHtml(dateLabel)}','${r.heureDebut}',${r.recurrenceId ? 'true' : 'false'},'${r.type}',${r.statut==='validee'},'${r.date}')">${libelleAnnuler}</button></div>` : ''}
+      ${(peutAnnuler || peutChoisirCheval) ? `<div class="data-actions">${peutChoisirCheval ? `<button class="btn-sm" onclick="window.choisirChevalReservation('${idSur(r.id)}')">🐴 Mon cheval</button>` : ''}${peutAnnuler ? `<button class="btn-sm danger" onclick="window.demanderAnnulationReservation('${idSur(r.id)}','',  '${idSur(r.heureDebut)}',${r.recurrenceId ? 'true' : 'false'},'${idSur(r.type)}',${r.statut==='validee'},'${idSur(r.date)}')">${libelleAnnuler}</button>` : ''}</div>` : ''}
     </div>`;
   };
 
@@ -647,7 +755,10 @@ async function chargerMesReservations() {
   wrapHisto.innerHTML = passees.length ? (await Promise.all(passees.map(r => ligneResa(r, false)))).join('') : '<div class="empty-state">Aucun historique pour l\'instant.</div>';
 }
 
-window.demanderAnnulationReservation = (id, dateLabel, heure, estRecurrence, type, etaitValidee, dateISOCours) => {
+window.demanderAnnulationReservation = (id, _ignore, heure, estRecurrence, type, etaitValidee, dateISOCours) => {
+  // Libellé recalculé ici (jamais passé via onclick) pour éviter toute injection.
+  const dateLabel = escapeHtml(capitalize(new Date(dateISOCours + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'})));
+  heure = escapeHtml(heure);
   const html = `
     <div class="modal-overlay" id="modalOverlayAnnulResa">
       <div class="modal-box" style="max-width:440px;">
@@ -715,7 +826,7 @@ window.demanderAnnulationReservation = (id, dateLabel, heure, estRecurrence, typ
 async function chargerActivites() {
   const snap = await getDocs(collection(db, 'activites'));
   let activites = [];
-  snap.forEach(d => activites.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => activites.push({ ...d.data(), id: d.id }));
   activites.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
   const wrap = document.getElementById('zoneActivites');
@@ -804,7 +915,7 @@ async function chargerNettoyage() {
   const wrap = document.getElementById('zoneNettoyage');
   const snap = await getDocs(query(collection(db, 'nettoyages'), where('assigneA', '==', membreUid)));
   let taches = [];
-  snap.forEach(d => taches.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => taches.push({ ...d.data(), id: d.id }));
   taches.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   if (taches.length === 0) {
     wrap.innerHTML = '<div class="empty-state">Aucune tâche de nettoyage assignée pour l\'instant.</div>';
@@ -857,7 +968,7 @@ async function chargerMesCreneauxBenevole() {
   const wrap = document.getElementById('zoneMesCreneauxBenevole');
   const snap = await getDocs(query(collection(db, 'planning_benevoles'), where('assigneA', '==', membreUid)));
   let creneaux = [];
-  snap.forEach(d => creneaux.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => creneaux.push({ ...d.data(), id: d.id }));
   creneaux.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.heure || '').localeCompare(b.heure || ''));
   if (creneaux.length === 0) {
     wrap.innerHTML = '<div class="empty-state">Aucun créneau qui vous soit assigné pour l\'instant.</div>';
@@ -929,7 +1040,7 @@ async function chargerPlanningEquipeBenevole() {
 async function chargerChat() {
   const msgsSnap = await getDocs(collection(db, 'conversations', membreUid, 'messages'));
   const msgs = [];
-  msgsSnap.forEach(d => msgs.push({ id: d.id, ...d.data() }));
+  msgsSnap.forEach(d => msgs.push({ ...d.data(), id: d.id }));
   msgs.sort((a, b) => (a.dateEnvoi || '').localeCompare(b.dateEnvoi || ''));
   const wrap = document.getElementById('chatThreadMembre');
   wrap.innerHTML = msgs.map(m => bulleMessage(m)).join('') || '<div class="empty-state">Aucun message pour l\'instant. Dites bonjour à Lara !</div>';
@@ -986,7 +1097,9 @@ async function chargerBoutiqueMembre() {
   try {
     const snap = await getDocs(query(collection(db, 'articles_boutique'), where('actif', '==', true)));
     const articles = [];
-    snap.forEach(d => articles.push({ id: d.id, ...d.data() }));
+    snap.forEach(d => articles.push({ ...d.data(), id: d.id }));
+    window._catalogueBoutique = {};
+    articles.forEach(a => { window._catalogueBoutique[a.id] = { nom: a.nom, prix: Number(a.prix), stock: Number(a.stock) }; });
     if (articles.length === 0) {
       wrap.innerHTML = '<div class="empty-state">Aucun article disponible pour l\'instant.</div>';
     } else {
@@ -998,7 +1111,7 @@ async function chargerBoutiqueMembre() {
             <div class="data-sub">${Number(a.prix).toFixed(2)} € TTC · ${a.stock > 0 ? `${a.stock} en stock` : '<span class="badge badge-danger">Rupture de stock</span>'}</div>
           </div>
           <div class="data-actions">
-            <button class="btn-sm primary" ${a.stock <= 0 ? 'disabled' : ''} onclick="window.ajouterAuPanier('${a.id}', '${escapeHtml(a.nom)}', ${a.prix}, ${a.stock})">Ajouter au panier</button>
+            <button class="btn-sm primary" ${a.stock <= 0 ? 'disabled' : ''} onclick="window.ajouterAuPanier('${idSur(a.id)}')">Ajouter au panier</button>
           </div>
         </div>`).join('');
     }
@@ -1009,7 +1122,10 @@ async function chargerBoutiqueMembre() {
   afficherPanier();
   chargerMesCommandes();
 }
-window.ajouterAuPanier = (articleId, nom, prix, stock) => {
+window.ajouterAuPanier = (articleId) => {
+  const art = (window._catalogueBoutique || {})[articleId];
+  if (!art) return;
+  const { nom, prix, stock } = art;
   const existant = panierLocal.find(l => l.articleId === articleId);
   if (existant) {
     if (existant.quantite >= stock) { alert('Stock insuffisant.'); return; }
@@ -1037,7 +1153,7 @@ function afficherPanier() {
         <div class="data-title">${l.quantite} × ${escapeHtml(l.nom)}</div>
         <div class="data-sub">${(l.prix * l.quantite).toFixed(2)} € TTC</div>
       </div>
-      <div class="data-actions"><button class="btn-sm danger" onclick="window.retirerDuPanier('${l.articleId}')">Retirer</button></div>
+      <div class="data-actions"><button class="btn-sm danger" onclick="window.retirerDuPanier('${idSur(l.articleId)}')">Retirer</button></div>
     </div>`).join('');
   const total = panierLocal.reduce((s, l) => s + l.prix * l.quantite, 0);
   totalEl.textContent = `Total : ${total.toFixed(2)} € TTC`;
@@ -1058,7 +1174,7 @@ document.getElementById('btnValiderPanier').addEventListener('click', async () =
 async function chargerMesCommandes() {
   const snap = await getDocs(query(collection(db, 'commandes'), where('membreId', '==', membreUid)));
   const commandes = [];
-  snap.forEach(d => commandes.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => commandes.push({ ...d.data(), id: d.id }));
   commandes.sort((a, b) => (b.dateCreation?.toMillis?.() || 0) - (a.dateCreation?.toMillis?.() || 0));
   const wrap = document.getElementById('zoneMesCommandes');
   if (commandes.length === 0) {
@@ -1111,7 +1227,7 @@ async function chargerStockMembre() {
   try {
     const snap = await getDocs(collection(db, 'stock'));
     stockCache = [];
-    snap.forEach(d => stockCache.push({ id: d.id, ...d.data() }));
+    snap.forEach(d => stockCache.push({ ...d.data(), id: d.id }));
     document.getElementById('tabStockBtn')?.classList.toggle('has-unread', stockCache.some(x => (Number(x.quantite)||0) <= 1));
     if (stockCache.length === 0) {
       wrap.innerHTML = '<div class="empty-state">Aucun article de stock enregistré pour l\'instant.</div>';
@@ -1143,7 +1259,7 @@ async function chargerAbonnementMembre() {
   try {
     const snap = await getDocs(query(collection(db, 'abonnements_membres'), where('membreId', '==', membreUid)));
     abonnementsMembreCache = [];
-    snap.forEach(d => abonnementsMembreCache.push({ id: d.id, ...d.data() }));
+    snap.forEach(d => abonnementsMembreCache.push({ ...d.data(), id: d.id }));
     abonnementsMembreCache.sort((a, b) => (b.dateSouscription || '').localeCompare(a.dateSouscription || ''));
 
     const actif = abonnementsMembreCache.find(a => a.actif);
