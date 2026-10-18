@@ -1,5 +1,5 @@
 // Projet : Lar-allegria
-// Site : Lar'Allegria by Lara Rossoux — V01-030
+// Site : Lar'Allegria by Lara Rossoux — V01-034
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -85,14 +85,32 @@ service cloud.firestore {
     // validation.
     match /reservations/{id} {
       allow read: if estConnecte();
+      // Un membre ne peut créer qu'une demande aux champs STRICTEMENT limités
+      // et au format contrôlé (date, heure, type) : empêche d'y glisser du
+      // code qui s'exécuterait ensuite dans l'espace admin (XSS stocké).
       allow create: if estAdmin() || (
         estConnecte() && request.resource.data.membreId == request.auth.uid
         && request.resource.data.statut == 'en_attente'
+        && request.resource.data.keys().hasOnly(['membreId','date','heureDebut','type','statut','createdAt','chevalSouhaiteId','chevalSouhaiteNom'])
+        && (!('chevalSouhaiteId' in request.resource.data) || (request.resource.data.chevalSouhaiteId is string && request.resource.data.chevalSouhaiteId.size() <= 40))
+        && (!('chevalSouhaiteNom' in request.resource.data) || (request.resource.data.chevalSouhaiteNom is string && request.resource.data.chevalSouhaiteNom.size() <= 80))
+        && request.resource.data.date is string && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.heureDebut is string && request.resource.data.heureDebut.matches('^[0-9]{2}:[0-9]{2}$')
+        && request.resource.data.type in ['cours','libre']
       );
+      // Un membre peut indiquer/changer SON cheval souhaité (jamais le cheval
+      // validé, réservé à l'admin) sur ses propres réservations.
       allow update: if estAdmin() || (
         estConnecte() && resource.data.membreId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['chevalSouhaiteId','chevalSouhaiteNom']) &&
+        request.resource.data.get('chevalSouhaiteId', '') is string && request.resource.data.get('chevalSouhaiteId', '').size() <= 40 &&
+        request.resource.data.get('chevalSouhaiteNom', '') is string && request.resource.data.get('chevalSouhaiteNom', '').size() <= 80
+      ) || (
+        estConnecte() && resource.data.membreId == request.auth.uid &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['statut','motifAnnulation','motifAnnulationDetail']) &&
-        request.resource.data.statut == 'annulee'
+        request.resource.data.statut == 'annulee' &&
+        (!('motifAnnulation' in request.resource.data) || (request.resource.data.motifAnnulation is string && request.resource.data.motifAnnulation.size() <= 60)) &&
+        (!('motifAnnulationDetail' in request.resource.data) || (request.resource.data.motifAnnulationDetail is string && request.resource.data.motifAnnulationDetail.size() <= 500))
       );
       allow delete: if estAdmin();
     }
@@ -130,13 +148,18 @@ service cloud.firestore {
     }
 
     match /conversations/{uid} {
-      allow read, write: if estConnecte() && (request.auth.uid == uid || estAdmin());
+      allow read: if estConnecte() && (request.auth.uid == uid || estAdmin());
+      allow create, update: if estAdmin() || (estConnecte() && request.auth.uid == uid &&
+        request.resource.data.keys().hasOnly(['dernierMessage','dateDernierMessage','nonLuAdmin','nonLuMembre']));
+      allow delete: if estAdmin();
       match /messages/{msgId} {
         allow read: if estConnecte() && (request.auth.uid == uid || estAdmin());
         // Un membre ne peut écrire que des messages signés "membre" dans sa
         // propre conversation, et ne peut que marquer un message comme lu.
         allow create: if estAdmin() ||
-          (estConnecte() && request.auth.uid == uid && request.resource.data.expediteur == 'membre');
+          (estConnecte() && request.auth.uid == uid && request.resource.data.expediteur == 'membre' &&
+           request.resource.data.keys().hasOnly(['texte','expediteur','dateEnvoi','lu']) &&
+           request.resource.data.texte is string && request.resource.data.texte.size() <= 2000);
         allow update: if estAdmin() ||
           (estConnecte() && request.auth.uid == uid &&
            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lu']));
