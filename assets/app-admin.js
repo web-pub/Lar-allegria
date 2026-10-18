@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-037';
+const VERSION_SITE = 'V01-039';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -279,6 +279,7 @@ onAuthStateChanged(auth, async (user) => {
   }
   await chargerMembres();
   afficherAccordCollaborationSiBesoin();
+  synchroniserAbonnements(); // décompte les cours validés et prestés
   chargerAlerteStockAdmin();
   chargerOngletSiBesoin('reservations'); // onglet ouvert par défaut à l'arrivée
 });
@@ -451,7 +452,8 @@ window.validerReservation = async (id, dateISO, heure, membreId, type) => {
     return;
   }
   await updateDoc(doc(db, 'reservations', id), { statut: 'validee' });
-  if (type === 'cours') consommerCoursAbonnement(membreId, dateISO);
+  // Le cours n'est décompté de l'abonnement qu'une fois PRESTÉ (voir synchroniserAbonnements).
+  if (type === 'cours' && coursEstPreste(dateISO, heure)) consommerCoursAbonnement(membreId, dateISO);
   notifierMembreReservation(membreId, `✅ Votre réservation du ${libelleDateHeure(dateISO, heure)} a été validée par Lara.`);
   chargerReservationsAttente();
   renderPlanningSemaine();
@@ -721,7 +723,8 @@ window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
         // Traitement séquentiel (pas Promise.all) : chaque date est ajoutée
         // au même abonnement, un traitement en parallèle écraserait les
         // mises à jour les unes les autres.
-        for (const d of aCreer) { await consommerCoursAbonnement(membreId, d); }
+        // Seuls les cours déjà prestés sont décomptés ; les futurs le seront le jour J.
+        for (const d of aCreer) { if (coursEstPreste(d, heure)) await consommerCoursAbonnement(membreId, d); }
       }
       window.fermerModal();
       chargerReservationsAttente();
@@ -1093,7 +1096,7 @@ window.ouvrirModalMembre = (membre, demandeId) => {
               <option value="bimensuelle" ${src.recurrenceCours==='bimensuelle'?'selected':''}>1x toutes les deux semaines</option>
             </select>
           </div>
-          <div class="field"><label>Fonctionne par abonnement <span class="hint">— 10+1 cours, décomptés à chaque leçon validée</span></label>
+          <div class="field"><label>Fonctionne par abonnement <span class="hint">— 10+1 cours, décomptés à chaque leçon validée ET donnée</span></label>
             <select id="fm-abonnement">
               <option value="non" ${!src.abonnement?'selected':''}>Non</option>
               <option value="oui" ${src.abonnement?'selected':''}>Oui</option>
@@ -1339,7 +1342,7 @@ async function chargerAbonnementsMembre(membreId) {
     const listeDates = utilises.map((c, i) => `
       <div class="data-row">
         <div class="data-main"><div class="data-title">Cours du ${formatDateCourte(c.date)}</div></div>
-        <div class="data-actions"><button class="btn-sm danger" onclick="window.retirerCoursUtilise('${actif.id}', ${i}, '${membreId}')">Retirer</button></div>
+        <div class="data-actions"><button class="btn-sm" onclick="window.modifierSeanceAbonnement('${idSur(actif.id)}', ${i}, '${idSur(membreId)}')">Modifier</button><button class="btn-sm danger" onclick="window.retirerCoursUtilise('${idSur(actif.id)}', ${i}, '${idSur(membreId)}')">Retirer</button></div>
       </div>`).join('');
     zoneActif.innerHTML = `
       <div class="data-row">
@@ -1363,7 +1366,7 @@ async function chargerAbonnementsMembre(membreId) {
     ? '<div class="empty-state">Aucun abonnement passé.</div>'
     : historique.map(a => {
         const utilises = a.coursUtilises || [];
-        return `<div class="data-row"><div class="data-main"><div class="data-title">Souscrit le ${formatDateCourte(a.dateSouscription)}</div><div class="data-sub">${a.paye ? 'Payé le ' + formatDateCourte(a.datePaiement) : 'Non payé'} · ${utilises.length}/11 cours utilisés</div></div></div>`;
+        return `<div class="data-row"><div class="data-main"><div class="data-title">Souscrit le ${formatDateCourte(a.dateSouscription)}</div><div class="data-sub">${a.paye ? 'Payé le ' + formatDateCourte(a.datePaiement) : 'Non payé'} · ${utilises.length}/11 cours utilisés</div></div><div class="data-actions"><button class="btn-sm" onclick="window.ouvrirSeancesAbonnement('${idSur(a.id)}','${idSur(membreId)}')">Voir / modifier les séances</button></div></div>`;
       }).join('');
 }
 window.creerNouvelAbonnement = async (membreId) => {
@@ -1395,27 +1398,134 @@ window.togglePayeAbonnement = async (abonnementId, membreId) => {
   });
   chargerAbonnementsMembre(membreId);
 };
+// ---- Modification manuelle des séances d'un abonnement (Lara et Super Admin) ----
+// Le nombre de cours utilisés = nombre de séances de la liste. Les dates
+// retirées ou déplacées sont mémorisées dans "coursExclus" pour que le décompte
+// automatique ne les remette pas.
+function parseDateFr(str) {
+  const m = String(str || '').trim().match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+  if (!m) return null;
+  const iso = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  return isNaN(new Date(iso + 'T00:00:00')) ? null : iso;
+}
+function aboParId(id) { return (window._abonnementsMembreActuel || []).find(x => x.id === id); }
+async function ecrireSeancesAbonnement(abonnementId, utilises, exclus) {
+  await updateDoc(doc(db, 'abonnements_membres', abonnementId), { coursUtilises: utilises, coursExclus: exclus });
+  const abo = aboParId(abonnementId);
+  if (abo) { abo.coursUtilises = utilises; abo.coursExclus = exclus; }
+}
 window.marquerCoursUtiliseManuel = async (abonnementId, membreId) => {
-  const dateStr = prompt('Date du cours (JJ/MM/AAAA) :', new Date().toLocaleDateString('fr-BE'));
-  if (!dateStr) return;
-  const [j, m, a] = dateStr.split('/');
-  if (!j || !m || !a) { alert('Format de date non reconnu.'); return; }
-  const dateISO = `${a}-${m.padStart(2,'0')}-${j.padStart(2,'0')}`;
-  const abo = (window._abonnementsMembreActuel || []).find(x => x.id === abonnementId);
-  const utilises = [...(abo?.coursUtilises || []), { date: dateISO }];
-  await updateDoc(doc(db, 'abonnements_membres', abonnementId), { coursUtilises: utilises });
+  const dateISO = parseDateFr(prompt('Date du cours (JJ/MM/AAAA) :', new Date().toLocaleDateString('fr-BE')));
+  if (!dateISO) { alert('Format de date non reconnu (JJ/MM/AAAA).'); return; }
+  const abo = aboParId(abonnementId);
+  const utilises = [...(abo?.coursUtilises || [])];
+  if (utilises.length >= 11 && !confirm('Cet abonnement a déjà 11 cours utilisés. Ajouter quand même ?')) return;
+  utilises.push({ date: dateISO });
+  const exclus = (abo?.coursExclus || []).filter(d => d !== dateISO);
+  await ecrireSeancesAbonnement(abonnementId, utilises, exclus);
   chargerAbonnementsMembre(membreId);
+};
+window.modifierSeanceAbonnement = async (abonnementId, index, membreId) => {
+  const abo = aboParId(abonnementId);
+  const utilises = [...(abo?.coursUtilises || [])];
+  const ancienne = utilises[index]?.date;
+  if (!ancienne) return;
+  const saisie = prompt('Nouvelle date du cours (JJ/MM/AAAA) :', ancienne.split('-').reverse().join('/'));
+  if (saisie === null) return;
+  const dateISO = parseDateFr(saisie);
+  if (!dateISO) { alert('Format de date non reconnu (JJ/MM/AAAA).'); return; }
+  if (dateISO === ancienne) return;
+  utilises[index] = { ...utilises[index], date: dateISO };
+  let exclus = [...(abo?.coursExclus || [])].filter(d => d !== dateISO);
+  if (!exclus.includes(ancienne)) exclus.push(ancienne);
+  await ecrireSeancesAbonnement(abonnementId, utilises, exclus);
+  chargerAbonnementsMembre(membreId);
+  if (document.getElementById('overlaySeancesAbo')) window.ouvrirSeancesAbonnement(abonnementId, membreId);
 };
 window.retirerCoursUtilise = async (abonnementId, index, membreId) => {
   if (!confirm('Retirer ce cours de la liste des cours utilisés (le crédite à nouveau) ?')) return;
-  const abo = (window._abonnementsMembreActuel || []).find(x => x.id === abonnementId);
+  const abo = aboParId(abonnementId);
   const utilises = [...(abo?.coursUtilises || [])];
-  utilises.splice(index, 1);
-  await updateDoc(doc(db, 'abonnements_membres', abonnementId), { coursUtilises: utilises });
+  const [retire] = utilises.splice(index, 1);
+  const exclus = [...(abo?.coursExclus || [])];
+  if (retire?.date && !exclus.includes(retire.date)) exclus.push(retire.date);
+  await ecrireSeancesAbonnement(abonnementId, utilises, exclus);
   chargerAbonnementsMembre(membreId);
+  if (document.getElementById('overlaySeancesAbo')) window.ouvrirSeancesAbonnement(abonnementId, membreId);
+};
+// Fenêtre pour consulter/modifier les séances d'un abonnement passé (historique).
+window.ouvrirSeancesAbonnement = (abonnementId, membreId) => {
+  const abo = aboParId(abonnementId);
+  if (!abo) return;
+  document.getElementById('overlaySeancesAbo')?.remove();
+  const lignes = (abo.coursUtilises || []).map((c, i) => `
+    <div class="data-row"><div class="data-main"><div class="data-title">Cours du ${formatDateCourte(c.date)}</div></div>
+    <div class="data-actions"><button class="btn-sm" onclick="window.modifierSeanceAbonnement('${idSur(abo.id)}', ${i}, '${idSur(membreId)}')">Modifier</button><button class="btn-sm danger" onclick="window.retirerCoursUtilise('${idSur(abo.id)}', ${i}, '${idSur(membreId)}')">Retirer</button></div></div>`).join('');
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal-overlay" id="overlaySeancesAbo" style="z-index:1500;"><div class="modal-box" style="max-width:520px;">
+      <h3>Séances — abonnement du ${formatDateCourte(abo.dateSouscription)}</h3>
+      <p style="color:var(--terre); font-size:0.85rem;">${(abo.coursUtilises || []).length} / 11 cours utilisés</p>
+      <div class="data-list">${lignes || '<div class="empty-state">Aucune séance.</div>'}</div>
+      <div class="modal-actions">
+        <button class="btn-sm" onclick="window.marquerCoursUtiliseManuel('${idSur(abo.id)}','${idSur(membreId)}').then(() => window.ouvrirSeancesAbonnement('${idSur(abo.id)}','${idSur(membreId)}'))">+ Ajouter une séance</button>
+        <button class="btn-sm primary" onclick="document.getElementById('overlaySeancesAbo').remove()">Fermer</button>
+      </div></div></div>`);
 };
 // Décompte (ou recrédite) un cours sur l'abonnement actif d'un membre,
 // appelé quand un cours est validé / annulé côté admin.
+// Un cours est "presté" quand son heure de début est passée.
+function coursEstPreste(dateISO, heure) {
+  const maintenant = new Date();
+  const auj = dateISOLocale(maintenant);
+  if (dateISO < auj) return true;
+  if (dateISO > auj) return false;
+  const hhmm = String(maintenant.getHours()).padStart(2, '0') + ':' + String(maintenant.getMinutes()).padStart(2, '0');
+  return (heure || '00:00') <= hhmm;
+}
+
+// Décompte automatique : tout cours VALIDÉ et PRESTÉ (date/heure passées) depuis
+// la souscription de l'abonnement actif est ajouté à cet abonnement, une seule
+// fois (comparaison par date). Exécuté à l'ouverture de l'espace admin.
+async function synchroniserAbonnements() {
+  try {
+    const snapAbo = await getDocs(query(collection(db, 'abonnements_membres'), where('actif', '==', true)));
+    if (snapAbo.empty) return;
+    const abos = [];
+    snapAbo.forEach(d => abos.push({ id: d.id, ...d.data() }));
+    const dateMin = abos.map(a => a.dateSouscription || '9999-12-31').reduce((x, y) => x < y ? x : y);
+    const aujourdhui = dateISOLocale(new Date());
+    if (dateMin > aujourdhui) return;
+    const snapR = await getDocs(query(collection(db, 'reservations'), where('date', '>=', dateMin), where('date', '<=', aujourdhui)));
+    const prestes = [];
+    snapR.forEach(d => {
+      const r = d.data();
+      if (r.type === 'cours' && r.statut === 'validee' && coursEstPreste(r.date, r.heureDebut)) prestes.push(r);
+    });
+    for (const abo of abos) {
+      const utilises = [...(abo.coursUtilises || [])];
+      const exclus = abo.coursExclus || [];
+      const dejaPris = {};
+      utilises.forEach(c => { dejaPris[c.date] = (dejaPris[c.date] || 0) + 1; });
+      const mesCours = prestes.filter(r => r.membreId === abo.membreId && r.date >= (abo.dateSouscription || '')).sort((a, b) => (a.date + a.heureDebut).localeCompare(b.date + b.heureDebut));
+      const nouveaux = [];
+      for (const r of mesCours) {
+        if (exclus.includes(r.date)) continue; // retiré/déplacé volontairement par l'admin
+        if (dejaPris[r.date] > 0) { dejaPris[r.date]--; continue; }
+        if (utilises.length + nouveaux.length >= 11) break;
+        nouveaux.push({ date: r.date });
+      }
+      if (!nouveaux.length) continue;
+      const avant = 11 - utilises.length;
+      const finale = utilises.concat(nouveaux);
+      await updateDoc(doc(db, 'abonnements_membres', abo.id), { coursUtilises: finale });
+      const restants = 11 - finale.length;
+      if (restants <= 2 && avant > restants) {
+        notifierMembreReservation(abo.membreId, `ℹ️ Il vous reste ${restants} cours dans votre abonnement.`);
+      }
+    }
+  } catch (err) { console.warn('Synchronisation des abonnements :', err); }
+}
+
 async function consommerCoursAbonnement(membreId, dateCours) {
   const m = membresParUid[membreId];
   if (!m || !m.abonnement) return;
