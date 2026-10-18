@@ -5,7 +5,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-046';
+const VERSION_SITE = 'V01-047';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -765,6 +765,8 @@ async function chargerMesReservations() {
     const troplTardPourAnnuler = r.statut === 'validee' && r.date >= aujourdhui && heuresRestantes >= 0 && heuresRestantes < 24;
     const libelleAnnuler = r.recurrenceId ? 'Libérer ce créneau' : 'Annuler';
     // Cheval : souhait du membre / validation de Lara.
+    const peutChoisirCheval = choixChevalModifiable(r);
+    const choixVerrouille = r.type === 'cours' && r.date >= aujourdhui && (r.statut === 'validee' || r.statut === 'en_attente') && !peutChoisirCheval;
     let chevalHtml = '';
     if (r.type === 'cours' && (r.statut === 'validee' || r.statut === 'en_attente')) {
       const souhait = r.chevalSouhaiteId || '';
@@ -777,8 +779,6 @@ async function chargerMesReservations() {
       else chevalHtml = '<div class="data-sub">🐴 Pas de préférence de cheval</div>';
       if (choixVerrouille) chevalHtml += `<div class="data-sub" style="font-style:italic;">🔒 ${r.chevalValideId ? 'Cheval validé par Lara : seule Lara peut le modifier.' : 'Moins de 24 h avant le cours : le choix du cheval ne peut plus être modifié en ligne.'}</div>`;
     }
-    const peutChoisirCheval = choixChevalModifiable(r);
-    const choixVerrouille = r.type === 'cours' && r.date >= aujourdhui && (r.statut === 'validee' || r.statut === 'en_attente') && !peutChoisirCheval;
     return `
     <div class="data-row">
       <div class="data-main">
