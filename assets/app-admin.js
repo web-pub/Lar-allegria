@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-034';
+const VERSION_SITE = 'V01-037';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -708,9 +708,13 @@ window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
       const recurrenceId = recurrence !== 'aucune' ? ('rec_' + Date.now()) : null;
       const aCreer = dates.filter(d => !occupes.has(`${d}_${heure}`));
       const ignores = dates.filter(d => occupes.has(`${d}_${heure}`));
+      // Le cheval préféré du membre (sa fiche) devient le souhait par défaut du cours.
+      const prefere = type === 'cours' ? membresParUid[membreId] : null;
+      const champsCheval = (prefere && prefere.chevalPrefereId) ? { chevalSouhaiteId: prefere.chevalPrefereId, chevalSouhaiteNom: prefere.chevalPrefereNom || '' } : {};
       await Promise.all(aCreer.map(d => addDoc(collection(db, 'reservations'), {
         membreId, type, date: d, heureDebut: heure, statut: 'validee',
         ajouteParAdmin: true, recurrenceId, nomClientEssai: nomClientEssai || null,
+        ...champsCheval,
         createdAt: serverTimestamp()
       })));
       if (type === 'cours' && aCreer.length > 0) {
@@ -977,6 +981,13 @@ document.getElementById('btnCreerCompteDemo').addEventListener('click', async ()
 });
 
 window.editerMembre = (id) => window.ouvrirModalMembre(membresParUid[id]);
+window.ignorerDemandeAbonnement = async (membreId, btn) => {
+  try {
+    await updateDoc(doc(db, 'membres', membreId), { abonnementRenouvellementDemande: false });
+    if (membresParUid[membreId]) membresParUid[membreId].abonnementRenouvellementDemande = false;
+    btn.closest('.banner-alert').remove();
+  } catch (err) { alert('Erreur : ' + (err.code || err.message)); }
+};
 window.supprimerDefinitivementMembre = async (id, identifiant) => {
   const m = membresParUid[id];
   if (m?.compteDemo && compteActuel.role !== 'superadmin') {
@@ -1088,7 +1099,7 @@ window.ouvrirModalMembre = (membre, demandeId) => {
               <option value="oui" ${src.abonnement?'selected':''}>Oui</option>
             </select>
           </div>
-          ${src.abonnementRenouvellementDemande ? `<div class="banner-alert" style="margin-bottom:16px;">Ce membre a demandé un nouvel abonnement.</div>` : ''}
+          ${src.abonnementRenouvellementDemande ? `<div class="banner-alert" style="margin-bottom:16px;">Ce membre a demandé un nouvel abonnement. <button type="button" class="btn-sm" style="margin-left:10px;" onclick="window.ignorerDemandeAbonnement('${idSur(src.id || '')}', this)">Ignorer la demande</button></div>` : ''}
           ${!estNouveau ? `
           <div class="field" id="fm-zoneAbonnements" style="${src.abonnement?'':'display:none;'}">
             <div class="section-heading" style="margin-bottom:8px;">

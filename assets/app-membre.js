@@ -5,7 +5,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-034';
+const VERSION_SITE = 'V01-037';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -45,7 +45,7 @@ onAuthStateChanged(auth, async (user) => {
   document.getElementById('tabNettoyageBtn').classList.toggle('hidden', membreData.typeMembre !== 'pension');
   document.getElementById('tabBenevolatBtn').classList.toggle('hidden', membreData.typeMembre !== 'benevole');
   document.getElementById('tabStockBtn').classList.toggle('hidden', membreData.typeMembre !== 'benevole');
-  document.getElementById('tabAbonnementBtn').classList.toggle('hidden', !membreData.abonnement);
+  document.getElementById('tabAbonnementBtn').classList.toggle('hidden', membreData.typeMembre === 'benevole');
   document.getElementById('resaTypeChoix').classList.toggle('hidden', membreData.typeMembre !== 'pension');
 
   afficherAccueil();
@@ -58,7 +58,7 @@ onAuthStateChanged(auth, async (user) => {
   chargerBoutiqueMembre();
   chargerHistoriquePaiementsMembre();
   chargerStockMembre();
-  if (membreData.abonnement) chargerAbonnementMembre();
+  if (membreData.typeMembre !== 'benevole') chargerAbonnementMembre();
   if (membreData.typeMembre === 'pension') chargerNettoyage();
   if (membreData.typeMembre === 'benevole') chargerPlanningBenevole();
 
@@ -135,11 +135,23 @@ window.ouvrirModalSuppressionCompte = () => {
   });
 };
 
-function afficherRappelAbonnement() {
+// Cours restants calculés à partir de l'abonnement ACTIF (collection
+// abonnements_membres) — et non d'un ancien champ de la fiche, qui pouvait
+// valoir 0 et déclencher à tort une demande de renouvellement.
+async function coursRestantsAbonnementActif() {
+  const snap = await getDocs(query(collection(db, 'abonnements_membres'), where('membreId', '==', membreUid), where('actif', '==', true)));
+  let actif = null;
+  snap.forEach(d => { if (!actif) actif = d.data(); });
+  if (!actif) return null; // pas d'abonnement actif
+  return 11 - (actif.coursUtilises || []).length;
+}
+async function afficherRappelAbonnement() {
   const zone = document.getElementById('zoneAbonnement');
   if (!zone) return;
-  if (!membreData.abonnement) { zone.innerHTML = ''; return; }
-  const restants = membreData.abonnementCoursRestants ?? 0;
+  if (membreData.typeMembre === 'benevole' || !membreData.abonnement) { zone.innerHTML = ''; return; }
+  let restants;
+  try { restants = await coursRestantsAbonnementActif(); } catch (e) { zone.innerHTML = ''; return; }
+  if (restants === null) { zone.innerHTML = ''; return; } // la rubrique Abonnement gère ce cas
   if (restants > 2) { zone.innerHTML = ''; return; }
   if (membreData.abonnementRenouvellementDemande) {
     zone.innerHTML = `<div class="banner-alert">Il vous reste <strong>${restants} cours</strong> — vous avez demandé le renouvellement de votre abonnement, Lara s'en occupe.</div>`;
@@ -154,6 +166,8 @@ function afficherRappelAbonnement() {
     </div>`;
 }
 window.demanderRenouvellementAbonnement = async () => {
+  const restants = await coursRestantsAbonnementActif();
+  if (restants !== null && restants > 2) { alert(`Il vous reste ${restants} cours : pas besoin de renouveler pour l'instant.`); afficherRappelAbonnement(); return; }
   await updateDoc(doc(db, 'membres', membreUid), { abonnementRenouvellementDemande: true });
   membreData.abonnementRenouvellementDemande = true;
   afficherRappelAbonnement();
@@ -203,6 +217,9 @@ function preremplirMonProfil() {
   document.getElementById('mp-rcCompagnie').value = rc.compagnie || '';
   document.getElementById('mp-rcNumero').value = rc.numeroPolice || '';
   document.getElementById('mp-rcEcheance').value = rc.dateEcheance || '';
+  chargerChevauxChoix().then(chevaux => {
+    document.getElementById('mp-chevalPrefere').innerHTML = optionsChevaux(chevaux, membreData.chevalPrefereId || '');
+  }).catch(() => {});
 }
 
 document.getElementById('mp-enregistrer').addEventListener('click', async () => {
@@ -225,8 +242,21 @@ document.getElementById('mp-enregistrer').addEventListener('click', async () => 
       dateEcheance: document.getElementById('mp-rcEcheance').value
     }
   };
+  // Cheval préféré par défaut (la liste ne contient que des chevaux vivants et proposés).
+  const selCheval = document.getElementById('mp-chevalPrefere');
+  if (selCheval.options.length > 1 || membreData.chevalPrefereId) {
+    data.chevalPrefereId = selCheval.value;
+    data.chevalPrefereNom = selCheval.value ? selCheval.options[selCheval.selectedIndex].textContent : '';
+  }
   try {
     await updateDoc(doc(db, 'membres', membreUid), data);
+    if (data.chevalPrefereId && document.getElementById('mp-chevalAppliquer').checked) {
+      const aujourdhui = dateISOLocale(new Date());
+      const snapR = await getDocs(query(collection(db, 'reservations'), where('membreId', '==', membreUid)));
+      const aMaj = [];
+      snapR.forEach(d => { const x = d.data(); if (x.type === 'cours' && x.date >= aujourdhui && (x.statut === 'validee' || x.statut === 'en_attente') && !x.chevalSouhaiteId) aMaj.push(d.id); });
+      for (const id of aMaj) await updateDoc(doc(db, 'reservations', id), { chevalSouhaiteId: data.chevalPrefereId, chevalSouhaiteNom: data.chevalPrefereNom });
+    }
     membreData = { ...membreData, ...data };
     document.getElementById('membreNom').textContent = `${membreData.prenom || ''} ${membreData.nom || ''}`.trim();
     statut.textContent = 'Profil enregistré ✓';
@@ -611,7 +641,7 @@ window.demanderCreneau = async (dateISO, heure) => {
         <p style="color:var(--terre); font-size:0.9rem;">${escapeHtml(libelle)} à ${escapeHtml(heure)} — ${type === 'cours' ? 'cours de dressage' : 'utilisation libre de la piste'}.</p>
         ${type === 'cours' && chevaux.length ? `
         <div class="field"><label>Cheval souhaité <span class="hint">— Lara valide selon les disponibilités (un cheval fait 1 cours puis se repose 1 h)</span></label>
-          <select id="dc-cheval">${optionsChevaux(chevaux, '')}</select>
+          <select id="dc-cheval">${optionsChevaux(chevaux, membreData.chevalPrefereId || '')}</select>
         </div>` : ''}
         <p style="color:var(--terre); font-size:0.85rem;">Cette demande sera envoyée à Lara pour validation.</p>
         <div class="modal-actions">
@@ -1299,6 +1329,8 @@ async function chargerAbonnementMembre() {
   }
 }
 window.demanderNouvelAbonnement = async () => {
+  const restants = await coursRestantsAbonnementActif();
+  if (restants !== null && restants > 2) { alert(`Il vous reste ${restants} cours sur votre abonnement : pas besoin d'en demander un nouveau pour l'instant.`); return; }
   await updateDoc(doc(db, 'membres', membreUid), { abonnementRenouvellementDemande: true });
   alert('Votre demande a bien été transmise à Lara.');
 };

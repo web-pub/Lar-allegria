@@ -606,3 +606,14 @@
   background: #D93A3A; margin-right: 7px; vertical-align: middle;
   box-shadow: 0 0 0 2px rgba(217,58,58,0.18);
 }
+
+/* Croix de fermeture des fenêtres */
+.modal-box { position: relative; }
+.modal-close-x {
+  position: absolute; top: 10px; right: 12px;
+  width: 32px; height: 32px; border: 0; border-radius: 50%;
+  background: transparent; color: var(--terre); font-size: 1.1rem; line-height: 1;
+  cursor: pointer; z-index: 2;
+}
+.modal-close-x:hover { background: var(--paper-warm); color: var(--rouge-dark); }
+.modal-box h3 { padding-right: 34px; }
