@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-042';
+const VERSION_SITE = 'V01-044';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -279,7 +279,7 @@ onAuthStateChanged(auth, async (user) => {
   }
   await chargerMembres();
   afficherAccordCollaborationSiBesoin();
-  synchroniserAbonnements(); // décompte les cours validés et prestés
+  synchroniserAbonnements().then(() => { if (ongletsCharges.has('membres')) renderMembres(); }); // décompte les cours validés et prestés
   chargerAlerteStockAdmin();
   chargerOngletSiBesoin('reservations'); // onglet ouvert par défaut à l'arrivée
 });
@@ -925,7 +925,7 @@ function renderMembres(filtre = '') {
       <div class="data-row">
         <div class="data-main">
           <div class="data-title">${escapeHtml(m.prenom)} ${escapeHtml(m.nom)}</div>
-          <div class="data-sub">${labelTypeMembre(m.typeMembre)} · ${escapeHtml(m.email||'')} ${m.typeMembre !== 'benevole' ? (m.cotisationPayee ? '<span class="badge badge-ok">Cotisation OK</span>' : '<span class="badge badge-warn">Cotisation à régler</span>') : ''} ${m.recurrenceCours === 'hebdomadaire' ? '<span class="badge badge-neutral">Cours 1x/semaine</span>' : m.recurrenceCours === 'bimensuelle' ? '<span class="badge badge-neutral">Cours 1x/2 semaines</span>' : ''} ${m.chefBenevoles ? '<span class="badge badge-danger">Chef des bénévoles</span>' : ''} ${m.abonnement ? '<span class="badge badge-neutral">Abonnement</span>' : ''} ${m.abonnementRenouvellementDemande ? '<span class="badge badge-warn">Nouvel abonnement demandé</span>' : ''} ${m.suppressionDemandee ? '<span class="badge badge-danger">Suppression demandée</span>' : ''} ${(m.compteDemo && compteActuel.role === 'superadmin') ? '<span class="badge badge-neutral">Compte démo</span>' : ''}</div>
+          <div class="data-sub">${labelTypeMembre(m.typeMembre)} · ${escapeHtml(m.email||'')} ${m.typeMembre !== 'benevole' ? (m.cotisationPayee ? '<span class="badge badge-ok">Cotisation OK</span>' : '<span class="badge badge-warn">Cotisation à régler</span>') : ''} ${m.recurrenceCours === 'hebdomadaire' ? '<span class="badge badge-neutral">Cours 1x/semaine</span>' : m.recurrenceCours === 'bimensuelle' ? '<span class="badge badge-neutral">Cours 1x/2 semaines</span>' : ''} ${m.chefBenevoles ? '<span class="badge badge-danger">Chef des bénévoles</span>' : ''} ${m.abonnement ? `<span class="badge ${(m.abonnementRestants ?? 11) <= 2 ? 'badge-danger' : 'badge-neutral'}">Abonnement${m.abonnementRestants !== undefined ? ' ' + m.abonnementRestants + '/11' : ''}</span>` : ''} ${m.abonnementRenouvellementDemande ? '<span class="badge badge-warn">Nouvel abonnement demandé</span>' : ''} ${m.suppressionDemandee ? '<span class="badge badge-danger">Suppression demandée</span>' : ''} ${(m.compteDemo && compteActuel.role === 'superadmin') ? '<span class="badge badge-neutral">Compte démo</span>' : ''}</div>
         </div>
         <div class="data-actions">
           ${(!m.compteDemo || compteActuel.role === 'superadmin') ? `<button class="btn-sm" onclick="window.editerMembre('${m.id}')">Modifier</button>
@@ -1340,7 +1340,7 @@ async function chargerAbonnementsMembre(membreId) {
   } else {
     const utilises = actif.coursUtilises || [];
     const restants = 11 - utilises.length;
-    const listeDates = utilises.map((c, i) => `
+    const listeDates = utilises.map((c, i) => ({ c, i })).sort((a, b) => (b.c.date || '').localeCompare(a.c.date || '')).map(({ c, i }) => `
       <div class="data-row">
         <div class="data-main"><div class="data-title">Cours du ${formatDateCourte(c.date)}</div></div>
         <div class="data-actions"><button class="btn-sm" onclick="window.modifierSeanceAbonnement('${idSur(actif.id)}', ${i}, '${idSur(membreId)}')">Modifier</button><button class="btn-sm danger" onclick="window.retirerCoursUtilise('${idSur(actif.id)}', ${i}, '${idSur(membreId)}')">Retirer</button></div>
@@ -1384,7 +1384,8 @@ window.creerNouvelAbonnement = async (membreId) => {
       actif: true,
       coursUtilises: []
     });
-    await updateDoc(doc(db, 'membres', membreId), { abonnementRenouvellementDemande: false });
+    await updateDoc(doc(db, 'membres', membreId), { abonnementRenouvellementDemande: false, abonnementRestants: 11 });
+    if (membresParUid[membreId]) membresParUid[membreId].abonnementRestants = 11;
     chargerAbonnementsMembre(membreId);
   } catch (err) {
     alert('Erreur : ' + (err.code || err.message) + '\n\nSi le message mentionne "permissions", il faut mettre à jour les règles Firestore (voir le README, section 4).');
@@ -1413,7 +1414,7 @@ function aboParId(id) { return (window._abonnementsMembreActuel || []).find(x =>
 async function ecrireSeancesAbonnement(abonnementId, utilises, exclus) {
   await updateDoc(doc(db, 'abonnements_membres', abonnementId), { coursUtilises: utilises, coursExclus: exclus });
   const abo = aboParId(abonnementId);
-  if (abo) { abo.coursUtilises = utilises; abo.coursExclus = exclus; }
+  if (abo) { abo.coursUtilises = utilises; abo.coursExclus = exclus; if (abo.actif) await majRestantsMembre(abo.membreId, 11 - utilises.length); }
 }
 window.marquerCoursUtiliseManuel = async (abonnementId, membreId) => {
   const dateISO = parseDateFr(prompt('Date du cours (JJ/MM/AAAA) :', new Date().toLocaleDateString('fr-BE')));
@@ -1459,7 +1460,7 @@ window.ouvrirSeancesAbonnement = (abonnementId, membreId) => {
   const abo = aboParId(abonnementId);
   if (!abo) return;
   document.getElementById('overlaySeancesAbo')?.remove();
-  const lignes = (abo.coursUtilises || []).map((c, i) => `
+  const lignes = (abo.coursUtilises || []).map((c, i) => ({ c, i })).sort((a, b) => (b.c.date || '').localeCompare(a.c.date || '')).map(({ c, i }) => `
     <div class="data-row"><div class="data-main"><div class="data-title">Cours du ${formatDateCourte(c.date)}</div></div>
     <div class="data-actions"><button class="btn-sm" onclick="window.modifierSeanceAbonnement('${idSur(abo.id)}', ${i}, '${idSur(membreId)}')">Modifier</button><button class="btn-sm danger" onclick="window.retirerCoursUtilise('${idSur(abo.id)}', ${i}, '${idSur(membreId)}')">Retirer</button></div></div>`).join('');
   document.body.insertAdjacentHTML('beforeend', `
@@ -1484,6 +1485,16 @@ function coursEstPreste(dateISO) {
 // Décompte automatique : tout cours VALIDÉ et PRESTÉ (date/heure passées) depuis
 // la souscription de l'abonnement actif est ajouté à cet abonnement, une seule
 // fois (comparaison par date). Exécuté à l'ouverture de l'espace admin.
+// Garde sur la fiche du membre le nombre de cours restants (affiché dans la liste).
+async function majRestantsMembre(membreId, restants) {
+  const m = membresParUid[membreId];
+  if (!m || m.abonnementRestants === restants) return;
+  try {
+    await updateDoc(doc(db, 'membres', membreId), { abonnementRestants: restants });
+    m.abonnementRestants = restants;
+  } catch (e) { /* non bloquant */ }
+}
+
 async function synchroniserAbonnements(membreIdUnique) {
   try {
     const snapAbo = await getDocs(membreIdUnique
@@ -1514,11 +1525,12 @@ async function synchroniserAbonnements(membreIdUnique) {
         if (utilises.length + nouveaux.length >= 11) break;
         nouveaux.push({ date: r.date });
       }
-      if (!nouveaux.length) continue;
+      if (!nouveaux.length) { await majRestantsMembre(abo.membreId, 11 - utilises.length); continue; }
       const avant = 11 - utilises.length;
       const finale = utilises.concat(nouveaux);
       await updateDoc(doc(db, 'abonnements_membres', abo.id), { coursUtilises: finale });
       const restants = 11 - finale.length;
+      await majRestantsMembre(abo.membreId, restants);
       if (restants <= 2 && avant > restants) {
         notifierMembreReservation(abo.membreId, `ℹ️ Il vous reste ${restants} cours dans votre abonnement.`);
       }
@@ -1536,6 +1548,7 @@ async function consommerCoursAbonnement(membreId, dateCours) {
   const utilises = [...(aboDoc.data().coursUtilises || []), { date: dateCours }];
   await updateDoc(doc(db, 'abonnements_membres', aboDoc.id), { coursUtilises: utilises });
   const restants = 11 - utilises.length;
+  await majRestantsMembre(membreId, restants);
   if ([2, 1, 0].includes(restants)) {
     notifierMembreReservation(membreId, `ℹ️ Il vous reste ${restants} cours dans votre abonnement.`);
   }
@@ -1551,6 +1564,7 @@ async function rendreCoursAbonnement(membreId, dateCours) {
   if (idx === -1) return;
   utilises.splice(idx, 1);
   await updateDoc(doc(db, 'abonnements_membres', aboDoc.id), { coursUtilises: utilises });
+  await majRestantsMembre(membreId, 11 - utilises.length);
 }
 
 // ==========================================================================

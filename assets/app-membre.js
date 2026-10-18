@@ -5,7 +5,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-042';
+const VERSION_SITE = 'V01-044';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -1309,7 +1309,41 @@ function formatDateCourteMembre(iso) {
   return capitalize(new Date(iso + 'T00:00:00').toLocaleDateString('fr-BE', { day:'numeric', month:'long', year:'numeric' }));
 }
 let abonnementsMembreCache = [];
+// Décompte automatique côté membre : à sa 1re connexion, ses cours VALIDÉS dont
+// le jour est arrivé (aujourd'hui compris) sont ajoutés à son abonnement actif,
+// une seule fois (comparaison par date), en respectant les dates retirées par
+// Lara (coursExclus). Même logique que côté admin.
+async function synchroniserMonAbonnement() {
+  try {
+    const snapAbo = await getDocs(query(collection(db, 'abonnements_membres'), where('membreId', '==', membreUid), where('actif', '==', true)));
+    if (snapAbo.empty) return;
+    const aboDoc = snapAbo.docs[0];
+    const abo = aboDoc.data();
+    const utilises = [...(abo.coursUtilises || [])];
+    const exclus = abo.coursExclus || [];
+    const aujourdhui = dateISOLocale(new Date());
+    const snapR = await getDocs(query(collection(db, 'reservations'), where('membreId', '==', membreUid)));
+    const dejaPris = {};
+    utilises.forEach(c => { dejaPris[c.date] = (dejaPris[c.date] || 0) + 1; });
+    const cours = [];
+    snapR.forEach(d => { const r = d.data(); if (r.type === 'cours' && r.statut === 'validee' && r.date <= aujourdhui && r.date >= (abo.dateSouscription || '')) cours.push(r); });
+    cours.sort((a, b) => (a.date + a.heureDebut).localeCompare(b.date + b.heureDebut));
+    const nouveaux = [];
+    for (const r of cours) {
+      if (exclus.includes(r.date)) continue;
+      if (dejaPris[r.date] > 0) { dejaPris[r.date]--; continue; }
+      if (utilises.length + nouveaux.length >= 11) break;
+      nouveaux.push({ date: r.date });
+    }
+    if (!nouveaux.length) return;
+    await updateDoc(doc(db, 'abonnements_membres', aboDoc.id), { coursUtilises: utilises.concat(nouveaux) });
+    try { await updateDoc(doc(db, 'membres', membreUid), { abonnementRestants: 11 - utilises.length - nouveaux.length }); } catch (e) {}
+    afficherRappelAbonnement();
+  } catch (err) { console.warn('Décompte automatique :', err); }
+}
+
 async function chargerAbonnementMembre() {
+  await synchroniserMonAbonnement();
   const zoneActuel = document.getElementById('zoneAbonnementMembreActuel');
   const zoneHisto = document.getElementById('zoneAbonnementMembreHistorique');
   try {
