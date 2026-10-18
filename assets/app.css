@@ -617,3 +617,24 @@
 }
 .modal-close-x:hover { background: var(--paper-warm); color: var(--rouge-dark); }
 .modal-box h3 { padding-right: 34px; }
+
+/* Carte de fidélité — abonnement 10 + 1 gratuit */
+.carte-fidelite { background: linear-gradient(135deg, #FFF8EC, #F6E7C8); border: 2px solid #D9B76A; border-radius: 16px; padding: 18px 18px 14px; box-shadow: var(--shadow-card); max-width: 520px; }
+.carte-entete { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
+.carte-titre { font-family: 'Yeseva One', serif; font-size: 1.25rem; color: var(--rouge-dark); }
+.carte-sous { font-size: 0.85rem; color: var(--terre); letter-spacing: .04em; text-transform: uppercase; }
+.carte-solde { text-align:center; background:#fff; border:1px solid #E3CD98; border-radius:12px; padding:6px 12px; line-height:1.1; }
+.carte-solde strong { display:block; font-size:1.6rem; color: var(--rouge-dark); }
+.carte-solde span { font-size:0.72rem; color: var(--terre); }
+.carte-solde.bas strong { color:#B3261E; }
+.carte-grille { display:grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap:10px; }
+.carte-case { aspect-ratio: 1; border:2px dashed #CDB27A; border-radius:50%; background:rgba(255,255,255,.65); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; min-width:0; }
+.carte-case .carte-num { font-size:1.2rem; color:#B9A272; font-weight:700; }
+.carte-case.tampon { border-style:solid; border-color:#B07B2C; background:#fff; }
+.carte-tampon { font-size:1.5rem; line-height:1; }
+.carte-date { font-size:0.68rem; color: var(--terre); margin-top:2px; font-weight:600; }
+.carte-case.offert { border-color:#D4A017; background:#FFF3C4; }
+.carte-case.offert .carte-cadeau { font-size:1.5rem; line-height:1; }
+.carte-case.offert .carte-date { color:#8A6500; }
+.carte-case.offert.tampon { background:#FFE58A; }
+.carte-pied { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:14px; font-size:0.82rem; color: var(--terre); }

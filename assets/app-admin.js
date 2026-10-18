@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-039';
+const VERSION_SITE = 'V01-042';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -453,7 +453,7 @@ window.validerReservation = async (id, dateISO, heure, membreId, type) => {
   }
   await updateDoc(doc(db, 'reservations', id), { statut: 'validee' });
   // Le cours n'est décompté de l'abonnement qu'une fois PRESTÉ (voir synchroniserAbonnements).
-  if (type === 'cours' && coursEstPreste(dateISO, heure)) consommerCoursAbonnement(membreId, dateISO);
+  if (type === 'cours' && coursEstPreste(dateISO)) consommerCoursAbonnement(membreId, dateISO);
   notifierMembreReservation(membreId, `✅ Votre réservation du ${libelleDateHeure(dateISO, heure)} a été validée par Lara.`);
   chargerReservationsAttente();
   renderPlanningSemaine();
@@ -724,7 +724,7 @@ window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
         // au même abonnement, un traitement en parallèle écraserait les
         // mises à jour les unes les autres.
         // Seuls les cours déjà prestés sont décomptés ; les futurs le seront le jour J.
-        for (const d of aCreer) { if (coursEstPreste(d, heure)) await consommerCoursAbonnement(membreId, d); }
+        for (const d of aCreer) { if (coursEstPreste(d)) await consommerCoursAbonnement(membreId, d); }
       }
       window.fermerModal();
       chargerReservationsAttente();
@@ -1326,6 +1326,7 @@ function formatDateCourte(iso) {
   return capitalize(new Date(iso + 'T00:00:00').toLocaleDateString('fr-BE', { day:'numeric', month:'long', year:'numeric' }));
 }
 async function chargerAbonnementsMembre(membreId) {
+  await synchroniserAbonnements(membreId); // met à jour le décompte avant d'afficher
   const snap = await getDocs(query(collection(db, 'abonnements_membres'), where('membreId', '==', membreId)));
   let abonnements = [];
   snap.forEach(d => abonnements.push({ ...d.data(), id: d.id }));
@@ -1473,22 +1474,21 @@ window.ouvrirSeancesAbonnement = (abonnementId, membreId) => {
 };
 // Décompte (ou recrédite) un cours sur l'abonnement actif d'un membre,
 // appelé quand un cours est validé / annulé côté admin.
-// Un cours est "presté" quand son heure de début est passée.
-function coursEstPreste(dateISO, heure) {
-  const maintenant = new Date();
-  const auj = dateISOLocale(maintenant);
-  if (dateISO < auj) return true;
-  if (dateISO > auj) return false;
-  const hhmm = String(maintenant.getHours()).padStart(2, '0') + ':' + String(maintenant.getMinutes()).padStart(2, '0');
-  return (heure || '00:00') <= hhmm;
+// Un cours est "presté" dès le JOUR du cours (aujourd'hui compris) : le cours
+// du jour est donc décompté sans attendre l'heure. S'il est annulé ensuite par
+// Lara, il est recrédité automatiquement (voir rendreCoursAbonnement).
+function coursEstPreste(dateISO) {
+  return dateISO <= dateISOLocale(new Date());
 }
 
 // Décompte automatique : tout cours VALIDÉ et PRESTÉ (date/heure passées) depuis
 // la souscription de l'abonnement actif est ajouté à cet abonnement, une seule
 // fois (comparaison par date). Exécuté à l'ouverture de l'espace admin.
-async function synchroniserAbonnements() {
+async function synchroniserAbonnements(membreIdUnique) {
   try {
-    const snapAbo = await getDocs(query(collection(db, 'abonnements_membres'), where('actif', '==', true)));
+    const snapAbo = await getDocs(membreIdUnique
+      ? query(collection(db, 'abonnements_membres'), where('membreId', '==', membreIdUnique), where('actif', '==', true))
+      : query(collection(db, 'abonnements_membres'), where('actif', '==', true)));
     if (snapAbo.empty) return;
     const abos = [];
     snapAbo.forEach(d => abos.push({ id: d.id, ...d.data() }));
@@ -1499,7 +1499,7 @@ async function synchroniserAbonnements() {
     const prestes = [];
     snapR.forEach(d => {
       const r = d.data();
-      if (r.type === 'cours' && r.statut === 'validee' && coursEstPreste(r.date, r.heureDebut)) prestes.push(r);
+      if (r.type === 'cours' && r.statut === 'validee' && coursEstPreste(r.date)) prestes.push(r);
     });
     for (const abo of abos) {
       const utilises = [...(abo.coursUtilises || [])];
@@ -1532,6 +1532,7 @@ async function consommerCoursAbonnement(membreId, dateCours) {
   const snap = await getDocs(query(collection(db, 'abonnements_membres'), where('membreId', '==', membreId), where('actif', '==', true)));
   if (snap.empty) return;
   const aboDoc = snap.docs[0];
+  if ((aboDoc.data().coursUtilises || []).some(c => c.date === dateCours)) return; // déjà décompté
   const utilises = [...(aboDoc.data().coursUtilises || []), { date: dateCours }];
   await updateDoc(doc(db, 'abonnements_membres', aboDoc.id), { coursUtilises: utilises });
   const restants = 11 - utilises.length;

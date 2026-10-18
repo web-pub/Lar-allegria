@@ -5,7 +5,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-039';
+const VERSION_SITE = 'V01-042';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -1278,6 +1278,32 @@ async function chargerStockMembre() {
     wrap.innerHTML = `<div class="banner-alert danger">Erreur : ${escapeHtml(err.code || '')} — ${escapeHtml(err.message || String(err))}</div>`;
   }
 }
+// Abonnement « 10 cours + 1 offert » présenté en cases à tamponner : 11 cases, la dernière est le cours gratuit.
+function carteFidelite(abo) {
+  const utilises = [...(abo.coursUtilises || [])].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const restants = 11 - utilises.length;
+  const cases = [];
+  for (let n = 1; n <= 11; n++) {
+    const c = utilises[n - 1];
+    const offert = n === 11;
+    const jj = c ? new Date(c.date + 'T00:00:00').toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit' }) : '';
+    cases.push(`<div class="carte-case ${c ? 'tampon' : ''} ${offert ? 'offert' : ''}" title="${c ? escapeHtml(formatDateCourteMembre(c.date)) : (offert ? 'Cours offert' : 'Cours ' + n)}">
+      ${c ? `<span class="carte-tampon">🐴</span><span class="carte-date">${jj}</span>` : (offert ? '<span class="carte-cadeau">🎁</span><span class="carte-date">GRATUIT</span>' : `<span class="carte-num">${n}</span>`)}
+    </div>`);
+  }
+  return `
+    <div class="carte-fidelite">
+      <div class="carte-entete">
+        <div><div class="carte-titre">Abonnement</div><div class="carte-sous">10 cours + 1 gratuit</div></div>
+        <div class="carte-solde ${restants <= 2 ? 'bas' : ''}"><strong>${restants}</strong><span>/ 11 restants</span></div>
+      </div>
+      <div class="carte-grille">${cases.join('')}</div>
+      <div class="carte-pied">
+        <span>Souscrit le ${formatDateCourteMembre(abo.dateSouscription)}</span>
+        ${abo.paye ? `<span class="badge badge-ok">Payé le ${formatDateCourteMembre(abo.datePaiement)}</span>` : '<span class="badge badge-warn">Non payé</span>'}
+      </div>
+    </div>`;
+}
 function formatDateCourteMembre(iso) {
   if (!iso) return '—';
   return capitalize(new Date(iso + 'T00:00:00').toLocaleDateString('fr-BE', { day:'numeric', month:'long', year:'numeric' }));
@@ -1300,21 +1326,10 @@ async function chargerAbonnementMembre() {
     } else {
       const utilises = actif.coursUtilises || [];
       const restants = 11 - utilises.length;
-      const listeDates = utilises.length
-        ? utilises.map(c => `<li>${formatDateCourteMembre(c.date)}</li>`).join('')
-        : '<li>Aucun cours utilisé pour l\'instant.</li>';
       zoneActuel.innerHTML = `
-        <div class="data-row">
-          <div class="data-main">
-            <div class="data-title">Abonnement souscrit le ${formatDateCourteMembre(actif.dateSouscription)}</div>
-            <div class="data-sub">
-              ${actif.paye ? `<span class="badge badge-ok">Payé le ${formatDateCourteMembre(actif.datePaiement)}</span>` : '<span class="badge badge-warn">Non payé</span>'}
-              <span class="badge ${restants<=2 ? 'badge-danger' : 'badge-neutral'}">${restants} / 11 cours restants</span>
-            </div>
-          </div>
-        </div>
+        ${carteFidelite(actif)}
         ${restants <= 2 ? `<div class="banner-alert ${restants===0?'danger':''}" style="margin-top:10px;">${restants === 0 ? "Votre abonnement est épuisé." : `Il ne vous reste que ${restants} cours.`} <button class="btn-sm primary" style="margin-top:6px;" onclick="window.demanderNouvelAbonnement()">Demander un nouvel abonnement</button></div>` : ''}
-        <ul style="margin-top:12px; padding-left:20px; color:var(--terre); font-size:0.9rem;">${listeDates}</ul>`;
+        `;
     }
 
     const historique = abonnementsMembreCache.filter(a => !a.actif);
