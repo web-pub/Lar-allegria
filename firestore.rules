@@ -1,5 +1,5 @@
 // Projet : Lar-allegria
-// Site : Lar'Allegria by Lara Rossoux — V01-044
+// Site : Lar'Allegria by Lara Rossoux — V01-046
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -23,6 +23,16 @@ service cloud.firestore {
     }
     function estBenevoleSimple() {
       return estConnecte() && monMembre().typeMembre == 'benevole' && monMembre().chefBenevoles != true;
+    }
+
+    // Vrai tant qu'il reste plus de 24 h avant le cours (date AAAA-MM-JJ, heure HH:MM
+    // saisies en heure belge, comparées à l'heure serveur UTC avec 26 h de marge
+    // pour couvrir l'heure d'été).
+    function avantLimiteCheval(dateCours, heureCours) {
+      let p = dateCours.split('-');
+      let h = heureCours.split(':');
+      return timestamp.date(int(p[0]), int(p[1]), int(p[2])) + duration.time(int(h[0]), int(h[1]), 0, 0)
+             - duration.time(26, 0, 0, 0) > request.time;
     }
 
     function champsAutorisesMembre() {
@@ -104,9 +114,12 @@ service cloud.firestore {
         && request.resource.data.type in ['cours','libre']
       );
       // Un membre peut indiquer/changer SON cheval souhaité (jamais le cheval
-      // validé, réservé à l'admin) sur ses propres réservations.
+      // validé, réservé à l'admin) tant que Lara n'a pas validé le cheval ET
+      // jusqu'à 24 h avant le cours. Ensuite, seule l'admin peut le modifier.
       allow update: if estAdmin() || (
         estConnecte() && resource.data.membreId == request.auth.uid &&
+        resource.data.get('chevalValideId', '') == '' &&
+        avantLimiteCheval(resource.data.date, resource.data.heureDebut) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['chevalSouhaiteId','chevalSouhaiteNom']) &&
         request.resource.data.get('chevalSouhaiteId', '') is string && request.resource.data.get('chevalSouhaiteId', '').size() <= 40 &&
         request.resource.data.get('chevalSouhaiteNom', '') is string && request.resource.data.get('chevalSouhaiteNom', '').size() <= 80
