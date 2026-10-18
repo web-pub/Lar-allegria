@@ -1,5 +1,5 @@
 // Projet : Lar-allegria
-// Site : Lar'Allegria by Lara Rossoux — V01-034
+// Site : Lar'Allegria by Lara Rossoux — V01-037
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -30,7 +30,8 @@ service cloud.firestore {
         .hasOnly(['gsm','email','adressePostale','niveauEquitation','contactUrgence',
                   'assuranceRC','chevaux','cotisationRenouvellement',
                   'motDePasseActuel','derniereConnexion','abonnementRenouvellementDemande',
-                  'suppressionDemandee','suppressionMotif','suppressionDateDemande']);
+                  'suppressionDemandee','suppressionMotif','suppressionDateDemande',
+                  'chevalPrefereId','chevalPrefereNom']);
     }
 
     match /membres/{uid} {

@@ -39,7 +39,7 @@
     <button class="tab-btn" data-tab="tarifs">Tarifs</button>
     <button class="tab-btn" data-tab="boutique" id="tabBoutiqueBtn">Boutique</button>
     <button class="tab-btn hidden" data-tab="stock" id="tabStockBtn">Stock</button>
-    <button class="tab-btn hidden" data-tab="abonnement" id="tabAbonnementBtn">Abonnement</button>
+    <button class="tab-btn" data-tab="abonnement" id="tabAbonnementBtn">Abonnement</button>
     <button class="tab-btn" data-tab="messages" id="tabMessagesBtn">Messages</button>
     <button class="tab-btn" data-tab="historique">Historique</button>
   </div>
@@ -81,6 +81,12 @@
           <option value="confirme">Confirmé(e)</option>
         </select>
       </div>
+
+      <h3 style="margin-top:18px;">Mon cheval préféré</h3>
+      <div class="field"><label>Cheval souhaité par défaut <span class="hint">— proposé automatiquement à chaque nouveau cours ; Lara valide selon les disponibilités (vous pouvez le changer cours par cours)</span></label>
+        <select id="mp-chevalPrefere"><option value="">Pas de préférence</option></select>
+      </div>
+      <label style="display:flex; gap:8px; align-items:center; font-size:0.9rem;"><input type="checkbox" id="mp-chevalAppliquer"> Appliquer aussi à mes prochains cours qui n'ont pas encore de cheval souhaité</label>
 
       <h3 style="margin-top:18px;">Contact d'urgence</h3>
       <div class="form-grid">
@@ -271,6 +277,7 @@
   });
 </script>
 <script type="module" src="assets/app-membre.js"></script>
+<script src="assets/modal-close.js" defer></script>
 <script src="assets/protection.js" defer></script>
 </body>
 </html>
