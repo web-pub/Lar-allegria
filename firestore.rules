@@ -1,5 +1,5 @@
 // Projet : Lar-allegria
-// Site : Lar'Allegria by Lara Rossoux — V01-042
+// Site : Lar'Allegria by Lara Rossoux — V01-044
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -31,7 +31,7 @@ service cloud.firestore {
                   'assuranceRC','chevaux','cotisationRenouvellement',
                   'motDePasseActuel','derniereConnexion','abonnementRenouvellementDemande',
                   'suppressionDemandee','suppressionMotif','suppressionDateDemande',
-                  'chevalPrefereId','chevalPrefereNom']);
+                  'chevalPrefereId','chevalPrefereNom','abonnementRestants']);
     }
 
     match /membres/{uid} {
@@ -60,9 +60,9 @@ service cloud.firestore {
     }
 
     // Abonnements (10+1 cours) : historique complet par membre. L'admin
-    // gère tout. Un membre peut lire les siens, et peut seulement RETIRER
-    // une date de cours utilisée de son abonnement actif (jamais en
-    // ajouter, jamais toucher aux autres champs) — c'est ce qui permet le
+    // gère tout. Un membre peut lire les siens, et peut retirer une date (annulation) ou
+    // faire décompter ses cours prestés de son abonnement actif (jamais toucher
+    // aux autres champs) — c'est ce qui permet le
     // crédit automatique quand il annule un cours ≥24h à l'avance.
     match /abonnements_membres/{id} {
       allow read: if estAdmin() || (estConnecte() && resource.data.membreId == request.auth.uid);
@@ -70,7 +70,11 @@ service cloud.firestore {
       allow update: if estAdmin() || (
         estConnecte() && resource.data.membreId == request.auth.uid &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coursUtilises']) &&
-        request.resource.data.coursUtilises.size() == resource.data.coursUtilises.size() - 1
+        // Retrait d'UNE date (annulation ≥24h = recrédit) ou décompte automatique
+        // de ses propres cours prestés (ajout, plafonné à 11 cours).
+        (request.resource.data.coursUtilises.size() == resource.data.coursUtilises.size() - 1 ||
+         (request.resource.data.coursUtilises.size() > resource.data.coursUtilises.size() &&
+          request.resource.data.coursUtilises.size() <= 11))
       );
     }
 
