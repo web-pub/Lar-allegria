@@ -5,7 +5,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-044';
+const VERSION_SITE = 'V01-046';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -254,7 +254,7 @@ document.getElementById('mp-enregistrer').addEventListener('click', async () => 
       const aujourdhui = dateISOLocale(new Date());
       const snapR = await getDocs(query(collection(db, 'reservations'), where('membreId', '==', membreUid)));
       const aMaj = [];
-      snapR.forEach(d => { const x = d.data(); if (x.type === 'cours' && x.date >= aujourdhui && (x.statut === 'validee' || x.statut === 'en_attente') && !x.chevalSouhaiteId) aMaj.push(d.id); });
+      snapR.forEach(d => { const x = d.data(); if (choixChevalModifiable(x) && !x.chevalSouhaiteId) aMaj.push(d.id); });
       for (const id of aMaj) await updateDoc(doc(db, 'reservations', id), { chevalSouhaiteId: data.chevalPrefereId, chevalSouhaiteNom: data.chevalPrefereNom });
     }
     membreData = { ...membreData, ...data };
@@ -610,6 +610,15 @@ async function renderGrilleReservations() {
   grille.innerHTML = blocs.join('') || '<div class="empty-state">Aucun jour d\'ouverture cette semaine.</div>';
 }
 
+// Le membre peut modifier son choix de cheval tant que Lara ne l'a pas validé
+// et jusqu'à 24 h avant le cours.
+function choixChevalModifiable(r) {
+  if (r.type !== 'cours' || !(r.statut === 'validee' || r.statut === 'en_attente')) return false;
+  if (r.chevalValideId) return false;
+  const heures = (new Date(`${r.date}T${r.heureDebut}:00`) - new Date()) / 3600000;
+  return heures >= 24;
+}
+
 // Chevaux que le membre peut choisir : ni décédés, ni archivés, ni réservés à Lara.
 let chevauxChoixCache = null;
 async function chargerChevauxChoix() {
@@ -678,10 +687,11 @@ window.demanderCreneau = async (dateISO, heure) => {
 window.choisirChevalReservation = async (resaId) => {
   const r = (window._mesReservations || []).find(x => x.id === resaId);
   if (!r) return;
+  if (!choixChevalModifiable(r)) { alert('Le cheval est validé par Lara ou le cours a lieu dans moins de 24 h : seule Lara peut encore le modifier.'); return; }
   let chevaux = [];
   try { chevaux = await chargerChevauxChoix(); } catch (e) { alert('Liste des chevaux indisponible.'); return; }
   const aujourdhui = dateISOLocale(new Date());
-  const memeSerie = r.recurrenceId ? (window._mesReservations || []).filter(x => x.recurrenceId === r.recurrenceId && x.date >= aujourdhui && x.type === 'cours' && (x.statut === 'validee' || x.statut === 'en_attente')) : [];
+  const memeSerie = r.recurrenceId ? (window._mesReservations || []).filter(x => x.recurrenceId === r.recurrenceId && x.date >= aujourdhui && choixChevalModifiable(x)) : [];
   const html = `
     <div class="modal-overlay" id="modalOverlayChoixCheval">
       <div class="modal-box" style="max-width:440px;">
@@ -728,7 +738,8 @@ async function chargerMesReservations() {
   window._mesReservations = mesResa;
   const aujourdhui = dateISOLocale(new Date());
   const aVenir = mesResa.filter(r => r.date >= aujourdhui && r.statut !== 'refusee').sort((a,b) => (a.date+a.heureDebut).localeCompare(b.date+b.heureDebut));
-  const passees = mesResa.filter(r => r.date < aujourdhui || r.statut === 'refusee').sort((a,b) => (b.date+b.heureDebut).localeCompare(a.date+a.heureDebut));
+  // L'historique inclut le cours d'aujourd'hui (décompté de l'abonnement dès le jour J).
+  const passees = mesResa.filter(r => r.date <= aujourdhui || r.statut === 'refusee').sort((a,b) => (b.date+b.heureDebut).localeCompare(a.date+a.heureDebut));
 
   const wrapListe = document.getElementById('zoneMesReservations');
   const wrapAccueil = document.getElementById('zoneProchaines');
@@ -764,12 +775,14 @@ async function chargerMesReservations() {
       else if (souhait) chevalHtml = `<div class="data-sub">🐴 Souhait : ${escapeHtml(r.chevalSouhaiteNom)} — en attente de validation par Lara</div>`;
       else if (r.chevalValideId) chevalHtml = `<div class="data-sub">🐴 Cheval attribué : <strong>${escapeHtml(r.chevalValideNom)}</strong></div>`;
       else chevalHtml = '<div class="data-sub">🐴 Pas de préférence de cheval</div>';
+      if (choixVerrouille) chevalHtml += `<div class="data-sub" style="font-style:italic;">🔒 ${r.chevalValideId ? 'Cheval validé par Lara : seule Lara peut le modifier.' : 'Moins de 24 h avant le cours : le choix du cheval ne peut plus être modifié en ligne.'}</div>`;
     }
-    const peutChoisirCheval = r.type === 'cours' && r.date >= aujourdhui && (r.statut === 'validee' || r.statut === 'en_attente');
+    const peutChoisirCheval = choixChevalModifiable(r);
+    const choixVerrouille = r.type === 'cours' && r.date >= aujourdhui && (r.statut === 'validee' || r.statut === 'en_attente') && !peutChoisirCheval;
     return `
     <div class="data-row">
       <div class="data-main">
-        <div class="data-title">${dateLabel} — ${escapeHtml(r.heureDebut)} (${r.type === 'libre' ? 'piste libre' : 'cours'})</div>
+        <div class="data-title">${dateLabel} — ${escapeHtml(r.heureDebut)} (${r.type === 'libre' ? 'piste libre' : 'cours'}) ${r.date === aujourdhui ? '<span class="badge badge-neutral">Aujourd\'hui</span>' : ''}</div>
         <div class="data-sub">${badge}</div>
         ${chevalHtml}
         ${motifHtml}

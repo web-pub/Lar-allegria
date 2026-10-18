@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-044';
+const VERSION_SITE = 'V01-046';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -2250,6 +2250,7 @@ async function enregistrerChevalCours(r, chevalId, silencieux) {
   const { chevaux } = planChevauxDonnees;
   const cheval = chevaux.find(c => c.id === chevalId) || null;
   const souhaitId = r.chevalSouhaiteId || '';
+  const ancienValide = r.chevalValideId || '';
   await updateDoc(doc(db, 'reservations', r.id), {
     chevalValideId: chevalId || '',
     chevalValideNom: cheval?.nom || '',
@@ -2257,7 +2258,11 @@ async function enregistrerChevalCours(r, chevalId, silencieux) {
   });
   r.chevalValideId = chevalId || ''; r.chevalValideNom = cheval?.nom || ''; r.chevalSouhaiteTraiteId = souhaitId;
   const quand = libelleDateHeure(r.date, r.heureDebut);
-  if (souhaitId && chevalId === souhaitId) {
+  if (ancienValide && chevalId && ancienValide !== chevalId) {
+    await notifierMembreReservation(r.membreId, `🐴 Lara a modifié le cheval de votre cours du ${quand} : ${cheval.nom}.`);
+  } else if (ancienValide && ancienValide === chevalId) {
+    return; // inchangé : pas de nouveau message
+  } else if (souhaitId && chevalId === souhaitId) {
     await notifierMembreReservation(r.membreId, `🐴 Bonne nouvelle : le cheval ${cheval.nom} que vous souhaitiez est confirmé pour votre cours du ${quand}.`);
   } else if (souhaitId && chevalId) {
     await notifierMembreReservation(r.membreId, `🐴 Le cheval souhaité (${r.chevalSouhaiteNom || '—'}) n'est pas disponible pour votre cours du ${quand}. Lara vous attribue ${cheval.nom}.`);
