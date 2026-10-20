@@ -1,3 +1,4 @@
+// Projet : Larallegria — Version V01-049
 import {
   auth, db, onAuthStateChanged, signOut,
   updatePassword, reauthenticateWithCredential, EmailAuthProvider,
@@ -5,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-048';
+const VERSION_SITE = 'V01-049';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {

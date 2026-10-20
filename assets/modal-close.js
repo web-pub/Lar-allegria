@@ -1,3 +1,4 @@
+// Projet : Larallegria — Version V01-049
 // Fenêtres (fiches, formulaires) : croix de fermeture en haut à droite +
 // avertissement si des modifications n'ont pas été enregistrées.
 // Fonctionne pour toute fenêtre ".modal-overlay" ajoutée à la page.

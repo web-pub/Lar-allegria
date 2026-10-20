@@ -1,3 +1,4 @@
+// Projet : Larallegria — Version V01-049
 import {
   auth, db, onAuthStateChanged, signOut,
   updatePassword, reauthenticateWithCredential, EmailAuthProvider,
@@ -6,7 +7,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-048';
+const VERSION_SITE = 'V01-049';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -838,7 +839,11 @@ async function chargerCalendrierDeuxSemaines() {
       const cle = `${dateISO}_${heure}`;
       const resa = parCle[cle];
       const estPasse = new Date(`${dateISO}T${heure}:00`) < maintenant;
-      if (estPasse) return `<button class="creneau-btn passe" disabled>${heure}</button>`;
+      if (estPasse) {
+        // Passé : on garde la trace de qui est monté, à quelle heure, et sur quel cheval
+        if (resa && resa.statut === 'validee') return `<button class="creneau-btn valide passe-resa" disabled title="${escapeHtml(nomAffichageReservation(resa))}">${heure} — ${escapeHtml(libelleCalendrier(resa))}</button>`;
+        return `<button class="creneau-btn passe" disabled>${heure}</button>`;
+      }
       if (resa) {
         const cls = resa.statut === 'validee' ? 'valide' : 'attente';
         return `<button class="creneau-btn ${cls}" onclick="window.annulerReservationAdmin('${resa.id}')" title="${escapeHtml(nomAffichageReservation(resa))} — cliquer pour annuler">${heure} — ${escapeHtml(libelleCalendrier(resa))}</button>`;
