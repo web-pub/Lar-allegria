@@ -5,7 +5,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-047';
+const VERSION_SITE = 'V01-048';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {

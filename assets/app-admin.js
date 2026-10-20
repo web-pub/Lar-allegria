@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-047';
+const VERSION_SITE = 'V01-048';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -387,6 +387,14 @@ function nomMembre(uid) {
 function nomAffichageReservation(r) {
   const base = nomMembre(r.membreId);
   return r.nomClientEssai ? `${base} — ${r.nomClientEssai}` : base;
+}
+// Libellé du calendrier : "Prénom (Cheval)" — parenthèses vides si pas encore de cheval validé.
+function libelleCalendrier(r) {
+  const m = membresParUid[r.membreId];
+  const prenom = m ? (m.prenom || m.identifiant || '') : nomMembre(r.membreId);
+  const essai = r.nomClientEssai ? ` — ${r.nomClientEssai}` : '';
+  const cheval = r.type === 'cours' ? (r.chevalValideNom || '') : '';
+  return `${prenom}${essai} (${cheval})`;
 }
 function labelTypeMembre(type) {
   if (type === 'pension') return 'Membre demi-pension';
@@ -833,7 +841,7 @@ async function chargerCalendrierDeuxSemaines() {
       if (estPasse) return `<button class="creneau-btn passe" disabled>${heure}</button>`;
       if (resa) {
         const cls = resa.statut === 'validee' ? 'valide' : 'attente';
-        return `<button class="creneau-btn ${cls}" onclick="window.annulerReservationAdmin('${resa.id}')" title="${escapeHtml(nomAffichageReservation(resa))} — cliquer pour annuler">${heure} — ${escapeHtml(nomAffichageReservation(resa))}</button>`;
+        return `<button class="creneau-btn ${cls}" onclick="window.annulerReservationAdmin('${resa.id}')" title="${escapeHtml(nomAffichageReservation(resa))} — cliquer pour annuler">${heure} — ${escapeHtml(libelleCalendrier(resa))}</button>`;
       }
       return `<button class="creneau-btn" onclick="window.ouvrirModalAjouterReservation('${dateISO}','${heure}')">${heure}</button>`;
     }).join('');
