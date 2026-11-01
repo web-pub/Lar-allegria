@@ -1,4 +1,4 @@
-<!-- Projet : Larallegria — Version V01-057 -->
+<!-- Projet : Larallegria — Version V01-058 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -33,19 +33,15 @@
     <button class="tab-btn" data-tab="planningchevaux">🐴 Planning chevaux</button>
     <button class="tab-btn" data-tab="chevaux">Chevaux</button>
     <button class="tab-btn" data-tab="nettoyage">Nettoyage box</button>
-    <button class="tab-btn" data-tab="tarifs">Tarifs</button>
     <button class="tab-btn" data-tab="activites">Activités</button>
     <button class="tab-btn" data-tab="evenements">Événements</button>
     <button class="tab-btn" data-tab="blog">Blog</button>
-    <button class="tab-btn" data-tab="livreor">📖 Livre d'or</button>
-    <button class="tab-btn" data-tab="partenaires">🤝 Partenaires</button>
-    <button class="tab-btn" data-tab="boutique" id="tabBoutiqueBtn">Boutique</button>
+    <button class="tab-btn" data-tab="vitrine">🛍 Boutique &amp; site</button>
     <button class="tab-btn" data-tab="stock">Stock</button>
     <button class="tab-btn" data-tab="planning-benevoles">Planning bénévoles</button>
     <button class="tab-btn" data-tab="messages" id="tabMessagesBtn">Messages</button>
     <button class="tab-btn" data-tab="compta">💶 Comptabilité</button>
     <button class="tab-btn" data-tab="reglages">⚙️ Paramètres</button>
-    <button class="tab-btn hidden" data-tab="motsdepasse" id="tabMotsDePasseBtn">🔑 Mots de passe</button>
   </div>
 
   <!-- ==================== RÉSERVATIONS ==================== -->
@@ -178,17 +174,6 @@
     </div>
   </div>
 
-  <!-- ==================== TARIFS ==================== -->
-  <div id="panel-tarifs" class="tab-panel hidden">
-    <div class="app-panel">
-      <div class="section-heading">
-        <h2>Grille tarifaire</h2>
-        <button class="btn-sm primary" id="btnAjouterTarif">+ Ajouter un tarif</button>
-      </div>
-      <div id="listeTarifs"><div class="empty-state">...</div></div>
-    </div>
-  </div>
-
   <!-- ==================== ACTIVITÉS ==================== -->
   <div id="panel-activites" class="tab-panel hidden">
     <div class="app-panel">
@@ -240,34 +225,6 @@
     </div>
   </div>
 
-  <!-- ==================== LIVRE D'OR ==================== -->
-  <div id="panel-livreor" class="tab-panel hidden">
-    <div class="app-panel">
-      <h2>Messages en attente de relecture</h2>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Un message envoyé depuis la page publique "Livre d'or" n'apparaît sur le site qu'une fois publié ici.</p>
-      <div class="data-list" id="listeLivreOrAttente"><div class="empty-state">...</div></div>
-    </div>
-    <div class="app-panel">
-      <h2>Messages publiés</h2>
-      <div class="data-list" id="listeLivreOrPublies"><div class="empty-state">...</div></div>
-    </div>
-  </div>
-
-  <!-- ==================== BOUTIQUE ==================== -->
-  <div id="panel-boutique" class="tab-panel hidden">
-    <div class="app-panel">
-      <div class="section-heading">
-        <h2>Articles</h2>
-        <button class="btn-sm primary" id="btnAjouterArticleBoutique">+ Ajouter un article</button>
-      </div>
-      <div class="data-list" id="listeArticlesBoutique"><div class="empty-state">...</div></div>
-    </div>
-    <div class="app-panel">
-      <h2>Commandes</h2>
-      <div class="data-list" id="listeCommandes"><div class="empty-state">...</div></div>
-    </div>
-  </div>
-
   <!-- ==================== STOCK ==================== -->
   <div id="panel-stock" class="tab-panel hidden">
     <div class="app-panel">
@@ -308,18 +265,6 @@
     </div>
   </div>
 
-  <!-- ==================== PARTENAIRES ==================== -->
-  <div id="panel-partenaires" class="tab-panel hidden">
-    <div class="app-panel">
-      <div class="section-heading">
-        <h2>Partenaires</h2>
-        <button class="btn-sm primary" id="btnAjouterPartenaire">+ Ajouter un partenaire</button>
-      </div>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Affichés sur la page publique "Partenaires", visible de tous les visiteurs, dans l'ordre indiqué.</p>
-      <div class="data-list" id="listePartenaires"><div class="empty-state">...</div></div>
-    </div>
-  </div>
-
   <!-- ==================== PLANNING CHEVAUX ==================== -->
   <div id="panel-planningchevaux" class="tab-panel hidden">
     <div class="app-panel">
@@ -332,20 +277,6 @@
         <button class="btn-sm primary" id="pcValiderSansConflit" style="margin-left:auto;">Valider les souhaits sans conflit</button>
       </div>
       <div class="data-list" id="listePlanningChevaux"><div class="empty-state">...</div></div>
-    </div>
-  </div>
-
-  <!-- ==================== MOTS DE PASSE (super-admin uniquement) ==================== -->
-  <div id="panel-motsdepasse" class="tab-panel hidden">
-    <div class="app-panel">
-      <h2>🔑 Mots de passe des comptes</h2>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Visible uniquement par le super-administrateur. Affiche le mot de passe actuel de chaque compte (admin et membres) et permet de le réinitialiser.</p>
-      <div class="data-list" id="listeMotsDePasse"><div class="empty-state">...</div></div>
-    </div>
-    <div class="app-panel">
-      <h2>Historique des sauvegardes</h2>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Un instantané des mots de passe est enregistré automatiquement à chaque connexion réussie du super-admin.</p>
-      <div class="data-list" id="listeSauvegardesMdp"><div class="empty-state">...</div></div>
     </div>
   </div>
 
@@ -463,7 +394,7 @@
 
   <!-- ==================== PARAMÈTRES ==================== -->
   <div id="panel-reglages" class="tab-panel hidden">
-    <div class="subtab-bar" data-parent="reglages"><button class="subtab-btn active" data-sub="parametres" data-parent="reglages">Paramètres</button><button class="subtab-btn" data-sub="contenu" data-parent="reglages">Contenu du site</button><button class="subtab-btn" data-sub="contrat" data-parent="reglages">📄 Contrat</button><button class="subtab-btn hidden" data-sub="maintenance" data-parent="reglages" id="tabMaintenanceBtn">🛠 Maintenance</button></div>
+    <div class="subtab-bar" data-parent="reglages"><button class="subtab-btn active" data-sub="parametres" data-parent="reglages">Paramètres</button><button class="subtab-btn" data-sub="contenu" data-parent="reglages">Contenu du site</button><button class="subtab-btn" data-sub="contrat" data-parent="reglages">📄 Contrat</button><button class="subtab-btn hidden" data-sub="maintenance" data-parent="reglages" id="tabMaintenanceBtn">🛠 Maintenance</button><button class="subtab-btn hidden" data-sub="motsdepasse" data-parent="reglages" id="tabMotsDePasseBtn">🔑 Mots de passe</button></div>
 <div id="panel-parametres" class="sub-panel">
     <div class="app-panel">
       <h2>Mon mot de passe</h2>
@@ -557,11 +488,71 @@
               <div class="field"><label>Au</label><input type="date" id="rr-fin"></div>
               <div class="field"><label>Membre</label><select id="rr-membre"><option value="">Tous les membres</option></select></div>
             </div>
-            <label style="font-size:0.85rem;"><input type="checkbox" id="rr-seulementFermeture"> Seulement celles annulées par une fermeture (à cocher pour les annulations faites depuis V01-057)</label>
+            <label style="font-size:0.85rem;"><input type="checkbox" id="rr-seulementFermeture"> Seulement celles annulées par une fermeture (à cocher pour les annulations faites depuis V01-058)</label>
           </div>
           <div class="data-actions"><button class="btn-sm primary" id="btnRestaurerResa">Rechercher et restaurer</button></div>
         </div>
       </div>
+    </div>
+  </div>
+<div id="panel-motsdepasse" class="sub-panel hidden">
+    <div class="app-panel">
+      <h2>🔑 Mots de passe des comptes</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Visible uniquement par le super-administrateur. Affiche le mot de passe actuel de chaque compte (admin et membres) et permet de le réinitialiser.</p>
+      <div class="data-list" id="listeMotsDePasse"><div class="empty-state">...</div></div>
+    </div>
+    <div class="app-panel">
+      <h2>Historique des sauvegardes</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Un instantané des mots de passe est enregistré automatiquement à chaque connexion réussie du super-admin.</p>
+      <div class="data-list" id="listeSauvegardesMdp"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+  </div>
+
+  <!-- ==================== TARIFS, BOUTIQUE, PARTENAIRES, LIVRE D'OR ==================== -->
+  <div id="panel-vitrine" class="tab-panel hidden">
+    <div class="subtab-bar" data-parent="vitrine"><button class="subtab-btn active" data-sub="tarifs" data-parent="vitrine">Tarifs</button><button class="subtab-btn" data-sub="boutique" data-parent="vitrine" id="tabBoutiqueBtn">Boutique</button><button class="subtab-btn" data-sub="partenaires" data-parent="vitrine">🤝 Partenaires</button><button class="subtab-btn" data-sub="livreor" data-parent="vitrine">📖 Livre d'or</button></div>
+<div id="panel-tarifs" class="sub-panel">
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>Grille tarifaire</h2>
+        <button class="btn-sm primary" id="btnAjouterTarif">+ Ajouter un tarif</button>
+      </div>
+      <div id="listeTarifs"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+<div id="panel-boutique" class="sub-panel hidden">
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>Articles</h2>
+        <button class="btn-sm primary" id="btnAjouterArticleBoutique">+ Ajouter un article</button>
+      </div>
+      <div class="data-list" id="listeArticlesBoutique"><div class="empty-state">...</div></div>
+    </div>
+    <div class="app-panel">
+      <h2>Commandes</h2>
+      <div class="data-list" id="listeCommandes"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+<div id="panel-partenaires" class="sub-panel hidden">
+    <div class="app-panel">
+      <div class="section-heading">
+        <h2>Partenaires</h2>
+        <button class="btn-sm primary" id="btnAjouterPartenaire">+ Ajouter un partenaire</button>
+      </div>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Affichés sur la page publique "Partenaires", visible de tous les visiteurs, dans l'ordre indiqué.</p>
+      <div class="data-list" id="listePartenaires"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+<div id="panel-livreor" class="sub-panel hidden">
+    <div class="app-panel">
+      <h2>Messages en attente de relecture</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Un message envoyé depuis la page publique "Livre d'or" n'apparaît sur le site qu'une fois publié ici.</p>
+      <div class="data-list" id="listeLivreOrAttente"><div class="empty-state">...</div></div>
+    </div>
+    <div class="app-panel">
+      <h2>Messages publiés</h2>
+      <div class="data-list" id="listeLivreOrPublies"><div class="empty-state">...</div></div>
     </div>
   </div>
   </div>
