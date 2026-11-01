@@ -1,5 +1,5 @@
 // Projet : Lar-allegria
-// Site : Lar'Allegria by Lara Rossoux — V01-049
+// Site : Lar'Allegria by Lara Rossoux — V01-051
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -106,7 +106,8 @@ service cloud.firestore {
       allow create: if estAdmin() || (
         estConnecte() && request.resource.data.membreId == request.auth.uid
         && request.resource.data.statut == 'en_attente'
-        && request.resource.data.keys().hasOnly(['membreId','date','heureDebut','type','statut','createdAt','chevalSouhaiteId','chevalSouhaiteNom'])
+        && request.resource.data.keys().hasOnly(['membreId','date','heureDebut','type','statut','createdAt','chevalSouhaiteId','chevalSouhaiteNom','membrePrenom'])
+        && (!('membrePrenom' in request.resource.data) || (request.resource.data.membrePrenom is string && request.resource.data.membrePrenom.matches('^[^<>&"\'`\\\\]{0,40}$')))
         && (!('chevalSouhaiteId' in request.resource.data) || (request.resource.data.chevalSouhaiteId is string && request.resource.data.chevalSouhaiteId.size() <= 40))
         && (!('chevalSouhaiteNom' in request.resource.data) || (request.resource.data.chevalSouhaiteNom is string && request.resource.data.chevalSouhaiteNom.size() <= 80))
         && request.resource.data.date is string && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
@@ -201,7 +202,11 @@ service cloud.firestore {
 
     match /commandes/{id} {
       allow read: if estConnecte() && (resource.data.membreId == request.auth.uid || estAdmin());
-      allow create: if estConnecte() && request.resource.data.membreId == request.auth.uid;
+      allow create: if estConnecte() && request.resource.data.membreId == request.auth.uid
+        && request.resource.data.keys().hasOnly(['membreId','lignes','total','statut','dateCreation'])
+        && request.resource.data.statut == 'en_attente'
+        && request.resource.data.lignes is list && request.resource.data.lignes.size() <= 50
+        && request.resource.data.total is number && request.resource.data.total >= 0 && request.resource.data.total < 100000;
       allow update, delete: if estAdmin();
     }
 

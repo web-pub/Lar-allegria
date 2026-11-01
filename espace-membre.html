@@ -1,4 +1,4 @@
-<!-- Projet : Larallegria — Version V01-049 -->
+<!-- Projet : Larallegria — Version V01-051 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -34,6 +34,7 @@
     <button class="tab-btn" data-tab="profil">Mon profil</button>
     <button class="tab-btn hidden" data-tab="cheval" id="tabChevalBtn">Mon cheval</button>
     <button class="tab-btn" data-tab="reservations">Réservations</button>
+    <button class="tab-btn hidden" data-tab="planningchef" id="tabPlanningChefBtn">Planning (consultation)</button>
     <button class="tab-btn" data-tab="activites">Activités</button>
     <button class="tab-btn hidden" data-tab="nettoyage" id="tabNettoyageBtn">Nettoyage box</button>
     <button class="tab-btn hidden" data-tab="benevolat" id="tabBenevolatBtn">Bénévolat</button>
@@ -156,6 +157,19 @@
     <div class="app-panel">
       <h2>Mes réservations</h2>
       <div class="data-list" id="zoneMesReservations"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+
+  <!-- ==================== PLANNING (chef des bénévoles, lecture seule) ==================== -->
+  <div id="panel-planningchef" class="tab-panel hidden">
+    <div class="banner-alert">👁️ Planning des réservations en consultation : vous pouvez le voir, mais ni valider ni annuler.</div>
+    <div class="app-panel">
+      <div class="resa-nav">
+        <button class="btn-sm" id="pcSemainePrec">← Semaine précédente</button>
+        <h3 id="pcSemaineLabel">Semaine du ...</h3>
+        <button class="btn-sm" id="pcSemaineSuiv">Semaine suivante →</button>
+      </div>
+      <div class="resa-jours" id="pcGrille"><div class="empty-state">Chargement…</div></div>
     </div>
   </div>
 
