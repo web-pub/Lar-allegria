@@ -1,4 +1,4 @@
-// Projet : Larallegria — Version V01-057
+// Projet : Larallegria — Version V01-058
 import {
   auth, db, onAuthStateChanged, signOut,
   updatePassword, reauthenticateWithCredential, EmailAuthProvider,
@@ -7,7 +7,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-057';
+const VERSION_SITE = 'V01-058';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 // Arrondi monétaire au centime (évite les dérives de virgule flottante : 0,1 + 0,2 = 0,30000000000000004)
@@ -267,7 +267,8 @@ const CHARGEURS_PAR_ONGLET = {
   maintenance: () => {},
   // Onglets regroupés : on charge le sous-onglet affiché par défaut (les autres au clic)
   compta: () => chargerOngletSiBesoin('livrecaisse'),
-  reglages: () => chargerOngletSiBesoin('parametres')
+  reglages: () => chargerOngletSiBesoin('parametres'),
+  vitrine: () => chargerOngletSiBesoin('tarifs')
 };
 function chargerOngletSiBesoin(nomOnglet) {
   if (ongletsCharges.has(nomOnglet)) return;

@@ -1,4 +1,4 @@
-// Projet : Larallegria — Version V01-057
+// Projet : Larallegria — Version V01-058
 import {
   auth, db, onAuthStateChanged, signOut,
   updatePassword, reauthenticateWithCredential, EmailAuthProvider,
@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-057';
+const VERSION_SITE = 'V01-058';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 // Date lisible : « Dimanche 27/09/2026 »

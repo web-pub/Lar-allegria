@@ -1,4 +1,4 @@
-// Projet : Larallegria — Version V01-057
+// Projet : Larallegria — Version V01-058
 // Menu hamburger (smartphone) — commun à toutes les pages publiques.
 (function () {
   var toggle = document.querySelector('.nav-toggle');
