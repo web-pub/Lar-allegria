@@ -1,4 +1,4 @@
-/* Projet : Larallegria — Version V01-056 */
+/* Projet : Larallegria — Version V01-057 */
 /* ==========================================================================
    Module de gestion — Espace admin / membre
    S'appuie sur les variables définies dans style.css
@@ -641,3 +641,10 @@
 .carte-pied { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:14px; font-size:0.82rem; color: var(--terre); }
 
 #calendrierDeuxSemaines .creneau-btn.passe-resa { opacity: 0.85; cursor: default; }
+
+/* Sous-onglets (Comptabilité, Paramètres) */
+.subtab-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 18px; padding-bottom: 10px; border-bottom: 1px solid #DCCBA8; }
+.subtab-btn { padding: 7px 14px; border-radius: 999px; border: 1px solid #DCCBA8; background: var(--white); color: var(--noir-dark); font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+.subtab-btn.active { background: var(--rouge-dark, #8B2E2E); border-color: var(--rouge-dark, #8B2E2E); color: var(--white); }
+.subtab-btn.hidden { display: none; }
+.sub-panel.hidden { display: none; }

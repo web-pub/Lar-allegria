@@ -1,4 +1,4 @@
-// Projet : Larallegria — Version V01-056
+// Projet : Larallegria — Version V01-057
 // Protection légère du contenu du site — © Hélène Laruelle.
 // Dissuasive uniquement : quiconque maîtrise les outils développeur peut la
 // contourner, mais elle décourage la copie occasionnelle du texte, des

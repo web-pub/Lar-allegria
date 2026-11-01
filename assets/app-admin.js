@@ -1,4 +1,4 @@
-// Projet : Larallegria — Version V01-056
+// Projet : Larallegria — Version V01-057
 import {
   auth, db, onAuthStateChanged, signOut,
   updatePassword, reauthenticateWithCredential, EmailAuthProvider,
@@ -7,7 +7,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-056';
+const VERSION_SITE = 'V01-057';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 // Arrondi monétaire au centime (évite les dérives de virgule flottante : 0,1 + 0,2 = 0,30000000000000004)
@@ -264,7 +264,10 @@ const CHARGEURS_PAR_ONGLET = {
   motsdepasse: () => { chargerMotsDePasseAdmin(); chargerSauvegardesMdp(); },
   partenaires: () => chargerPartenairesAdmin(),
   contrat: () => renderContrat(),
-  maintenance: () => {}
+  maintenance: () => {},
+  // Onglets regroupés : on charge le sous-onglet affiché par défaut (les autres au clic)
+  compta: () => chargerOngletSiBesoin('livrecaisse'),
+  reglages: () => chargerOngletSiBesoin('parametres')
 };
 function chargerOngletSiBesoin(nomOnglet) {
   if (ongletsCharges.has(nomOnglet)) return;
@@ -302,6 +305,17 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('panel-' + btn.dataset.tab).classList.remove('hidden');
     chargerOngletSiBesoin(btn.dataset.tab);
+  });
+});
+
+// Sous-onglets (Comptabilité : caisse / compta / recettes — Paramètres : paramètres / contenu / contrat / maintenance)
+document.querySelectorAll('.subtab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const parent = document.getElementById('panel-' + btn.dataset.parent);
+    parent.querySelectorAll('.subtab-btn').forEach(b => b.classList.toggle('active', b === btn));
+    parent.querySelectorAll('.sub-panel').forEach(p => p.classList.add('hidden'));
+    document.getElementById('panel-' + btn.dataset.sub).classList.remove('hidden');
+    chargerOngletSiBesoin(btn.dataset.sub);
   });
 });
 
