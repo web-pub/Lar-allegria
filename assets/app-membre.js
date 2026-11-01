@@ -1,4 +1,4 @@
-// Projet : Larallegria — Version V01-049
+// Projet : Larallegria — Version V01-051
 import {
   auth, db, onAuthStateChanged, signOut,
   updatePassword, reauthenticateWithCredential, EmailAuthProvider,
@@ -6,7 +6,7 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-049';
+const VERSION_SITE = 'V01-051';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 function dateISOLocale(d) {
@@ -23,6 +23,8 @@ function escapeHtml(str) {
 }
 
 let membreData = null;
+// Prénom nettoyé (sans < > & guillemets), mémorisé sur la réservation pour le planning « consultation » du chef des bénévoles.
+function prenomPourPlanning(p) { return String(p || '').replace(/[<>&"'`\\]/g, '').trim().slice(0, 40); }
 let membreUid = null;
 let disponibilites = { joursOuverts: [1,2,3,4,5,6], heureDebut: '09:00', heureFin: '19:00' };
 
@@ -47,6 +49,7 @@ onAuthStateChanged(auth, async (user) => {
   document.getElementById('tabBenevolatBtn').classList.toggle('hidden', membreData.typeMembre !== 'benevole');
   document.getElementById('tabStockBtn').classList.toggle('hidden', membreData.typeMembre !== 'benevole');
   document.getElementById('tabAbonnementBtn').classList.toggle('hidden', membreData.typeMembre === 'benevole');
+  document.getElementById('tabPlanningChefBtn').classList.toggle('hidden', membreData.chefBenevoles !== true);
   document.getElementById('resaTypeChoix').classList.toggle('hidden', membreData.typeMembre !== 'pension');
 
   afficherAccueil();
@@ -62,6 +65,7 @@ onAuthStateChanged(auth, async (user) => {
   if (membreData.typeMembre !== 'benevole') chargerAbonnementMembre();
   if (membreData.typeMembre === 'pension') chargerNettoyage();
   if (membreData.typeMembre === 'benevole') chargerPlanningBenevole();
+  if (membreData.chefBenevoles === true) chargerPlanningChef();
 
   await chargerDisponibilites();
   await renderGrilleReservations();
@@ -144,7 +148,7 @@ async function coursRestantsAbonnementActif() {
   let actif = null;
   snap.forEach(d => { if (!actif) actif = d.data(); });
   if (!actif) return null; // pas d'abonnement actif
-  return 11 - (actif.coursUtilises || []).length;
+  return Math.max(0, 11 - (actif.coursUtilises || []).length);
 }
 async function afficherRappelAbonnement() {
   const zone = document.getElementById('zoneAbonnement');
@@ -669,7 +673,7 @@ window.demanderCreneau = async (dateISO, heure) => {
     const chevalNom = chevalId ? (chevaux.find(c => c.id === chevalId)?.nom || '') : '';
     const btn = document.getElementById('dc-confirmer'); btn.disabled = true;
     try {
-      const data = { membreId: membreUid, date: dateISO, heureDebut: heure, type, statut: 'en_attente', createdAt: serverTimestamp() };
+      const data = { membreId: membreUid, date: dateISO, heureDebut: heure, type, statut: 'en_attente', createdAt: serverTimestamp(), membrePrenom: prenomPourPlanning(membreData.prenom) };
       if (chevalId) { data.chevalSouhaiteId = chevalId; data.chevalSouhaiteNom = chevalNom; }
       await addDoc(collection(db, 'reservations'), data);
       fermer();
@@ -1199,12 +1203,12 @@ function afficherPanier() {
       </div>
       <div class="data-actions"><button class="btn-sm danger" onclick="window.retirerDuPanier('${idSur(l.articleId)}')">Retirer</button></div>
     </div>`).join('');
-  const total = panierLocal.reduce((s, l) => s + l.prix * l.quantite, 0);
+  const total = Math.round(panierLocal.reduce((s, l) => s + l.prix * l.quantite, 0) * 100) / 100;
   totalEl.textContent = `Total : ${total.toFixed(2)} € TTC`;
 }
 document.getElementById('btnValiderPanier').addEventListener('click', async () => {
   if (panierLocal.length === 0) { alert('Votre panier est vide.'); return; }
-  const total = panierLocal.reduce((s, l) => s + l.prix * l.quantite, 0);
+  const total = Math.round(panierLocal.reduce((s, l) => s + l.prix * l.quantite, 0) * 100) / 100;
   await addDoc(collection(db, 'commandes'), {
     membreId: membreUid,
     lignes: panierLocal.map(l => ({ articleId: l.articleId, nom: l.nom, prixUnitaire: l.prix, quantite: l.quantite })),
@@ -1455,3 +1459,46 @@ setTimeout(() => {
     }
   });
 }, 7000);
+
+
+// ==========================================================================
+// PLANNING DES RÉSERVATIONS — consultation seule (chef des bénévoles)
+// Aucune action : ni validation, ni annulation, ni modification.
+// ==========================================================================
+let semainePlanningChef = lundiDeLaSemaine(new Date());
+async function chargerPlanningChef() {
+  const lundi = new Date(semainePlanningChef);
+  const dimanche = new Date(lundi); dimanche.setDate(dimanche.getDate() + 6);
+  document.getElementById('pcSemaineLabel').textContent =
+    `Semaine du ${lundi.toLocaleDateString('fr-BE', {day:'numeric', month:'long'})} au ${dimanche.toLocaleDateString('fr-BE', {day:'numeric', month:'long', year:'numeric'})}`;
+  const grille = document.getElementById('pcGrille');
+  try {
+    const snap = await getDocs(query(collection(db, 'reservations'), where('date', '>=', dateISOLocale(lundi)), where('date', '<=', dateISOLocale(dimanche))));
+    const parJour = {};
+    snap.forEach(d => {
+      const r = d.data();
+      if (r.statut !== 'validee' && r.statut !== 'en_attente') return;
+      (parJour[r.date] = parJour[r.date] || []).push(r);
+    });
+    let html = '';
+    for (let i = 0; i < 7; i++) {
+      const j = new Date(lundi); j.setDate(j.getDate() + i);
+      const iso = dateISOLocale(j);
+      const liste = (parJour[iso] || []).sort((a, b) => (a.heureDebut || '').localeCompare(b.heureDebut || ''));
+      const lignes = liste.map(r => {
+        const prenom = r.membrePrenom || 'Membre';
+        const cheval = r.type === 'cours' ? (r.chevalValideNom || '') : '';
+        const detail = r.type === 'libre' ? `${escapeHtml(prenom)} (piste libre)` : `${escapeHtml(prenom)} (${escapeHtml(cheval)})`;
+        const cls = r.statut === 'validee' ? 'valide' : 'attente';
+        return `<div class="creneau-btn ${cls}" style="cursor:default; text-align:left; white-space:normal; line-height:1.25;">${escapeHtml(r.heureDebut)} — ${detail}${r.statut === 'en_attente' ? ' <em>(en attente)</em>' : ''}</div>`;
+      }).join('');
+      const titre = j.toLocaleDateString('fr-BE', {weekday:'short', day:'numeric', month:'short'});
+      html += `<div class="resa-jour"><div class="resa-jour-titre">${escapeHtml(titre.charAt(0).toUpperCase() + titre.slice(1))}</div><div class="resa-creneaux">${lignes || '<div class="empty-state" style="margin:0;">—</div>'}</div></div>`;
+    }
+    grille.innerHTML = html;
+  } catch (err) {
+    grille.innerHTML = '<div class="empty-state">Planning indisponible pour le moment.</div>';
+  }
+}
+document.getElementById('pcSemainePrec')?.addEventListener('click', () => { semainePlanningChef.setDate(semainePlanningChef.getDate() - 7); chargerPlanningChef(); });
+document.getElementById('pcSemaineSuiv')?.addEventListener('click', () => { semainePlanningChef.setDate(semainePlanningChef.getDate() + 7); chargerPlanningChef(); });

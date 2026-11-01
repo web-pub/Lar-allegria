@@ -1,4 +1,4 @@
-// Projet : Larallegria — Version V01-049
+// Projet : Larallegria — Version V01-051
 import {
   auth, db, onAuthStateChanged, signOut,
   updatePassword, reauthenticateWithCredential, EmailAuthProvider,
@@ -7,9 +7,11 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-049';
+const VERSION_SITE = 'V01-051';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
+// Arrondi monétaire au centime (évite les dérives de virgule flottante : 0,1 + 0,2 = 0,30000000000000004)
+function arrondi2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
 function dateISOLocale(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -723,7 +725,7 @@ window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
       const prefere = type === 'cours' ? membresParUid[membreId] : null;
       const champsCheval = (prefere && prefere.chevalPrefereId) ? { chevalSouhaiteId: prefere.chevalPrefereId, chevalSouhaiteNom: prefere.chevalPrefereNom || '' } : {};
       await Promise.all(aCreer.map(d => addDoc(collection(db, 'reservations'), {
-        membreId, type, date: d, heureDebut: heure, statut: 'validee',
+        membreId, type, date: d, heureDebut: heure, statut: 'validee', membrePrenom: String(membresParUid[membreId]?.prenom || '').replace(/[<>&"'`\\]/g, '').trim().slice(0, 40),
         ajouteParAdmin: true, recurrenceId, nomClientEssai: nomClientEssai || null,
         ...champsCheval,
         createdAt: serverTimestamp()
@@ -817,6 +819,9 @@ async function chargerCalendrierDeuxSemaines() {
     const r = d.data();
     if (r.statut === 'annulee' || r.statut === 'refusee') return;
     parCle[`${r.date}_${r.heureDebut}`] = { id: d.id, ...r };
+    // Réservations anciennes : on mémorise le prénom (lu par le planning du chef des bénévoles)
+    const m0 = membresParUid[r.membreId];
+    if (r.membrePrenom === undefined && m0 && m0.prenom) updateDoc(doc(db, 'reservations', d.id), { membrePrenom: String(m0.prenom).replace(/[<>&"'`\\]/g, '').trim().slice(0, 40) }).catch(() => {});
   });
   const disp = await getDoc(doc(db, 'parametres', 'disponibilites'));
   const horaires = horairesParJourDepuis(disp.exists() ? disp.data() : {});
@@ -1352,7 +1357,7 @@ async function chargerAbonnementsMembre(membreId) {
     zoneActif.innerHTML = '<div class="empty-state">Aucun abonnement actif pour ce membre.</div>';
   } else {
     const utilises = actif.coursUtilises || [];
-    const restants = 11 - utilises.length;
+    const restants = Math.max(0, 11 - utilises.length);
     const listeDates = utilises.map((c, i) => ({ c, i })).sort((a, b) => (b.c.date || '').localeCompare(a.c.date || '')).map(({ c, i }) => `
       <div class="data-row">
         <div class="data-main"><div class="data-title">Cours du ${formatDateCourte(c.date)}</div></div>
@@ -2173,7 +2178,35 @@ async function chargerCommandesAdmin() {
     </div>`;
   }).join('') : '<div class="empty-state">Aucune commande.</div>';
 }
-window.validerCommande = async (id) => { await updateDoc(doc(db, 'commandes', id), { statut: 'validee' }); chargerCommandesAdmin(); };
+window.validerCommande = async (id) => {
+  try {
+    const cmdSnap = await getDoc(doc(db, 'commandes', id));
+    if (!cmdSnap.exists()) return;
+    const cmd = cmdSnap.data();
+    if (cmd.statut !== 'en_attente') { chargerCommandesAdmin(); return; }
+    // Recalcul avec les prix ACTUELS du catalogue (le panier est calculé côté membre, donc non fiable) + contrôle du stock.
+    const lignes = cmd.lignes || [];
+    const arts = await Promise.all(lignes.map(l => getDoc(doc(db, 'articles_boutique', String(l.articleId || '_')))));
+    let totalVerifie = 0; const problemes = [];
+    lignes.forEach((l, i) => {
+      const a = arts[i].exists() ? arts[i].data() : null;
+      const q = Math.max(0, Math.floor(Number(l.quantite) || 0));
+      if (!a) { problemes.push(`« ${l.nom} » n'existe plus au catalogue`); return; }
+      totalVerifie = arrondi2(totalVerifie + (Number(a.prix) || 0) * q);
+      if ((Number(a.stock) || 0) < q) problemes.push(`« ${l.nom} » : stock insuffisant (${a.stock ?? 0} en stock, ${q} demandé)`);
+    });
+    if (problemes.length) { alert('Validation impossible :\n- ' + problemes.join('\n- ')); return; }
+    if (Math.abs(totalVerifie - (Number(cmd.total) || 0)) > 0.005 &&
+        !confirm(`Le total de la commande (${Number(cmd.total).toFixed(2)} €) ne correspond pas aux prix actuels du catalogue (${totalVerifie.toFixed(2)} €).\n\nValider avec le total corrigé de ${totalVerifie.toFixed(2)} € ?`)) return;
+    await updateDoc(doc(db, 'commandes', id), { statut: 'validee', total: totalVerifie });
+    // Décompte du stock boutique (une commande validée = articles sortis)
+    for (let i = 0; i < lignes.length; i++) {
+      const a = arts[i].data(); const q = Math.max(0, Math.floor(Number(lignes[i].quantite) || 0));
+      await updateDoc(doc(db, 'articles_boutique', arts[i].id), { stock: Math.max(0, (Number(a.stock) || 0) - q) });
+    }
+  } catch (err) { alert('Erreur : ' + (err.code || err.message)); }
+  chargerCommandesAdmin();
+};
 window.annulerCommande = async (id) => { await updateDoc(doc(db, 'commandes', id), { statut: 'annulee' }); chargerCommandesAdmin(); };
 
 
@@ -2662,7 +2695,7 @@ window.ouvrirModalArticleBlog = (a) => {
         <h3>${a ? "Modifier l'article" : 'Écrire un article'}</h3>
         <div class="form-grid">
           <div class="field"><label>Titre</label><input id="bl-titre" value="${escapeHtml(a?.titre||'')}"></div>
-          <div class="field"><label>Date</label><input type="date" id="bl-date" value="${a?.date || new Date().toISOString().slice(0,10)}"></div>
+          <div class="field"><label>Date</label><input type="date" id="bl-date" value="${a?.date || dateISOLocale(new Date())}"></div>
         </div>
         <div class="field"><label>Photo (URL, facultatif)</label><input id="bl-photo" value="${escapeHtml(a?.photoUrl||'')}"></div>
         <div class="field"><label>Contenu</label><textarea id="bl-contenu" rows="6" spellcheck="true" lang="fr">${escapeHtml(a?.contenu||'')}</textarea></div>
@@ -3202,8 +3235,8 @@ async function chargerLivreCaisse() {
   const ligneDepart = `<tr><td colspan="4" style="font-style:italic;">Solde de départ au 1er janvier</td><td class="solde">${soldeDepart.toFixed(2)} €</td><td></td></tr>`;
   const lignes = mouvements.map(m => {
     const montant = Number(m.montant) || 0;
-    if (m.type === 'encaissement') { solde += montant; totalEncaisse += montant; }
-    else { solde -= montant; totalDecaisse += montant; }
+    if (m.type === 'encaissement') { solde = arrondi2(solde + montant); totalEncaisse = arrondi2(totalEncaisse + montant); }
+    else { solde = arrondi2(solde - montant); totalDecaisse = arrondi2(totalDecaisse + montant); }
     const dateLabel = new Date(m.date + 'T00:00:00').toLocaleDateString('fr-BE', { day:'2-digit', month:'2-digit', year:'numeric' });
     return `<tr>
       <td>${dateLabel}</td>
@@ -3287,7 +3320,7 @@ document.getElementById('btnExporterCaisse').addEventListener('click', async () 
   const lignes = [{ 'Date': '', 'Libellé': 'Solde de départ', 'Encaissé (€)': '', 'Décaissé (€)': '', 'Solde (€)': soldeDepart }];
   mouvements.forEach(m => {
     const montant = Number(m.montant) || 0;
-    if (m.type === 'encaissement') solde += montant; else solde -= montant;
+    solde = m.type === 'encaissement' ? arrondi2(solde + montant) : arrondi2(solde - montant);
     lignes.push({
       'Date': m.date, 'Libellé': m.libelle || '',
       'Encaissé (€)': m.type === 'encaissement' ? montant : '',
@@ -3372,8 +3405,8 @@ async function chargerCompta() {
   let totalAchats = 0, totalVentes = 0, totalDeductible = 0;
   corps.innerHTML = ecritures.map(e => {
     const montant = Number(e.montant) || 0;
-    if (e.type === 'vente') totalVentes += montant; else totalAchats += montant;
-    totalDeductible += Number(e.montantDeductible) || 0;
+    if (e.type === 'vente') totalVentes = arrondi2(totalVentes + montant);
+    else { totalAchats = arrondi2(totalAchats + montant); totalDeductible = arrondi2(totalDeductible + (Number(e.montantDeductible) || 0)); } // seuls les achats/charges sont déductibles
     const dateLabel = new Date(e.date + 'T00:00:00').toLocaleDateString('fr-BE', { day:'2-digit', month:'2-digit', year:'numeric' });
     const compteLabel = e.compteNumero ? `${escapeHtml(e.compteNumero)} — ${escapeHtml(e.compteNom||'')}` : '—';
     return `<tr>
@@ -3389,7 +3422,7 @@ async function chargerCompta() {
       </td>
     </tr>`;
   }).join('');
-  const resultat = totalVentes - totalAchats;
+  const resultat = arrondi2(totalVentes - totalAchats);
   document.getElementById('totauxCompta').innerHTML =
     `Compte de résultat simplifié ${compteActuelAnnee} — Total achats : ${totalAchats.toFixed(2)} € · Total ventes : ${totalVentes.toFixed(2)} € · <strong>Résultat : ${resultat.toFixed(2)} €</strong> · Total déductible : ${totalDeductible.toFixed(2)} €`;
   window._ecrituresCompta = ecritures;
@@ -3451,7 +3484,7 @@ window.ouvrirModalEcriture = (e) => {
     const fin = `${an}-${mois}-${String(dernierJour).padStart(2,'0')}`;
     const snapMois = await getDocs(query(collection(db, 'livre_recettes'), where('date', '>=', debut), where('date', '<=', fin)));
     let total = 0;
-    snapMois.forEach(d => total += Number(d.data().montant) || 0);
+    snapMois.forEach(d => { total = arrondi2(total + totalLignesJour(d.data())); }); // tient compte du nouveau format (lignes par catégorie)
     document.getElementById('ec-montant').value = total.toFixed(2);
     if (!document.getElementById('ec-libelle').value) {
       const nomsMois = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
@@ -3475,7 +3508,7 @@ window.ouvrirModalEcriture = (e) => {
     const compte = planComptableCache.find(c => c.id === compteId);
     const montant = parseFloat(document.getElementById('ec-montant').value);
     if (!montant || montant <= 0) { alert('Merci d\'indiquer un montant valide.'); return; }
-    const tauxDeductible = compte ? (compte.tauxDeductible ?? 100) : 0;
+    const tauxDeductible = (compte && document.getElementById('ec-type').value !== 'vente') ? (compte.tauxDeductible ?? 100) : 0; // une vente n'est jamais « déductible »
     const data = {
       date: document.getElementById('ec-date').value,
       type: document.getElementById('ec-type').value,
@@ -3587,7 +3620,7 @@ window.supprimerCategorieRecette = async (id) => {
 function totalLignesJour(r) {
   if (!r) return 0;
   if (Array.isArray(r.lignes) && r.lignes.length > 0) {
-    return r.lignes.reduce((s, l) => s + (Number(l.montant) || 0), 0);
+    return arrondi2(r.lignes.reduce((s, l) => s + (Number(l.montant) || 0), 0));
   }
   return Number(r.montant) || 0; // ancien format (un seul montant, sans catégorie)
 }
@@ -3610,7 +3643,7 @@ async function chargerLivreRecettes() {
       const dateISO = `${an}-${String(mois+1).padStart(2,'0')}-${String(jour).padStart(2,'0')}`;
       const r = parDate[dateISO];
       const montant = totalLignesJour(r);
-      total += montant;
+      total = arrondi2(total + montant);
       const dateLabel = capitalize(new Date(dateISO + 'T00:00:00').toLocaleDateString('fr-BE', { weekday:'short', day:'2-digit', month:'2-digit' }));
       const nbCategories = r?.lignes?.length ? ` <span class="badge badge-neutral">${r.lignes.length} cat.</span>` : '';
       lignes += `<tr onclick="window.ouvrirModalRecette('${dateISO}')" style="cursor:pointer;">
@@ -3679,7 +3712,7 @@ window.ouvrirModalRecette = (dateISO) => {
   window._recalculerTotalLigneRecette = () => {
     let total = 0;
     document.querySelectorAll('#lr-lignesZone .lr-ligne-montant').forEach(inp => { total += parseFloat(inp.value) || 0; });
-    document.getElementById('lr-totalCalcule').textContent = total.toFixed(2);
+    document.getElementById('lr-totalCalcule').textContent = arrondi2(total).toFixed(2);
   };
   document.getElementById('lr-lignesZone').addEventListener('input', (e) => {
     if (e.target.classList.contains('lr-ligne-montant')) window._recalculerTotalLigneRecette();
