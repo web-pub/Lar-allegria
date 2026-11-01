@@ -1,4 +1,4 @@
-<!-- Projet : Larallegria — Version V01-056 -->
+<!-- Projet : Larallegria — Version V01-057 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -43,14 +43,9 @@
     <button class="tab-btn" data-tab="stock">Stock</button>
     <button class="tab-btn" data-tab="planning-benevoles">Planning bénévoles</button>
     <button class="tab-btn" data-tab="messages" id="tabMessagesBtn">Messages</button>
-    <button class="tab-btn" data-tab="contenu">Contenu du site</button>
-    <button class="tab-btn" data-tab="parametres">Paramètres</button>
-    <button class="tab-btn" data-tab="livrecaisse">💰 Livre de caisse</button>
-    <button class="tab-btn" data-tab="comptabilite">📒 Comptabilité</button>
-    <button class="tab-btn" data-tab="livrerecettes">📗 Livre des recettes</button>
-    <button class="tab-btn" data-tab="contrat">📄 Contrat</button>
+    <button class="tab-btn" data-tab="compta">💶 Comptabilité</button>
+    <button class="tab-btn" data-tab="reglages">⚙️ Paramètres</button>
     <button class="tab-btn hidden" data-tab="motsdepasse" id="tabMotsDePasseBtn">🔑 Mots de passe</button>
-    <button class="tab-btn hidden" data-tab="maintenance" id="tabMaintenanceBtn">🛠 Maintenance</button>
   </div>
 
   <!-- ==================== RÉSERVATIONS ==================== -->
@@ -313,74 +308,51 @@
     </div>
   </div>
 
-  <!-- ==================== CONTENU DU SITE ==================== -->
-  <div id="panel-contenu" class="tab-panel hidden">
+  <!-- ==================== PARTENAIRES ==================== -->
+  <div id="panel-partenaires" class="tab-panel hidden">
     <div class="app-panel">
-      <h2>Textes des pages publiques</h2>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Modifie les textes affichés sur le site. Laisse un champ vide pour garder le texte par défaut.</p>
-      <h3>Accueil</h3>
-      <div class="field"><label>Titre principal</label><textarea id="ct-heroTitre" rows="2" spellcheck="true" lang="fr"></textarea></div>
-      <div class="field"><label>Texte d'introduction</label><textarea id="ct-heroTexte" rows="3" spellcheck="true" lang="fr"></textarea></div>
-      <h3 style="margin-top:18px;">Le Club</h3>
-      <div class="field"><label>"Notre philosophie" — premier paragraphe</label><textarea id="ct-clubIntro" rows="3" spellcheck="true" lang="fr"></textarea></div>
-      <div class="field"><label>"Ce que propose le club" — paragraphe</label><textarea id="ct-clubOffre" rows="3" spellcheck="true" lang="fr"></textarea></div>
-      <h3 style="margin-top:18px;">Lara</h3>
-      <div class="field"><label>"Seule à bord, bien entourée" — premier paragraphe</label><textarea id="ct-laraBio" rows="3" spellcheck="true" lang="fr"></textarea></div>
-      <div class="field"><label>"Seule à bord, bien entourée" — second paragraphe</label><textarea id="ct-laraBio2" rows="3" spellcheck="true" lang="fr"></textarea></div>
-      <div class="field"><label>"Sa méthode" — paragraphe</label><textarea id="ct-laraMethode" rows="3" spellcheck="true" lang="fr"></textarea></div>
-      <h3 style="margin-top:18px;">Activités</h3>
-      <div class="field"><label>"Membre cours ou membre demi-pension" — paragraphe</label><textarea id="ct-activitesIntro" rows="3" spellcheck="true" lang="fr"></textarea></div>
-      <h3 style="margin-top:18px;">Nous contacter</h3>
-      <div class="field"><label>"Nos cours" — paragraphe</label><textarea id="ct-contactCours" rows="3" spellcheck="true" lang="fr"></textarea></div>
-      <div class="field"><label>"Rejoindre le club" — paragraphe</label><textarea id="ct-contactRejoindre" rows="3" spellcheck="true" lang="fr"></textarea></div>
-      <button class="btn-sm primary" id="btnSauverContenu" style="margin-top:14px;">Enregistrer les textes</button>
+      <div class="section-heading">
+        <h2>Partenaires</h2>
+        <button class="btn-sm primary" id="btnAjouterPartenaire">+ Ajouter un partenaire</button>
+      </div>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Affichés sur la page publique "Partenaires", visible de tous les visiteurs, dans l'ordre indiqué.</p>
+      <div class="data-list" id="listePartenaires"><div class="empty-state">...</div></div>
     </div>
   </div>
 
-  <!-- ==================== PARAMÈTRES ==================== -->
-  <div id="panel-parametres" class="tab-panel hidden">
+  <!-- ==================== PLANNING CHEVAUX ==================== -->
+  <div id="panel-planningchevaux" class="tab-panel hidden">
     <div class="app-panel">
-      <h2>Mon mot de passe</h2>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Change ton mot de passe de connexion à l'espace admin.</p>
-      <div class="login-error" id="pwError"></div>
-      <div class="form-success" id="pwSuccess">✅ Mot de passe modifié.</div>
-      <div class="form-grid">
-        <div class="field"><label>Mot de passe actuel</label><input type="password" id="pw-actuel" autocomplete="current-password"></div>
-        <div class="field"><label>Nouveau mot de passe</label><input type="password" id="pw-nouveau" autocomplete="new-password"></div>
+      <div class="section-heading"><h2>🐴 Planning des chevaux</h2></div>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:12px;">Valide le cheval de chaque cours. Règle : un cheval fait 1 cours d'une heure puis se repose 1 heure (pas deux cours à la suite). Les chevaux décédés ou archivés ne sont jamais proposés. Le membre est prévenu par message si son cheval souhaité n'est pas disponible.</p>
+      <div class="week-nav" style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <button class="btn-sm" id="pcSemainePrec">←</button>
+        <strong id="pcSemaineLabel"></strong>
+        <button class="btn-sm" id="pcSemaineSuiv">→</button>
+        <button class="btn-sm primary" id="pcValiderSansConflit" style="margin-left:auto;">Valider les souhaits sans conflit</button>
       </div>
-      <div class="field" style="max-width:220px;"><label>Confirmer le nouveau</label><input type="password" id="pw-confirme" autocomplete="new-password"></div>
-      <button class="btn-sm primary" id="btnChangerMotDePasse">Changer mon mot de passe</button>
-    </div>
-    <div class="app-panel">
-      <h2>Horaires d'ouverture de la piste</h2>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Définit la grille de créneaux d'une heure proposée aux membres pour les réservations — les horaires peuvent être différents pour chaque jour de la semaine.</p>
-      <div id="param-jours"></div>
-      <button class="btn-sm primary" id="btnSauverDisponibilites" style="margin-top:14px;">Enregistrer les horaires</button>
-    </div>
-    <div class="app-panel">
-      <h2>Jours fermés / horaires exceptionnels</h2>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Pour un jour précis, ou une période complète (ex : vacances, maladie), qui déroge aux horaires habituels ci-dessus — sans toucher à la grille hebdomadaire normale. Utile pour bloquer une période sans que les créneaux ne redeviennent "libres".</p>
-      <div class="form-grid">
-        <div class="field"><label>Du</label><input type="date" id="exc-date"></div>
-        <div class="field"><label>Au <span class="hint">— optionnel, pour bloquer toute une période</span></label><input type="date" id="exc-dateFin"></div>
-      </div>
-      <div class="field"><label>Statut</label>
-        <select id="exc-statut">
-          <option value="ferme">Fermé sur cette période</option>
-          <option value="horaire">Horaire spécial</option>
-        </select>
-      </div>
-      <div class="form-grid" id="exc-horaireZone" style="display:none;">
-        <div class="field"><label>Ouverture</label><input type="time" id="exc-heureDebut"></div>
-        <div class="field"><label>Fermeture</label><input type="time" id="exc-heureFin"></div>
-      </div>
-      <button class="btn-sm primary" id="btnAjouterException">Enregistrer cette exception</button>
-      <div class="data-list" id="listeExceptions" style="margin-top:14px;"></div>
+      <div class="data-list" id="listePlanningChevaux"><div class="empty-state">...</div></div>
     </div>
   </div>
 
-  <!-- ==================== LIVRE DE CAISSE ==================== -->
-  <div id="panel-livrecaisse" class="tab-panel hidden">
+  <!-- ==================== MOTS DE PASSE (super-admin uniquement) ==================== -->
+  <div id="panel-motsdepasse" class="tab-panel hidden">
+    <div class="app-panel">
+      <h2>🔑 Mots de passe des comptes</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Visible uniquement par le super-administrateur. Affiche le mot de passe actuel de chaque compte (admin et membres) et permet de le réinitialiser.</p>
+      <div class="data-list" id="listeMotsDePasse"><div class="empty-state">...</div></div>
+    </div>
+    <div class="app-panel">
+      <h2>Historique des sauvegardes</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Un instantané des mots de passe est enregistré automatiquement à chaque connexion réussie du super-admin.</p>
+      <div class="data-list" id="listeSauvegardesMdp"><div class="empty-state">...</div></div>
+    </div>
+  </div>
+
+  <!-- ==================== COMPTABILITÉ ==================== -->
+  <div id="panel-compta" class="tab-panel hidden">
+    <div class="subtab-bar" data-parent="compta"><button class="subtab-btn active" data-sub="livrecaisse" data-parent="compta">💰 Livre de caisse</button><button class="subtab-btn" data-sub="comptabilite" data-parent="compta">📒 Comptabilité</button><button class="subtab-btn" data-sub="livrerecettes" data-parent="compta">📗 Livre des recettes</button></div>
+<div id="panel-livrecaisse" class="sub-panel">
     <div class="app-panel">
       <div class="banner-alert info">
         Mouvements en <strong>espèces uniquement</strong> (hors banque) : ce qui est payé ou encaissé en liquide. Renseigne un solde de départ, puis chaque mouvement fait évoluer le solde ligne par ligne.
@@ -409,9 +381,7 @@
       <div class="data-sub" id="totauxCaisse" style="margin-top:10px; font-weight:600;"></div>
     </div>
   </div>
-
-  <!-- ==================== COMPTABILITÉ (achats / ventes) ==================== -->
-  <div id="panel-comptabilite" class="tab-panel hidden">
+<div id="panel-comptabilite" class="sub-panel hidden">
     <div class="app-panel">
       <div class="banner-alert info">
         Encodage des <strong>achats</strong> et des <strong>ventes</strong> — les ventes reprennent normalement, une fois par mois, le total du Livre des recettes de ce mois-là (bouton dédié pour aller plus vite, valeur modifiable ensuite). Ça donne un compte de résultat simplifié achats / ventes.
@@ -451,9 +421,7 @@
       </div>
     </div>
   </div>
-
-  <!-- ==================== LIVRE DES RECETTES (journal quotidien) ==================== -->
-  <div id="panel-livrerecettes" class="tab-panel hidden">
+<div id="panel-livrerecettes" class="sub-panel hidden">
     <div class="app-panel">
       <h2>📗 Livre des recettes</h2>
       <div class="banner-alert info" style="margin-top:10px;">
@@ -491,42 +459,77 @@
       </div>
     </div>
   </div>
-
-
-  <!-- ==================== PARTENAIRES ==================== -->
-  <div id="panel-partenaires" class="tab-panel hidden">
-    <div class="app-panel">
-      <div class="section-heading">
-        <h2>Partenaires</h2>
-        <button class="btn-sm primary" id="btnAjouterPartenaire">+ Ajouter un partenaire</button>
-      </div>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Affichés sur la page publique "Partenaires", visible de tous les visiteurs, dans l'ordre indiqué.</p>
-      <div class="data-list" id="listePartenaires"><div class="empty-state">...</div></div>
-    </div>
   </div>
 
-  <!-- ==================== PLANNING CHEVAUX ==================== -->
-  <div id="panel-planningchevaux" class="tab-panel hidden">
+  <!-- ==================== PARAMÈTRES ==================== -->
+  <div id="panel-reglages" class="tab-panel hidden">
+    <div class="subtab-bar" data-parent="reglages"><button class="subtab-btn active" data-sub="parametres" data-parent="reglages">Paramètres</button><button class="subtab-btn" data-sub="contenu" data-parent="reglages">Contenu du site</button><button class="subtab-btn" data-sub="contrat" data-parent="reglages">📄 Contrat</button><button class="subtab-btn hidden" data-sub="maintenance" data-parent="reglages" id="tabMaintenanceBtn">🛠 Maintenance</button></div>
+<div id="panel-parametres" class="sub-panel">
     <div class="app-panel">
-      <div class="section-heading"><h2>🐴 Planning des chevaux</h2></div>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:12px;">Valide le cheval de chaque cours. Règle : un cheval fait 1 cours d'une heure puis se repose 1 heure (pas deux cours à la suite). Les chevaux décédés ou archivés ne sont jamais proposés. Le membre est prévenu par message si son cheval souhaité n'est pas disponible.</p>
-      <div class="week-nav" style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
-        <button class="btn-sm" id="pcSemainePrec">←</button>
-        <strong id="pcSemaineLabel"></strong>
-        <button class="btn-sm" id="pcSemaineSuiv">→</button>
-        <button class="btn-sm primary" id="pcValiderSansConflit" style="margin-left:auto;">Valider les souhaits sans conflit</button>
+      <h2>Mon mot de passe</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Change ton mot de passe de connexion à l'espace admin.</p>
+      <div class="login-error" id="pwError"></div>
+      <div class="form-success" id="pwSuccess">✅ Mot de passe modifié.</div>
+      <div class="form-grid">
+        <div class="field"><label>Mot de passe actuel</label><input type="password" id="pw-actuel" autocomplete="current-password"></div>
+        <div class="field"><label>Nouveau mot de passe</label><input type="password" id="pw-nouveau" autocomplete="new-password"></div>
       </div>
-      <div class="data-list" id="listePlanningChevaux"><div class="empty-state">...</div></div>
+      <div class="field" style="max-width:220px;"><label>Confirmer le nouveau</label><input type="password" id="pw-confirme" autocomplete="new-password"></div>
+      <button class="btn-sm primary" id="btnChangerMotDePasse">Changer mon mot de passe</button>
+    </div>
+    <div class="app-panel">
+      <h2>Horaires d'ouverture de la piste</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Définit la grille de créneaux d'une heure proposée aux membres pour les réservations — les horaires peuvent être différents pour chaque jour de la semaine.</p>
+      <div id="param-jours"></div>
+      <button class="btn-sm primary" id="btnSauverDisponibilites" style="margin-top:14px;">Enregistrer les horaires</button>
+    </div>
+    <div class="app-panel">
+      <h2>Jours fermés / horaires exceptionnels</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Pour un jour précis, ou une période complète (ex : vacances, maladie), qui déroge aux horaires habituels ci-dessus — sans toucher à la grille hebdomadaire normale. Utile pour bloquer une période sans que les créneaux ne redeviennent "libres".</p>
+      <div class="form-grid">
+        <div class="field"><label>Du</label><input type="date" id="exc-date"></div>
+        <div class="field"><label>Au <span class="hint">— optionnel, pour bloquer toute une période</span></label><input type="date" id="exc-dateFin"></div>
+      </div>
+      <div class="field"><label>Statut</label>
+        <select id="exc-statut">
+          <option value="ferme">Fermé sur cette période</option>
+          <option value="horaire">Horaire spécial</option>
+        </select>
+      </div>
+      <div class="form-grid" id="exc-horaireZone" style="display:none;">
+        <div class="field"><label>Ouverture</label><input type="time" id="exc-heureDebut"></div>
+        <div class="field"><label>Fermeture</label><input type="time" id="exc-heureFin"></div>
+      </div>
+      <button class="btn-sm primary" id="btnAjouterException">Enregistrer cette exception</button>
+      <div class="data-list" id="listeExceptions" style="margin-top:14px;"></div>
     </div>
   </div>
-
-  <!-- ==================== CONTRAT ==================== -->
-  <div id="panel-contrat" class="tab-panel hidden">
+<div id="panel-contenu" class="sub-panel hidden">
+    <div class="app-panel">
+      <h2>Textes des pages publiques</h2>
+      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Modifie les textes affichés sur le site. Laisse un champ vide pour garder le texte par défaut.</p>
+      <h3>Accueil</h3>
+      <div class="field"><label>Titre principal</label><textarea id="ct-heroTitre" rows="2" spellcheck="true" lang="fr"></textarea></div>
+      <div class="field"><label>Texte d'introduction</label><textarea id="ct-heroTexte" rows="3" spellcheck="true" lang="fr"></textarea></div>
+      <h3 style="margin-top:18px;">Le Club</h3>
+      <div class="field"><label>"Notre philosophie" — premier paragraphe</label><textarea id="ct-clubIntro" rows="3" spellcheck="true" lang="fr"></textarea></div>
+      <div class="field"><label>"Ce que propose le club" — paragraphe</label><textarea id="ct-clubOffre" rows="3" spellcheck="true" lang="fr"></textarea></div>
+      <h3 style="margin-top:18px;">Lara</h3>
+      <div class="field"><label>"Seule à bord, bien entourée" — premier paragraphe</label><textarea id="ct-laraBio" rows="3" spellcheck="true" lang="fr"></textarea></div>
+      <div class="field"><label>"Seule à bord, bien entourée" — second paragraphe</label><textarea id="ct-laraBio2" rows="3" spellcheck="true" lang="fr"></textarea></div>
+      <div class="field"><label>"Sa méthode" — paragraphe</label><textarea id="ct-laraMethode" rows="3" spellcheck="true" lang="fr"></textarea></div>
+      <h3 style="margin-top:18px;">Activités</h3>
+      <div class="field"><label>"Membre cours ou membre demi-pension" — paragraphe</label><textarea id="ct-activitesIntro" rows="3" spellcheck="true" lang="fr"></textarea></div>
+      <h3 style="margin-top:18px;">Nous contacter</h3>
+      <div class="field"><label>"Nos cours" — paragraphe</label><textarea id="ct-contactCours" rows="3" spellcheck="true" lang="fr"></textarea></div>
+      <div class="field"><label>"Rejoindre le club" — paragraphe</label><textarea id="ct-contactRejoindre" rows="3" spellcheck="true" lang="fr"></textarea></div>
+      <button class="btn-sm primary" id="btnSauverContenu" style="margin-top:14px;">Enregistrer les textes</button>
+    </div>
+  </div>
+<div id="panel-contrat" class="sub-panel hidden">
     <div id="zoneContrat"><div class="empty-state">Chargement…</div></div>
   </div>
-
-  <!-- ==================== MAINTENANCE (super-admin uniquement) ==================== -->
-  <div id="panel-maintenance" class="tab-panel hidden">
+<div id="panel-maintenance" class="sub-panel hidden">
     <div class="app-panel">
       <h2>🛠 Maintenance</h2>
       <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Outils réservés au Super Admin. Chaque bouton ne sert qu'une fois (il détecte si l'élément existe déjà).</p>
@@ -554,26 +557,13 @@
               <div class="field"><label>Au</label><input type="date" id="rr-fin"></div>
               <div class="field"><label>Membre</label><select id="rr-membre"><option value="">Tous les membres</option></select></div>
             </div>
-            <label style="font-size:0.85rem;"><input type="checkbox" id="rr-seulementFermeture"> Seulement celles annulées par une fermeture (à cocher pour les annulations faites depuis V01-056)</label>
+            <label style="font-size:0.85rem;"><input type="checkbox" id="rr-seulementFermeture"> Seulement celles annulées par une fermeture (à cocher pour les annulations faites depuis V01-057)</label>
           </div>
           <div class="data-actions"><button class="btn-sm primary" id="btnRestaurerResa">Rechercher et restaurer</button></div>
         </div>
       </div>
     </div>
   </div>
-
-  <!-- ==================== MOTS DE PASSE (super-admin uniquement) ==================== -->
-  <div id="panel-motsdepasse" class="tab-panel hidden">
-    <div class="app-panel">
-      <h2>🔑 Mots de passe des comptes</h2>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Visible uniquement par le super-administrateur. Affiche le mot de passe actuel de chaque compte (admin et membres) et permet de le réinitialiser.</p>
-      <div class="data-list" id="listeMotsDePasse"><div class="empty-state">...</div></div>
-    </div>
-    <div class="app-panel">
-      <h2>Historique des sauvegardes</h2>
-      <p style="color:var(--terre); font-size:0.85rem; margin-bottom:14px;">Un instantané des mots de passe est enregistré automatiquement à chaque connexion réussie du super-admin.</p>
-      <div class="data-list" id="listeSauvegardesMdp"><div class="empty-state">...</div></div>
-    </div>
   </div>
 
 </main>
