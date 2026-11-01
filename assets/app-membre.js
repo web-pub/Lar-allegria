@@ -1,4 +1,4 @@
-// Projet : Larallegria — Version V01-051
+// Projet : Larallegria — Version V01-056
 import {
   auth, db, onAuthStateChanged, signOut,
   updatePassword, reauthenticateWithCredential, EmailAuthProvider,
@@ -6,9 +6,15 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-051';
+const VERSION_SITE = 'V01-056';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
+// Date lisible : « Dimanche 27/09/2026 »
+function jourDateFr(iso) {
+  const d = new Date(iso + 'T00:00:00');
+  const j = d.toLocaleDateString('fr-BE', { weekday: 'long' });
+  return j.charAt(0).toUpperCase() + j.slice(1) + ' ' + d.toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
 function dateISOLocale(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -49,7 +55,7 @@ onAuthStateChanged(auth, async (user) => {
   document.getElementById('tabBenevolatBtn').classList.toggle('hidden', membreData.typeMembre !== 'benevole');
   document.getElementById('tabStockBtn').classList.toggle('hidden', membreData.typeMembre !== 'benevole');
   document.getElementById('tabAbonnementBtn').classList.toggle('hidden', membreData.typeMembre === 'benevole');
-  document.getElementById('tabPlanningChefBtn').classList.toggle('hidden', membreData.chefBenevoles !== true);
+  document.getElementById('tabPlanningChefBtn').classList.toggle('hidden', !(membreData.typeMembre === 'benevole' && membreData.chefBenevoles === true));
   document.getElementById('resaTypeChoix').classList.toggle('hidden', membreData.typeMembre !== 'pension');
 
   afficherAccueil();
@@ -65,7 +71,7 @@ onAuthStateChanged(auth, async (user) => {
   if (membreData.typeMembre !== 'benevole') chargerAbonnementMembre();
   if (membreData.typeMembre === 'pension') chargerNettoyage();
   if (membreData.typeMembre === 'benevole') chargerPlanningBenevole();
-  if (membreData.chefBenevoles === true) chargerPlanningChef();
+  if (membreData.typeMembre === 'benevole' && membreData.chefBenevoles === true) chargerPlanningChef();
 
   await chargerDisponibilites();
   await renderGrilleReservations();
@@ -647,7 +653,7 @@ window.demanderCreneau = async (dateISO, heure) => {
   const type = membreData.typeMembre === 'pension' ? document.getElementById('resa-type').value : 'cours';
   let chevaux = [];
   if (type === 'cours') { try { chevaux = await chargerChevauxChoix(); } catch (e) { chevaux = []; } }
-  const libelle = capitalize(new Date(dateISO + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
+  const libelle = jourDateFr(dateISO);
   const html = `
     <div class="modal-overlay" id="modalOverlayDemandeCreneau">
       <div class="modal-box" style="max-width:440px;">
@@ -733,7 +739,7 @@ window.choisirChevalReservation = async (resaId) => {
   });
 };
 function libelleDateCourt(dateISO) {
-  return capitalize(new Date(dateISO + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
+  return jourDateFr(dateISO);
 }
 
 async function chargerMesReservations() {
@@ -751,13 +757,14 @@ async function chargerMesReservations() {
   const wrapHisto = document.getElementById('zoneHistoriqueReservations');
 
   const ligneResa = async (r, avecMeteo) => {
-    const dateLabel = capitalize(new Date(r.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
+    const dateLabel = jourDateFr(r.date);
     let meteoHtml = '';
     if (avecMeteo) {
       const m = await meteoPour(r.date, r.heureDebut);
       const alerte = alerteMeteo(m);
       meteoHtml = m ? `<div class="data-sub">${iconeCode(m.code)} ${m.temperature}°C</div>${alerte ? `<div class="banner-alert" style="margin-top:6px; padding:6px 10px; background:${alerte.couleur}1a; border-color:${alerte.couleur}; color:${alerte.couleur};">${alerte.texte}</div>` : ''}` : '';
     }
+    const profMembre = (r.type === 'cours' && r.enseignant === 'francoise') ? '<div class="data-sub">🎓 Cours avec Françoise</div>' : '';
     const badge = r.statut === 'validee' ? '<span class="badge badge-ok">Validée par Lara</span>'
       : r.statut === 'en_attente' ? '<span class="badge badge-warn">En attente de validation</span>'
       : r.statut === 'refusee' ? '<span class="badge badge-danger">Refusée</span>'
@@ -789,7 +796,7 @@ async function chargerMesReservations() {
       <div class="data-main">
         <div class="data-title">${dateLabel} — ${escapeHtml(r.heureDebut)} (${r.type === 'libre' ? 'piste libre' : 'cours'}) ${r.date === aujourdhui ? '<span class="badge badge-neutral">Aujourd\'hui</span>' : ''}</div>
         <div class="data-sub">${badge}</div>
-        ${chevalHtml}
+        ${profMembre}${chevalHtml}
         ${motifHtml}
         ${troplTardPourAnnuler ? '<div class="data-sub">Annulation en ligne impossible à moins de 24h — contactez Lara si besoin.</div>' : ''}
         ${meteoHtml}
@@ -805,7 +812,7 @@ async function chargerMesReservations() {
 
 window.demanderAnnulationReservation = (id, _ignore, heure, estRecurrence, type, etaitValidee, dateISOCours) => {
   // Libellé recalculé ici (jamais passé via onclick) pour éviter toute injection.
-  const dateLabel = escapeHtml(capitalize(new Date(dateISOCours + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'})));
+  const dateLabel = escapeHtml(jourDateFr(dateISOCours));
   heure = escapeHtml(heure);
   const html = `
     <div class="modal-overlay" id="modalOverlayAnnulResa">
@@ -894,7 +901,7 @@ async function chargerActivites() {
   });
 
   wrap.innerHTML = activites.map(a => {
-    const dateLabel = a.date ? capitalize(new Date(a.date + 'T00:00:00').toLocaleDateString('fr-BE', { weekday: 'long', day: 'numeric', month: 'long' })) : '';
+    const dateLabel = a.date ? jourDateFr(a.date) : '';
     const maReponse = mesReponses[a.id];
     let statutHtml;
     if (maReponse) {
@@ -942,8 +949,8 @@ async function chargerActivites() {
 
 window.repondreActivite = async (activiteId, statut) => {
   const activite = (await getDoc(doc(db, 'activites', activiteId))).data();
-  const nombrePersonnes = statut === 'present' ? (parseInt(document.getElementById('act-nb-' + activiteId)?.value, 10) || 1) : 1;
-  const montant = activite.prixParPersonne ? activite.prixParPersonne * nombrePersonnes : 0;
+  const nombrePersonnes = statut === 'present' ? Math.min(20, Math.max(1, parseInt(document.getElementById('act-nb-' + activiteId)?.value, 10) || 1)) : 1;
+  const montant = activite.prixParPersonne ? Math.round(Number(activite.prixParPersonne) * nombrePersonnes * 100) / 100 : 0;
   const cle = `${activiteId}_${membreUid}`;
   await setDoc(doc(db, 'activites_reponses', cle), {
     activiteId, uid: membreUid, statut, nombrePersonnes, montant, paye: false, paiementValide: false,
@@ -984,7 +991,7 @@ async function chargerNettoyage() {
   });
 
   wrap.innerHTML = taches.map(t => {
-    const dateLabel = t.date ? capitalize(new Date(t.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'})) : '';
+    const dateLabel = t.date ? jourDateFr(t.date) : '';
     const badge = t.statut === 'fait' ? '<span class="badge badge-ok">Fait</span>' : '<span class="badge badge-warn">À faire</span>';
     const nomCheval = chevalParBox[t.boxId]?.trim();
     const photoCheval = nomCheval ? photoParNomCheval[nomCheval.toLowerCase()] : null;
@@ -1023,7 +1030,7 @@ async function chargerMesCreneauxBenevole() {
     return;
   }
   wrap.innerHTML = creneaux.map(c => {
-    const dateLabel = c.date ? capitalize(new Date(c.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'})) : '';
+    const dateLabel = c.date ? jourDateFr(c.date) : '';
     const badge = c.statut === 'fait' ? '<span class="badge badge-ok">Fait</span>' : '<span class="badge badge-warn">À venir</span>';
     return `
     <div class="data-row">
@@ -1069,7 +1076,7 @@ async function chargerPlanningEquipeBenevole() {
     return;
   }
   wrap.innerHTML = creneaux.map(c => {
-    const dateLabel = c.date ? capitalize(new Date(c.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'})) : '';
+    const dateLabel = c.date ? jourDateFr(c.date) : '';
     const estOuvert = !c.assigneA;
     return `
     <div class="data-row">
@@ -1324,7 +1331,7 @@ function carteFidelite(abo) {
 }
 function formatDateCourteMembre(iso) {
   if (!iso) return '—';
-  return capitalize(new Date(iso + 'T00:00:00').toLocaleDateString('fr-BE', { day:'numeric', month:'long', year:'numeric' }));
+  return new Date(iso + 'T00:00:00').toLocaleDateString('fr-BE', { day:'2-digit', month:'2-digit', year:'numeric' });
 }
 let abonnementsMembreCache = [];
 // Décompte automatique côté membre : à sa 1re connexion, ses cours VALIDÉS dont
@@ -1485,15 +1492,22 @@ async function chargerPlanningChef() {
       const j = new Date(lundi); j.setDate(j.getDate() + i);
       const iso = dateISOLocale(j);
       const liste = (parJour[iso] || []).sort((a, b) => (a.heureDebut || '').localeCompare(b.heureDebut || ''));
+      const exc = await exceptionJour(iso);
+      const hj = horaireDuJour(j.getDay() === 0 ? 7 : j.getDay());
+      const fermeJour = !!(exc?.ferme || (!hj.ouvert && !(exc && (exc.heureDebut || exc.heureFin))));
+      const chefEstEnseignante = membreData.chefBenevoles === true;
       const lignes = liste.map(r => {
         const prenom = r.membrePrenom || 'Membre';
+        const profNom = r.type === 'cours' && r.enseignant === 'francoise' ? 'Françoise' : '';
         const cheval = r.type === 'cours' ? (r.chevalValideNom || '') : '';
         const detail = r.type === 'libre' ? `${escapeHtml(prenom)} (piste libre)` : `${escapeHtml(prenom)} (${escapeHtml(cheval)})`;
         const cls = r.statut === 'validee' ? 'valide' : 'attente';
-        return `<div class="creneau-btn ${cls}" style="cursor:default; text-align:left; white-space:normal; line-height:1.25;">${escapeHtml(r.heureDebut)} — ${detail}${r.statut === 'en_attente' ? ' <em>(en attente)</em>' : ''}</div>`;
+        const avertFerme = fermeJour ? '⚠️ ' : '';
+        const prof = profNom ? ` · 🎓 <strong>${chefEstEnseignante ? 'Vous donnez ce cours' : 'avec ' + escapeHtml(profNom)}</strong>` : '';
+        return `<div class="creneau-btn ${cls}" style="cursor:default; text-align:left; white-space:normal; line-height:1.25;">${avertFerme}${escapeHtml(r.heureDebut)} — ${detail}${prof}${r.statut === 'en_attente' ? ' <em>(en attente)</em>' : ''}${fermeJour ? ' <em>(jour fermé !)</em>' : ''}</div>`;
       }).join('');
       const titre = j.toLocaleDateString('fr-BE', {weekday:'short', day:'numeric', month:'short'});
-      html += `<div class="resa-jour"><div class="resa-jour-titre">${escapeHtml(titre.charAt(0).toUpperCase() + titre.slice(1))}</div><div class="resa-creneaux">${lignes || '<div class="empty-state" style="margin:0;">—</div>'}</div></div>`;
+      html += `<div class="resa-jour"><div class="resa-jour-titre">${escapeHtml(titre.charAt(0).toUpperCase() + titre.slice(1))}</div>${fermeJour ? '<div class="empty-state" style="margin:0;">Fermé</div>' : ''}<div class="resa-creneaux">${lignes || (fermeJour ? '' : '<div class="empty-state" style="margin:0;">—</div>')}</div></div>`;
     }
     grille.innerHTML = html;
   } catch (err) {

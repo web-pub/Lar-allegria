@@ -1,4 +1,4 @@
-// Projet : Larallegria — Version V01-051
+// Projet : Larallegria — Version V01-056
 import {
   auth, db, onAuthStateChanged, signOut,
   updatePassword, reauthenticateWithCredential, EmailAuthProvider,
@@ -7,11 +7,17 @@ import {
 } from "./firebase-config.js";
 import { meteoPour, alerteMeteo, iconeCode } from "./meteo.js";
 
-const VERSION_SITE = 'V01-051';
+const VERSION_SITE = 'V01-056';
 document.getElementById('versionTag').textContent = VERSION_SITE;
 
 // Arrondi monétaire au centime (évite les dérives de virgule flottante : 0,1 + 0,2 = 0,30000000000000004)
 function arrondi2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+// Date lisible : « Dimanche 27/09/2026 »
+function jourDateFr(iso) {
+  const d = new Date(iso + 'T00:00:00');
+  const j = d.toLocaleDateString('fr-BE', { weekday: 'long' });
+  return j.charAt(0).toUpperCase() + j.slice(1) + ' ' + d.toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
 function dateISOLocale(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -391,13 +397,26 @@ function nomAffichageReservation(r) {
   const base = nomMembre(r.membreId);
   return r.nomClientEssai ? `${base} — ${r.nomClientEssai}` : base;
 }
+// Enseignants : Lara (par défaut) ou Françoise. Jamais en même temps (un seul cours par créneau sur la piste).
+const ENSEIGNANTS = { lara: 'Lara', francoise: 'Françoise' };
+function optionsEnseignant(sel) { return Object.entries(ENSEIGNANTS).map(([k, v]) => `<option value="${k}" ${(sel || 'lara') === k ? 'selected' : ''}>${v}</option>`).join(''); }
+function selectEnseignantHtml(r) {
+  if (r.type !== 'cours') return '';
+  return `<label class="hint" style="font-size:0.8rem;">Enseignant : <select onchange="window.changerEnseignant('${idSur(r.id)}', this.value)" style="font-size:0.8rem;">${optionsEnseignant(r.enseignant)}</select></label>`;
+}
+window.changerEnseignant = async (id, valeur) => {
+  if (!ENSEIGNANTS[valeur]) return;
+  try { await updateDoc(doc(db, 'reservations', id), { enseignant: valeur }); chargerCalendrierDeuxSemaines(); }
+  catch (err) { alert('Erreur : ' + (err.code || err.message)); }
+};
 // Libellé du calendrier : "Prénom (Cheval)" — parenthèses vides si pas encore de cheval validé.
 function libelleCalendrier(r) {
   const m = membresParUid[r.membreId];
   const prenom = m ? (m.prenom || m.identifiant || '') : nomMembre(r.membreId);
   const essai = r.nomClientEssai ? ` — ${r.nomClientEssai}` : '';
   const cheval = r.type === 'cours' ? (r.chevalValideNom || '') : '';
-  return `${prenom}${essai} (${cheval})`;
+  const prof = (r.type === 'cours' && r.enseignant && r.enseignant !== 'lara') ? ` · ${ENSEIGNANTS[r.enseignant] || ''}` : '';
+  return `${prenom}${essai} (${cheval})${prof}`;
 }
 function labelTypeMembre(type) {
   if (type === 'pension') return 'Membre demi-pension';
@@ -419,7 +438,7 @@ async function notifierMembreReservation(membreId, texte) {
   } catch (err) { /* ne bloque jamais l'action principale de réservation */ }
 }
 function libelleDateHeure(dateISO, heure) {
-  const dateLabel = capitalize(new Date(dateISO + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
+  const dateLabel = jourDateFr(dateISO);
   return `${dateLabel} à ${heure}`;
 }
 
@@ -436,7 +455,7 @@ async function chargerReservationsAttente() {
   }
 
   const lignes = await Promise.all(resa.map(async (r) => {
-    const dateLabel = capitalize(new Date(r.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
+    const dateLabel = jourDateFr(r.date);
     const m = await meteoPour(r.date, r.heureDebut);
     const alerte = alerteMeteo(m);
     const meteoHtml = m ? `<span class="badge badge-neutral">${iconeCode(m.code)} ${m.temperature}°C</span>` : '';
@@ -445,6 +464,7 @@ async function chargerReservationsAttente() {
       <div class="data-main">
         <div class="data-title">${escapeHtml(nomAffichageReservation(r))} — ${dateLabel} ${escapeHtml(r.heureDebut)}</div>
         <div class="data-sub">${r.type === 'libre' ? 'Piste libre' : 'Cours de dressage'} ${r.chevalSouhaiteNom ? `· 🐴 Souhait : ${escapeHtml(r.chevalSouhaiteNom)}` : ''} ${meteoHtml}</div>
+        ${selectEnseignantHtml(r) ? `<div class="data-sub">${selectEnseignantHtml(r)}</div>` : ''}
         ${alerte ? `<div class="banner-alert" style="margin-top:6px; padding:6px 10px; background:${alerte.couleur}1a; border-color:${alerte.couleur}; color:${alerte.couleur};">${alerte.texte}</div>` : ''}
       </div>
       <div class="data-actions">
@@ -505,13 +525,13 @@ async function renderPlanningSemaine() {
     return;
   }
   wrap.innerHTML = resa.map(r => {
-    const dateLabel = capitalize(new Date(r.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
+    const dateLabel = jourDateFr(r.date);
     const badge = r.statut === 'validee' ? '<span class="badge badge-ok">Validée</span>' : '<span class="badge badge-warn">En attente</span>';
     return `
     <div class="data-row">
       <div class="data-main">
         <div class="data-title">${dateLabel} ${escapeHtml(r.heureDebut)} — ${escapeHtml(nomAffichageReservation(r))}</div>
-        <div class="data-sub">${r.type === 'libre' ? 'Piste libre' : 'Cours de dressage'} ${badge}</div>
+        <div class="data-sub">${r.type === 'libre' ? 'Piste libre' : 'Cours de dressage'} ${badge} ${selectEnseignantHtml(r)}</div>
       </div>
       <div class="data-actions">
         <button class="btn-sm danger" onclick="window.annulerReservationAdmin('${r.id}')">Annuler</button>
@@ -575,7 +595,7 @@ async function rechercherHistoriqueResa() {
   window._historiqueResa = resultats;
   if (resultats.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucune réservation sur cette période.</div>'; return; }
   wrap.innerHTML = resultats.map(r => {
-    const dateLabel = capitalize(new Date(r.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long', year:'numeric'}));
+    const dateLabel = jourDateFr(r.date);
     const badge = r.statut === 'validee' ? '<span class="badge badge-ok">Validée</span>'
       : r.statut === 'en_attente' ? '<span class="badge badge-warn">En attente</span>'
       : r.statut === 'refusee' ? '<span class="badge badge-danger">Refusée</span>'
@@ -624,7 +644,7 @@ document.getElementById('btnVerifierOrphelines').addEventListener('click', async
   if (orphelines.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucune réservation orpheline trouvée à venir.</div>'; return; }
   orphelines.sort((a, b) => a.date.localeCompare(b.date));
   wrap.innerHTML = orphelines.map(r => {
-    const dateLabel = capitalize(new Date(r.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
+    const dateLabel = jourDateFr(r.date);
     return `
     <div class="data-row">
       <div class="data-main">
@@ -656,7 +676,8 @@ window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
         <h3>Ajouter une réservation</h3>
         <div class="field"><label>Membre *</label><select id="ar-membre"><option value="">— Choisir —</option>${membresTries.map(m => `<option value="${m.id}">${escapeHtml(nomMembre(m.id))}</option>`).join('')}</select></div>
         <div class="field"><label>Nom du client <span class="hint">— pour un essai réservé sous un compte partagé type "Nouveau Client" : garde une trace de qui a testé, sans créer de fiche membre</span></label><input id="ar-nomClientEssai" placeholder="ex: Marc Dupont"></div>
-        <div class="field"><label>Type</label><select id="ar-type"><option value="cours">Cours de dressage avec Lara</option><option value="libre">Utilisation libre de la piste</option></select></div>
+        <div class="field"><label>Type</label><select id="ar-type"><option value="cours">Cours de dressage</option><option value="libre">Utilisation libre de la piste</option></select></div>
+        <div class="field" id="ar-zoneEnseignant"><label>Enseignant</label><select id="ar-enseignant">${optionsEnseignant('lara')}</select></div>
         <div class="form-grid">
           <div class="field"><label>Date de départ</label><input type="date" id="ar-date" value="${prefillDate || ''}"></div>
           <div class="field"><label>Heure</label><input type="time" id="ar-heure" value="${prefillHeure || ''}"></div>
@@ -678,6 +699,9 @@ window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
       </div>
     </div>`;
   document.getElementById('modalZone').innerHTML = html;
+  document.getElementById('ar-type').addEventListener('change', (e) => {
+    document.getElementById('ar-zoneEnseignant').classList.toggle('hidden', e.target.value !== 'cours');
+  });
   document.getElementById('ar-recurrence').addEventListener('change', (e) => {
     document.getElementById('ar-zoneJusquau').classList.toggle('hidden', e.target.value === 'aucune');
   });
@@ -719,8 +743,19 @@ window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
         if (r.statut === 'validee' || r.statut === 'en_attente') occupes.add(`${r.date}_${r.heureDebut}`);
       });
       const recurrenceId = recurrence !== 'aucune' ? ('rec_' + Date.now()) : null;
-      const aCreer = dates.filter(d => !occupes.has(`${d}_${heure}`));
-      const ignores = dates.filter(d => occupes.has(`${d}_${heure}`));
+      // Les occurrences d'une récurrence ne sont pas créées sur un jour fermé (exception « Fermé » ou jour non ouvert).
+      const dispDoc = await getDoc(doc(db, 'parametres', 'disponibilites'));
+      const horairesRec = horairesParJourDepuis(dispDoc.exists() ? dispDoc.data() : {});
+      const fermes = new Set();
+      if (dates.length > 1) {
+        for (const d of dates.slice(1)) {
+          const ex = await exceptionJourAdmin(d);
+          const jr = new Date(d + 'T00:00:00').getDay() || 7;
+          if (ex?.ferme || (!horairesRec[jr]?.ouvert && !(ex && (ex.heureDebut || ex.heureFin)))) fermes.add(d);
+        }
+      }
+      const aCreer = dates.filter(d => !occupes.has(`${d}_${heure}`) && !fermes.has(d));
+      const ignores = dates.filter(d => occupes.has(`${d}_${heure}`) || fermes.has(d));
       // Le cheval préféré du membre (sa fiche) devient le souhait par défaut du cours.
       const prefere = type === 'cours' ? membresParUid[membreId] : null;
       const champsCheval = (prefere && prefere.chevalPrefereId) ? { chevalSouhaiteId: prefere.chevalPrefereId, chevalSouhaiteNom: prefere.chevalPrefereNom || '' } : {};
@@ -728,6 +763,7 @@ window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
         membreId, type, date: d, heureDebut: heure, statut: 'validee', membrePrenom: String(membresParUid[membreId]?.prenom || '').replace(/[<>&"'`\\]/g, '').trim().slice(0, 40),
         ajouteParAdmin: true, recurrenceId, nomClientEssai: nomClientEssai || null,
         ...champsCheval,
+        ...(type === 'cours' ? { enseignant: ENSEIGNANTS[document.getElementById('ar-enseignant').value] ? document.getElementById('ar-enseignant').value : 'lara' } : {}),
         createdAt: serverTimestamp()
       })));
       if (type === 'cours' && aCreer.length > 0) {
@@ -743,7 +779,7 @@ window.ouvrirModalAjouterReservation = (prefillDate, prefillHeure) => {
       chargerRecurrencesAdmin();
       chargerCalendrierDeuxSemaines();
       if (ignores.length > 0) {
-        alert(`${aCreer.length} créneau(x) créé(s).\n${ignores.length} déjà occupé(s), non modifié(s) : ${ignores.join(', ')}`);
+        alert(`${aCreer.length} créneau(x) créé(s).\n${ignores.length} ignoré(s) (déjà occupé ou jour fermé) : ${ignores.join(', ')}`);
       }
     } catch (err) {
       alert('Erreur lors de l\'enregistrement : ' + (err.code || err.message));
@@ -831,14 +867,14 @@ async function chargerCalendrierDeuxSemaines() {
     const jourISO = d.getDay() === 0 ? 7 : d.getDay();
     const dateISO = dateISOLocale(d);
     const exception = await exceptionJourAdmin(dateISO);
-    if (exception?.ferme) {
-      return `<div class="resa-jour"><div class="resa-jour-titre">${capitalize(d.toLocaleDateString('fr-BE', {weekday:'short', day:'numeric', month:'short'}))}</div><div class="empty-state" style="margin:0;">Fermé</div></div>`;
-    }
+    // Jour fermé : on affiche quand même les réservations qui y subsistent (⚠️), pour pouvoir les annuler.
+    const resteFerme = (jour) => Object.values(parCle).filter(r => r.date === dateISO).map(r =>
+      `<button class="creneau-btn ${r.statut === 'validee' ? 'valide' : 'attente'}" onclick="window.annulerReservationAdmin('${r.id}')" title="Réservation sur un jour fermé — cliquer pour annuler">⚠️ ${r.heureDebut} — ${escapeHtml(libelleCalendrier(r))}</button>`).join('');
+    const fermeHtml = () => `<div class="resa-jour"><div class="resa-jour-titre">${capitalize(d.toLocaleDateString('fr-BE', {weekday:'short', day:'numeric', month:'short'}))}</div><div class="empty-state" style="margin:0;">Fermé</div>${resteFerme() ? `<div class="resa-creneaux">${resteFerme()}</div>` : ''}</div>`;
+    if (exception?.ferme) return fermeHtml();
     const h = horaires[jourISO] || { ouvert: false };
     const ouvertParException = exception && (exception.heureDebut || exception.heureFin);
-    if (!h.ouvert && !ouvertParException) {
-      return `<div class="resa-jour"><div class="resa-jour-titre">${capitalize(d.toLocaleDateString('fr-BE', {weekday:'short', day:'numeric', month:'short'}))}</div><div class="empty-state" style="margin:0;">Fermé</div></div>`;
-    }
+    if (!h.ouvert && !ouvertParException) return fermeHtml();
     const heures = creneauxHorairesAdmin(exception?.heureDebut || h.heureDebut, exception?.heureFin || h.heureFin);
     const boutons = heures.map(heure => {
       const cle = `${dateISO}_${heure}`;
@@ -1077,7 +1113,7 @@ window.ouvrirModalMembre = (membre, demandeId) => {
           </div>
         </div>
         <div class="field" id="fm-zoneChefBenevoles" style="${src.typeMembre==='benevole'?'':'display:none;'}">
-          <label>Chef des bénévoles <span class="hint">— peut ajouter ET retirer du stock (comme l'admin), mais n'a accès à rien d'autre côté admin</span></label>
+          <label>Chef des bénévoles <span class="hint">— peut ajouter ET retirer du stock (comme l'admin) et consulter le planning des réservations (lecture seule) ; rien d'autre côté admin</span></label>
           <select id="fm-chefBenevoles">
             <option value="non" ${!src.chefBenevoles?'selected':''}>Non</option>
             <option value="oui" ${src.chefBenevoles?'selected':''}>Oui</option>
@@ -1255,7 +1291,7 @@ window.ouvrirModalMembre = (membre, demandeId) => {
       cotisationDateEcheance: document.getElementById('fm-cotisationEcheance').value,
       recurrenceCours: document.getElementById('fm-recurrenceCours').value,
       abonnement: document.getElementById('fm-abonnement').value === 'oui',
-      chefBenevoles: document.getElementById('fm-chefBenevoles').value === 'oui',
+      chefBenevoles: document.getElementById('fm-type').value === 'benevole' && document.getElementById('fm-chefBenevoles').value === 'oui', // le statut de chef ne vaut que pour un bénévole
       archive: false
     };
     if (estNouveau) {
@@ -1299,7 +1335,7 @@ async function chargerCoursMembre(membreId) {
   snap.forEach(d => toutes.push({ ...d.data(), id: d.id }));
 
   const ligne = (r) => {
-    const dateLabel = r.date ? capitalize(new Date(r.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'})) : '';
+    const dateLabel = r.date ? jourDateFr(r.date) : '';
     const badge = r.statut === 'validee' ? '<span class="badge badge-ok">Validée</span>'
       : r.statut === 'en_attente' ? '<span class="badge badge-warn">En attente</span>'
       : r.statut === 'refusee' ? '<span class="badge badge-danger">Refusée</span>'
@@ -1341,7 +1377,7 @@ async function chargerStockMembre(membreId) {
 // ==========================================================================
 function formatDateCourte(iso) {
   if (!iso) return '—';
-  return capitalize(new Date(iso + 'T00:00:00').toLocaleDateString('fr-BE', { day:'numeric', month:'long', year:'numeric' }));
+  return new Date(iso + 'T00:00:00').toLocaleDateString('fr-BE', { day:'2-digit', month:'2-digit', year:'numeric' });
 }
 async function chargerAbonnementsMembre(membreId) {
   await synchroniserAbonnements(membreId); // met à jour le décompte avant d'afficher
@@ -1668,7 +1704,7 @@ async function chargerNettoyages() {
   const wrap = document.getElementById('listeNettoyages');
   if (taches.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucune tâche planifiée.</div>'; return; }
   wrap.innerHTML = taches.map(t => {
-    const dateLabel = t.date ? capitalize(new Date(t.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'})) : '';
+    const dateLabel = t.date ? jourDateFr(t.date) : '';
     const badge = t.statut === 'fait' ? '<span class="badge badge-ok">Fait</span>' : '<span class="badge badge-warn">À faire</span>';
     const boxRef = boxesCache.find(b => b.id === t.boxId);
     const nomCheval = boxRef?.chevalActuel?.trim();
@@ -2092,6 +2128,15 @@ window.voirReponsesActivite = async (id) => {
   document.getElementById('modalZone').innerHTML = html;
 };
 window.validerPaiementActivite = async (reponseId, activiteId) => {
+  // Contrôle : le montant déclaré doit correspondre au tarif de l'activité × nombre de personnes.
+  const [repSnap, actSnap] = await Promise.all([getDoc(doc(db, 'activites_reponses', reponseId)), getDoc(doc(db, 'activites', activiteId))]);
+  if (repSnap.exists() && actSnap.exists()) {
+    const attendu = arrondi2((Number(actSnap.data().prixParPersonne) || 0) * (Number(repSnap.data().nombrePersonnes) || 1));
+    if (Math.abs(attendu - (Number(repSnap.data().montant) || 0)) > 0.005) {
+      if (!confirm(`Le montant enregistré (${Number(repSnap.data().montant || 0).toFixed(2)} €) ne correspond pas au tarif × nombre de personnes (${attendu.toFixed(2)} €).\n\nValider le paiement avec le montant corrigé de ${attendu.toFixed(2)} € ?`)) return;
+      await updateDoc(doc(db, 'activites_reponses', reponseId), { montant: attendu });
+    }
+  }
   await updateDoc(doc(db, 'activites_reponses', reponseId), { paiementValide: true });
   window.voirReponsesActivite(activiteId);
 };
@@ -2262,7 +2307,7 @@ function renderPlanningChevaux() {
   if (!cours.length) { wrap.innerHTML = '<div class="empty-state">Aucun cours cette semaine.</div>'; return; }
   const utilisables = chevaux.filter(chevalUtilisable).sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
   wrap.innerHTML = cours.map(r => {
-    const dateLabel = capitalize(new Date(r.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
+    const dateLabel = jourDateFr(r.date);
     const souhait = r.chevalSouhaiteId ? parId[r.chevalSouhaiteId] : null;
     const aTraiter = (r.chevalSouhaiteId || '') !== (r.chevalSouhaiteTraiteId || '') || (!r.chevalValideId && r.chevalSouhaiteId);
     const valide = r.chevalValideId ? parId[r.chevalValideId] : null;
@@ -2831,7 +2876,7 @@ async function chargerPlanningBenevolesAdmin() {
   const wrap = document.getElementById('listePlanningBenevoles');
   if (creneaux.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucun créneau planifié.</div>'; return; }
   wrap.innerHTML = creneaux.map(c => {
-    const dateLabel = c.date ? capitalize(new Date(c.date + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'})) : '';
+    const dateLabel = c.date ? jourDateFr(c.date) : '';
     const badge = c.statut === 'fait' ? '<span class="badge badge-ok">Fait</span>' : '<span class="badge badge-warn">À venir</span>';
     const assigne = c.assigneA ? escapeHtml(c.assigneNom || nomMembre(c.assigneA)) : '<em>Non assigné — ouvert à tous les bénévoles</em>';
     return `
@@ -3001,6 +3046,14 @@ document.getElementById('btnAjouterException').addEventListener('click', async (
     if (dates.length >= 366) break; // garde-fou (1 an max)
   }
   try {
+    if (statut === 'ferme') {
+      // Aperçu AVANT d'enregistrer : combien de réservations seront annulées, et pour qui.
+      const aAnnuler = await reservationsImpactees(dateDebut, dateFin);
+      if (aAnnuler.length > 0) {
+        const noms = [...new Set(aAnnuler.map(r => nomMembre(r.membreId)))].slice(0, 12).join(', ');
+        if (!confirm(`⚠️ Fermer du ${dateDebut} au ${dateFin} va ANNULER ${aAnnuler.length} réservation(s) (${aAnnuler.filter(r => r.statut === 'validee').length} validée(s)) et envoyer un message d'annulation aux membres concernés : ${noms}${aAnnuler.length > 12 ? '…' : ''}.\n\nContinuer ?`)) return;
+      }
+    }
     await Promise.all(dates.map(d => setDoc(doc(db, 'disponibilites_exceptions', d), data)));
     document.getElementById('exc-date').value = '';
     document.getElementById('exc-dateFin').value = '';
@@ -3023,13 +3076,19 @@ document.getElementById('btnAjouterException').addEventListener('click', async (
 // cette période (quel que soit leur statut en cours) sont annulées
 // automatiquement, le cours est recrédité si besoin, et chaque membre
 // concerné reçoit un message (point rouge) l'informant de l'annulation.
+async function reservationsImpactees(dateDebut, dateFin) {
+  const snap = await getDocs(query(collection(db, 'reservations'), where('date', '>=', dateDebut), where('date', '<=', dateFin)));
+  const liste = [];
+  snap.forEach(d => { const r = d.data(); if (r.statut !== 'annulee' && r.statut !== 'refusee') liste.push({ ...r, id: d.id }); });
+  return liste;
+}
 async function annulerReservationsPourFermeture(dateDebut, dateFin) {
   const snap = await getDocs(query(collection(db, 'reservations'), where('date', '>=', dateDebut), where('date', '<=', dateFin)));
   let compteur = 0;
   for (const d of snap.docs) {
     const r = d.data();
     if (r.statut === 'annulee' || r.statut === 'refusee') continue;
-    await updateDoc(doc(db, 'reservations', d.id), { statut: 'annulee', annulePar: 'admin' });
+    await updateDoc(doc(db, 'reservations', d.id), { statut: 'annulee', annulePar: 'admin', annuleParFermeture: true });
     if (r.type === 'cours' && r.statut === 'validee') await rendreCoursAbonnement(r.membreId, r.date);
     notifierMembreReservation(r.membreId, `⚠️ Votre réservation du ${libelleDateHeure(r.date, r.heureDebut)} a été annulée par Lara (piste fermée sur cette période).`);
     compteur++;
@@ -3060,8 +3119,8 @@ async function chargerExceptionsAdmin() {
   const wrap = document.getElementById('listeExceptions');
   if (groupes.length === 0) { wrap.innerHTML = '<div class="empty-state">Aucune exception à venir.</div>'; return; }
   wrap.innerHTML = groupes.map(g => {
-    const labelDebut = capitalize(new Date(g.dateDebut + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
-    const labelFin = capitalize(new Date(g.dateFin + 'T00:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long'}));
+    const labelDebut = jourDateFr(g.dateDebut);
+    const labelFin = jourDateFr(g.dateFin);
     const dateLabel = g.dateDebut === g.dateFin ? labelDebut : `Du ${labelDebut} au ${labelFin}`;
     return `
     <div class="data-row">
@@ -3664,7 +3723,7 @@ async function chargerLivreRecettes() {
 
 window.ouvrirModalRecette = (dateISO) => {
   const r = window._livreRecettesParDate[dateISO];
-  const dateLabel = capitalize(new Date(dateISO + 'T00:00:00').toLocaleDateString('fr-BE', { weekday:'long', day:'numeric', month:'long', year:'numeric' }));
+  const dateLabel = jourDateFr(dateISO);
   // Reprend les lignes existantes, ou convertit l'ancien format (un seul
   // montant sans catégorie) en une première ligne "Autre" éditable.
   let lignesInitiales = Array.isArray(r?.lignes) && r.lignes.length > 0
@@ -3973,3 +4032,46 @@ async function chargerAlerteStockAdmin() {
     majPointRougeStockAdmin(stock);
   } catch (err) { /* sans conséquence : l'onglet Stock reste consultable */ }
 }
+
+
+// ==========================================================================
+// MAINTENANCE — restaurer des réservations annulées par erreur (Super Admin)
+// Remet en "validée" les réservations annulées PAR L'ADMIN (ex : fermeture de
+// piste enregistrée par erreur) sur une période, sans toucher aux créneaux
+// désormais occupés, et prévient les membres.
+// ==========================================================================
+document.getElementById('btnRestaurerResa')?.addEventListener('click', async () => {
+  const debut = document.getElementById('rr-debut').value;
+  const fin = document.getElementById('rr-fin').value || debut;
+  if (!debut) { alert('Choisissez au moins une date de début.'); return; }
+  if (fin < debut) { alert('La date de fin doit être après la date de début.'); return; }
+  const soloFermeture = document.getElementById('rr-seulementFermeture').checked;
+  const membreFiltre = document.getElementById('rr-membre').value;
+  try {
+    const snap = await getDocs(query(collection(db, 'reservations'), where('date', '>=', debut), where('date', '<=', fin)));
+    const toutes = []; snap.forEach(d => toutes.push({ ...d.data(), id: d.id }));
+    const occupes = new Set(toutes.filter(r => r.statut === 'validee' || r.statut === 'en_attente').map(r => `${r.date}_${r.heureDebut}`));
+    const candidates = toutes.filter(r => r.statut === 'annulee' && r.annulePar === 'admin' && (!membreFiltre || r.membreId === membreFiltre) && (!soloFermeture || r.annuleParFermeture === true))
+      .sort((a, b) => (a.date + a.heureDebut).localeCompare(b.date + b.heureDebut));
+    const restaurables = [], conflits = [];
+    candidates.forEach(r => { const cle = `${r.date}_${r.heureDebut}`; if (occupes.has(cle)) conflits.push(r); else { restaurables.push(r); occupes.add(cle); } });
+    if (restaurables.length === 0) { alert(`Aucune réservation à restaurer sur cette période.${conflits.length ? `\n(${conflits.length} créneau(x) déjà reprenant une autre réservation.)` : ''}`); return; }
+    const apercu = restaurables.slice(0, 15).map(r => `• ${r.date} ${r.heureDebut} — ${nomMembre(r.membreId)}`).join('\n');
+    if (!confirm(`${restaurables.length} réservation(s) seront remises en "validée" et les membres prévenus :\n\n${apercu}${restaurables.length > 15 ? '\n…' : ''}${conflits.length ? `\n\n${conflits.length} créneau(x) ignoré(s) car déjà réoccupé(s).` : ''}\n\nContinuer ?`)) return;
+    for (const r of restaurables) {
+      await updateDoc(doc(db, 'reservations', r.id), { statut: 'validee', annulePar: null, annuleParFermeture: null });
+      notifierMembreReservation(r.membreId, `✅ Votre réservation du ${libelleDateHeure(r.date, r.heureDebut)} est rétablie (l'annulation était une erreur). Excuses pour le désagrément.`);
+    }
+    synchroniserAbonnements();
+    alert(`${restaurables.length} réservation(s) restaurée(s).`);
+  } catch (err) { alert('Erreur : ' + (err.code || err.message)); }
+});
+
+// Liste des membres dans l'outil de restauration (remplie à l'ouverture de l'onglet Maintenance).
+document.getElementById('tabMaintenanceBtn')?.addEventListener('click', () => {
+  const sel = document.getElementById('rr-membre');
+  if (!sel || sel.options.length > 1) return;
+  Object.keys(membresParUid).sort((a, b) => nomMembre(a).localeCompare(nomMembre(b))).forEach(uid => {
+    const o = document.createElement('option'); o.value = uid; o.textContent = nomMembre(uid); sel.appendChild(o);
+  });
+});
