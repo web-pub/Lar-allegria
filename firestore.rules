@@ -1,5 +1,5 @@
 // Projet : Lar-allegria
-// Site : Lar'Allegria by Lara Rossoux — V01-051
+// Site : Lar'Allegria by Lara Rossoux — V01-056
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -19,7 +19,7 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/membres/$(request.auth.uid)).data;
     }
     function estChefBenevoles() {
-      return estConnecte() && monMembre().chefBenevoles == true;
+      return estConnecte() && monMembre().typeMembre == 'benevole' && monMembre().chefBenevoles == true;
     }
     function estBenevoleSimple() {
       return estConnecte() && monMembre().typeMembre == 'benevole' && monMembre().chefBenevoles != true;
@@ -161,8 +161,20 @@ service cloud.firestore {
 
     match /activites_reponses/{id} {
       allow read: if estConnecte() && (resource.data.uid == request.auth.uid || estAdmin());
-      allow create: if estConnecte() && request.resource.data.uid == request.auth.uid;
-      allow update: if estAdmin() || (estConnecte() && resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid);
+      // Un membre répond une fois (présent/absent) sans pouvoir se déclarer
+      // « validé » : paiementValide est réservé à l'admin, le nombre de
+      // personnes est borné (1 à 20), et plus rien ne bouge une fois validé.
+      allow create: if estConnecte() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['activiteId','uid','statut','nombrePersonnes','montant','paye','paiementValide','dateReponse'])
+        && request.resource.data.paye == false && request.resource.data.paiementValide == false
+        && request.resource.data.statut in ['present','absent']
+        && request.resource.data.nombrePersonnes is int && request.resource.data.nombrePersonnes >= 1 && request.resource.data.nombrePersonnes <= 20
+        && request.resource.data.montant is number && request.resource.data.montant >= 0;
+      allow update: if estAdmin() || (estConnecte() && resource.data.uid == request.auth.uid
+        && resource.data.paiementValide != true
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.paiementValide == resource.data.paiementValide
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['statut','nombrePersonnes','montant','paye','dateReponse']));
       allow delete: if estAdmin();
     }
 
@@ -222,10 +234,6 @@ service cloud.firestore {
       allow write: if estAdmin();
     }
 
-    // Partenaires (page publique). Lecture publique. Un admin classique gère
-    // les partenaires ordinaires ; la fiche partenaire par défaut
-    // (partenaireDefaut == true, "Hexelya") n'est créable, modifiable et
-    // supprimable que par le super-admin.
     // Contrat de collaboration : versions numérotées. Lecture admin + super
     // admin ; création/modification du texte par le super admin seul ; l'admin
     // ne peut qu'apposer sa signature (signeLe / signeVersion) une seule fois.
@@ -238,6 +246,10 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Partenaires (page publique). Lecture publique. Un admin classique gère
+    // les partenaires ordinaires ; la fiche partenaire par défaut
+    // (partenaireDefaut == true, "Hexelya") n'est créable, modifiable et
+    // supprimable que par le super-admin.
     match /partenaires/{id} {
       allow read: if true;
       allow create: if estSuperAdmin() ||
@@ -316,8 +328,10 @@ service cloud.firestore {
         estConnecte() && resource.data.assigneA == request.auth.uid &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['statut','dateRealisation'])
       ) || (
-        estConnecte() && (!('assigneA' in resource.data) || resource.data.assigneA == null || resource.data.assigneA == '') &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assigneA','assigneNom'])
+        (estChefBenevoles() || estBenevoleSimple()) &&
+        (!('assigneA' in resource.data) || resource.data.assigneA == null || resource.data.assigneA == '') &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assigneA','assigneNom']) &&
+        request.resource.data.assigneA == request.auth.uid
       );
     }
 
